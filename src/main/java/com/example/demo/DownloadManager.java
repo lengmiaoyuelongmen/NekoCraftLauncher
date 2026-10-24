@@ -294,6 +294,101 @@ public final class DownloadManager {
         }
     }
 
+    /** 大文件分段并发下载：多连接 Range 聚合，失败自动回退单连接。 */
+    public static Stats downloadRanged(Task task, int connections, Progress progress) {
+        long total = task.size > 0 ? task.size : headSize(task.url);
+        if (total < 2L * 1024 * 1024 || connections <= 1) {
+            return downloadAll(List.of(task), 1, progress);
+        }
+        int parts = Math.max(2, Math.min(8, connections));
+        long chunk = (total + parts - 1) / parts;
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(parts);
+        java.util.concurrent.atomic.AtomicLong done = new java.util.concurrent.atomic.AtomicLong();
+        java.util.concurrent.atomic.AtomicInteger failed = new java.util.concurrent.atomic.AtomicInteger();
+        List<File> partFiles = new ArrayList<>();
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
+        long started = System.currentTimeMillis();
+        for (int i = 0; i < parts; i++) {
+            long start = i * chunk;
+            long end = Math.min(total - 1, start + chunk - 1);
+            if (start > end) break;
+            File part = new File(task.target.getAbsolutePath() + ".part" + i);
+            partFiles.add(part);
+            final int index = i;
+            futures.add(CompletableFuture.runAsync(() -> {
+                try {
+                    HttpRequest req = HttpRequest.newBuilder(URI.create(task.url))
+                            .timeout(REQUEST_TIMEOUT)
+                            .header("Range", "bytes=" + start + "-" + end)
+                            .GET().build();
+                    HttpResponse<InputStream> resp = CLIENT.send(req, HttpResponse.BodyHandlers.ofInputStream());
+                    if (resp.statusCode() != 206) throw new RuntimeException("HTTP " + resp.statusCode());
+                    try (InputStream in = resp.body(); OutputStream out = Files.newOutputStream(part.toPath())) {
+                        byte[] buffer = new byte[65536];
+                        int read;
+                        while ((read = in.read(buffer)) != -1) {
+                            out.write(buffer, 0, read);
+                            long nowDone = done.addAndGet(read);
+                            long elapsed = Math.max(1, System.currentTimeMillis() - started);
+                            publishStatus(currentDone, currentTotal, nowDone, task.target.getName(),
+                                    nowDone * 1000 / elapsed);
+                            if (progress != null && (nowDone & 0x3FFFF) < 4096) {
+                                progress.onProgress((int) Math.min(100, nowDone * 100 / total), 100, nowDone);
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    failed.incrementAndGet();
+                    part.delete();
+                }
+            }, pool));
+        }
+        try {
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+        } finally {
+            pool.shutdown();
+        }
+        Stats stats = new Stats();
+        if (failed.get() == 0) {
+            try {
+                try (OutputStream out = Files.newOutputStream(task.target.toPath())) {
+                    for (File part : partFiles) {
+                        if (!part.isFile()) throw new RuntimeException("分段缺失");
+                        Files.copy(part.toPath(), out);
+                    }
+                }
+                if (task.sha1 != null && !task.sha1.isBlank()
+                        && !task.sha1.equalsIgnoreCase(sha1(task.target))) {
+                    throw new RuntimeException("SHA1 校验失败");
+                }
+                stats.downloaded = 1;
+                stats.bytes = total;
+                return stats;
+            } catch (Exception ignored) {
+                task.target.delete();
+            }
+        }
+        for (File part : partFiles) part.delete();
+        return downloadAll(List.of(task), 1, progress);
+    }
+
+    private static long headSize(String url) {
+        try {
+            HttpRequest req = HttpRequest.newBuilder(URI.create(url))
+                    .timeout(Duration.ofSeconds(20))
+                    .header("Range", "bytes=0-0")
+                    .GET().build();
+            HttpResponse<InputStream> resp = CLIENT.send(req, HttpResponse.BodyHandlers.ofInputStream());
+            try (InputStream ignored = resp.body()) {
+                String range = resp.headers().firstValue("Content-Range").orElse("");
+                int slash = range.lastIndexOf('/');
+                if (slash >= 0) return Long.parseLong(range.substring(slash + 1));
+            }
+        } catch (Exception ignored) {
+        }
+        return -1;
+    }
+
     private static List<String> candidates(String officialUrl) {
         String mirror = officialUrl
                 .replace("libraries.minecraft.net", "bmclapi2.bangbang93.com/maven")

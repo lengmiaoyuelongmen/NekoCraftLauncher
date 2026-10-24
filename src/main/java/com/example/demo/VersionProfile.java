@@ -163,6 +163,14 @@ public final class VersionProfile {
             }
         } catch (Exception ignored) {
         }
+        // 旧版本 JSON 没有 javaVersion：按原版版本号推断，避免误用 Java 21
+        java.util.regex.Matcher matcher = Pattern.compile("^1\\.(\\d+)").matcher(rootId);
+        if (matcher.find()) {
+            int minor = Integer.parseInt(matcher.group(1));
+            if (minor >= 18) return 17;
+            if (minor == 17) return 16;
+            return 8;
+        }
         return 21;
     }
 

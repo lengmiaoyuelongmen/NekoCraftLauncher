@@ -33,7 +33,8 @@ public class JavaManager {
             File javaExe = new File(javaDir, "zulu" + majorVersion + "/bin/java.exe");
 
             if (javaExe.exists()) {
-                logConsumer.accept("✅ 检测到本地已存在 Zulu " + majorVersion + " 环境");
+                logConsumer.accept("✅ 检测到本地 Azul Zulu " + majorVersion + "："
+                        + javaExe.getAbsolutePath());
                 return javaExe.getAbsolutePath();
             }
 
@@ -55,29 +56,19 @@ public class JavaManager {
                 zipFile.getParentFile().mkdirs();
                 logConsumer.accept("📥 开始下载 Zulu " + majorVersion + " (约 200MB，请耐心等待)...");
 
-                HttpRequest dlReq = HttpRequest.newBuilder(URI.create(downloadUrl)).GET().build();
-                HttpResponse<InputStream> dlResp = client.send(dlReq, HttpResponse.BodyHandlers.ofInputStream());
-
-                long totalBytes = dlResp.headers().firstValueAsLong("Content-Length").orElse(-1);
-                long downloadedBytes = 0;
-                int lastPercent = 0;
-
-                try (InputStream in = dlResp.body(); FileOutputStream out = new FileOutputStream(zipFile)) {
-                    byte[] buf = new byte[16384];
-                    int read;
-                    while ((read = in.read(buf)) != -1) {
-                        out.write(buf, 0, read);
-                        downloadedBytes += read;
-                        if (totalBytes > 0) {
-                            int percent = (int) ((downloadedBytes * 100) / totalBytes);
-                            if (percent >= lastPercent + 10) {
-                                logConsumer.accept("⏳ Java 下载进度: " + percent + "% (" + (downloadedBytes / 1024 / 1024) + "MB / " + (totalBytes / 1024 / 1024) + "MB)");
-                                lastPercent = percent;
+                java.util.concurrent.atomic.AtomicInteger lastPercent = new java.util.concurrent.atomic.AtomicInteger();
+                DownloadManager.Stats dlStats = DownloadManager.downloadRanged(
+                        new DownloadManager.Task(downloadUrl, zipFile, null, -1), 4,
+                        (percent, total, bytes) -> {
+                            if (percent >= lastPercent.get() + 10) {
+                                lastPercent.set(percent);
+                                logConsumer.accept("⏳ Azul Zulu 下载进度: " + percent + "% ("
+                                        + (bytes / 1024 / 1024) + " MB)");
                             }
-                        }
-                    }
+                        });
+                if (dlStats.failed > 0 || !zipFile.isFile() || zipFile.length() == 0) {
+                    throw new RuntimeException("Azul Zulu 下载失败");
                 }
-
                 logConsumer.accept("📦 下载完毕，正在解压运行环境...");
                 try (ZipInputStream zis = new ZipInputStream(new java.io.FileInputStream(zipFile))) {
                     ZipEntry entry;

@@ -4589,13 +4589,27 @@ public class HelloApplication extends Application {
         File clientJar = new File(versionDir, profile.getRootId() + ".jar");
         String clientUrl = profile.getClientUrl();
         if ((!clientJar.isFile() || clientJar.length() == 0) && clientUrl != null) {
-            log.accept("📥 下载客户端 jar...");
-            List<DownloadManager.Task> one = List.of(new DownloadManager.Task(
-                    clientUrl, clientJar, profile.getClientSha1(), profile.getClientSize()));
-            DownloadManager.Stats stats = DownloadManager.downloadAll(one, 1,
-                    (done, total, bytes) -> updateProgress(done, total, bytes));
-            if (stats.failed > 0 || !clientJar.isFile()) {
-                throw new Exception("客户端 jar 下载失败，请检查网络后重试");
+            String mirrorUrl = "https://bmclapi2.bangbang93.com/version/" + profile.getRootId() + "/client";
+            boolean mirrorFirst = !"official".equals(config.getDownloadSource());
+            if (mirrorFirst) {
+                log.accept("📥 通过 BMCLAPI 镜像下载客户端 jar...");
+                DownloadManager.Stats mirrorStats = DownloadManager.downloadRanged(
+                        new DownloadManager.Task(mirrorUrl, clientJar, profile.getClientSha1(),
+                                profile.getClientSize()), 4,
+                        (done, total, bytes) -> updateProgress(done, total, bytes));
+                if (mirrorStats.failed > 0 || !clientJar.isFile() || clientJar.length() == 0) {
+                    log.accept("⚠ 镜像下载失败，切换 Mojang 官方源…");
+                }
+            }
+            if (!clientJar.isFile() || clientJar.length() == 0) {
+                log.accept("📥 通过 Mojang 官方源下载客户端 jar...");
+                DownloadManager.Stats stats = DownloadManager.downloadRanged(
+                        new DownloadManager.Task(clientUrl, clientJar,
+                                profile.getClientSha1(), profile.getClientSize()), 4,
+                        (done, total, bytes) -> updateProgress(done, total, bytes));
+                if (stats.failed > 0 || !clientJar.isFile()) {
+                    throw new Exception("客户端 jar 下载失败，请检查网络后重试");
+                }
             }
         }
 
@@ -5076,12 +5090,19 @@ public class HelloApplication extends Application {
                 ? AuthlibInjectorManager.ensureInjectorAsync(gameDir, msg -> Platform.runLater(() -> logArea.appendText(msg + "\n")))
                 : CompletableFuture.completedFuture(null);
 
+        int requiredJava = profile.getJavaMajorVersion();
+        if (config.getJavaPath() != null && !config.getJavaPath().isBlank()) {
+            logArea.appendText("☕ 版本 " + profile.getId() + " 需要 Java " + requiredJava
+                    + "，使用设置中指定的 Java：" + config.getJavaPath() + "\n");
+        } else {
+            logArea.appendText("☕ 版本 " + profile.getId() + " 需要 Java " + requiredJava
+                    + "，未指定路径，准备 Azul Zulu 高性能运行时…\n");
+        }
         CompletableFuture<String> javaFuture;
         if (config.getJavaPath() != null && !config.getJavaPath().isBlank()) {
             javaFuture = CompletableFuture.completedFuture(config.getJavaPath());
         } else {
-            // 版本 JSON 声明了需要哪个 Java 大版本（26.x 是 25，1.20.4 是 17）
-            javaFuture = JavaManager.ensureJavaAsync(gameDir, profile.getJavaMajorVersion(),
+            javaFuture = JavaManager.ensureJavaAsync(gameDir, requiredJava,
                     msg -> Platform.runLater(() -> logArea.appendText(msg + "\n")));
         }
 
