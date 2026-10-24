@@ -88,8 +88,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\create-github-repo.ps1
 启动器「设置 → 软件更新」支持三种地址：
 
 ```text
-https://api.github.com/repos/<OWNER>/NekoCraftLauncher/releases/latest
-https://github.com/<OWNER>/NekoCraftLauncher
+https://api.github.com/repos/qwe1314qwe2023/NekoCraftLauncher/releases/latest
+https://github.com/qwe1314qwe2023/NekoCraftLauncher
 ```
 
 直接粘贴仓库地址会自动转换成 GitHub Releases API。也可以使用静态 JSON：
