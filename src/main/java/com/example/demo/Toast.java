@@ -37,7 +37,7 @@ public final class Toast {
         stack.setMouseTransparent(true);
         stack.setPickOnBounds(false);
         StackPane.setAlignment(stack, Pos.TOP_CENTER);
-        StackPane.setMargin(stack, new Insets(64, 0, 0, 0));
+        StackPane.setMargin(stack, new Insets(60, 0, 0, 0));
         sceneRoot.getChildren().add(stack);
     }
 
@@ -85,7 +85,8 @@ public final class Toast {
         icon.setStyle("-fx-text-fill: " + accent + "; -fx-font-size: 13px; -fx-font-weight: bold;");
 
         Label text = new Label(message);
-        text.setStyle("-fx-text-fill: -app-text; -fx-font-size: 12.5px;");
+        text.setStyle("-fx-text-fill: " + (Theme.isLight() ? "#0f172a" : "#e5e7eb")
+                + "; -fx-font-size: 12px;");
         text.setWrapText(true);
         text.setMaxWidth(460);
 
@@ -93,11 +94,12 @@ public final class Toast {
         pill.setAlignment(Pos.CENTER_LEFT);
         pill.setMaxWidth(Region.USE_PREF_SIZE);
         pill.setPadding(new Insets(10, 16, 10, 16));
-        pill.setStyle("-fx-background-color: rgba(28,31,39,0.96);"
+        boolean light = Theme.isLight();
+        pill.setStyle("-fx-background-color: " + (light ? "rgba(255,255,255,0.98)" : "rgba(28,31,39,0.96)") + ";"
                 + " -fx-background-radius: 10;"
-                + " -fx-border-color: rgba(255,255,255,0.10);"
+                + " -fx-border-color: " + (light ? "rgba(15,23,42,0.14)" : "rgba(255,255,255,0.10)") + ";"
                 + " -fx-border-radius: 10;"
-                + " -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.35), 16, 0.1, 0, 6);");
+                + " -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.20), 12, 0.08, 0, 4);");
 
         pill.setOpacity(0);
         pill.setTranslateY(-8);
