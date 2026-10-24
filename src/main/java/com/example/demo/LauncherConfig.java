@@ -95,7 +95,7 @@ public class LauncherConfig {
     private String uiLanguage = "zh_CN";
 
     /** 主题强调色名称（见 Theme.PRESETS） */
-    private String accentColor = "共产红";
+    private String accentColor = "Neko 白";
 
     /** 启动页背景图片路径（空 = 无） */
     private String backgroundImage = "";
@@ -125,7 +125,7 @@ public class LauncherConfig {
     private String updateUrl = "https://api.github.com/repos/qwe1314qwe2023/NekoCraftLauncher/releases/latest";
 
     /** 浅色模式（顶栏保持深色） */
-    private boolean lightTheme = false;
+    private boolean lightTheme = true;
 
     /** 智能性能：启动时自动合并 G1GC 参数并调整游戏进程优先级 */
     private boolean smartPerformance = false;
@@ -458,7 +458,7 @@ public class LauncherConfig {
     }
 
     public String getAccentColor() {
-        return accentColor == null || accentColor.isBlank() ? "共产红" : accentColor;
+        return accentColor == null || accentColor.isBlank() ? "Neko 白" : accentColor;
     }
 
     public void setAccentColor(String accentColor) {

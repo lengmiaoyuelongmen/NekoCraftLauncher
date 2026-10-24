@@ -1097,11 +1097,11 @@ public final class SettingsPanel extends VBox {
         customMemoryRadio.setSelected(true);
         languageCombo.setValue("简体中文");
         fontScaleCombo.setValue("标准");
-        lightModeBox.setSelected(false);
-        Theme.setLight(false);
+        lightModeBox.setSelected(true);
+        Theme.setLight(true);
         if (getScene() != null) Theme.apply(getScene().getRoot());
         Theme.setCurrent(Theme.PRESETS[0]);
-        config.setAccentColor("共产红");
+        config.setAccentColor("Neko 白");
         config.setBackgroundImage("");
         config.save();
         applyBackground();

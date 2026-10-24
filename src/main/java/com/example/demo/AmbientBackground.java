@@ -90,19 +90,21 @@ public final class AmbientBackground extends Canvas {
         wasAnimating = true;
         g.clearRect(0, 0, w, h);
         boolean light = Theme.isLight();
+        Color accent = Color.web(Theme.current().accent());
+        Color accentSoft = Color.color(accent.getRed(), accent.getGreen(), accent.getBlue(), light ? 0.06 : 0.10);
 
         blob(g, w * (0.24 + Math.sin(time * 0.09) * 0.05),
                 h * (0.22 + Math.cos(time * 0.07) * 0.06),
                 Math.max(w, h) * 0.62,
-                light ? Color.rgb(120, 10, 20, 0.05) : Color.rgb(190, 20, 35, 0.13));
+                Color.color(accent.getRed(), accent.getGreen(), accent.getBlue(), light ? 0.07 : 0.15));
         blob(g, w * (0.78 + Math.cos(time * 0.06) * 0.05),
                 h * (0.72 + Math.sin(time * 0.08) * 0.07),
                 Math.max(w, h) * 0.55,
-                light ? Color.rgb(140, 20, 30, 0.04) : Color.rgb(255, 120, 90, 0.055));
+                Color.color(accent.getRed(), accent.getGreen(), accent.getBlue(), light ? 0.05 : 0.08));
         blob(g, w * (0.55 + Math.sin(time * 0.05) * 0.07),
                 h * (0.35 + Math.cos(time * 0.11) * 0.05),
                 Math.max(w, h) * 0.36,
-                light ? Color.rgb(80, 10, 15, 0.035) : Color.rgb(255, 205, 110, 0.035));
+                Color.color(accent.getRed(), accent.getGreen(), accent.getBlue(), light ? 0.04 : 0.06));
 
         double scx = w * 0.5;
         double scy = h * 0.46;
@@ -121,6 +123,10 @@ public final class AmbientBackground extends Canvas {
         g.setStroke(light ? Color.rgb(120, 10, 20, 0.035) : Color.rgb(255, 205, 110, 0.04));
         g.strokePolygon(sx, sy, 10);
 
+        // Neko 爪印：低对比度装饰，保持可读性
+        paw(g, w * 0.84, h * 0.20, Math.min(w, h) * 0.035, accentSoft);
+        paw(g, w * 0.13, h * 0.78, Math.min(w, h) * 0.026, accentSoft);
+
         if (pointerActive) {
             smoothX += (pointerX - smoothX) * 0.14;
             smoothY += (pointerY - smoothY) * 0.14;
@@ -135,6 +141,14 @@ public final class AmbientBackground extends Canvas {
             g.setFill(light ? Color.rgb(90, 10, 20, alpha * 0.5) : Color.rgb(255, 120, 100, alpha));
             g.fillOval(x * w, y * h, starSize[i], starSize[i]);
         }
+    }
+
+    private void paw(GraphicsContext g, double cx, double cy, double r, Color color) {
+        g.setFill(color);
+        g.fillOval(cx - r * 0.42, cy + r * 0.08, r * 0.84, r * 0.70);
+        g.fillOval(cx - r * 0.72, cy - r * 0.42, r * 0.34, r * 0.42);
+        g.fillOval(cx - r * 0.16, cy - r * 0.60, r * 0.34, r * 0.42);
+        g.fillOval(cx + r * 0.38, cy - r * 0.42, r * 0.34, r * 0.42);
     }
 
     private void blob(GraphicsContext g, double cx, double cy, double radius, Color color) {

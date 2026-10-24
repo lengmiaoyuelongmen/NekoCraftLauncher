@@ -1022,7 +1022,11 @@ public final class InstanceSettingsPanel extends HBox {
         String id = instanceId == null ? "" : instanceId;
         javafx.scene.control.TextField nameField = new javafx.scene.control.TextField(InstanceMeta.name(gameDir, id));
         nameField.setPromptText("实例名");
+        String renameFieldStyle = "-fx-text-fill: -app-text; -fx-prompt-text-fill: -app-text-muted;"
+                + " -fx-background-color: -app-row3; -fx-background-radius: 8; -fx-padding: 8 10;";
+        nameField.setStyle(renameFieldStyle);
         javafx.scene.control.TextField descField = new javafx.scene.control.TextField(InstanceMeta.description(gameDir, id));
+        descField.setStyle(renameFieldStyle);
         descField.setPromptText("一句话描述（可留空）");
 
         Label saved = new Label("");

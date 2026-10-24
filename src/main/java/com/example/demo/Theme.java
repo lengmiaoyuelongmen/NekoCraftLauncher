@@ -19,6 +19,8 @@ public final class Theme {
     }
 
     public static final Palette[] PRESETS = {
+            new Palette("Neko 白", "#14b8a6", "#0f766e", "#5eead4", "#ccfbf1"),
+            new Palette("Neko 黑", "#38bdf8", "#0284c7", "#7dd3fc", "#bae6fd"),
             new Palette("共产红", "#e11d2e", "#a30f1b", "#ff6b6b", "#ffd1d1"),
             new Palette("为爱发电", "#ff4d3a", "#b3261e", "#ffb26b", "#ffe1a8"),
             new Palette("青绿", "#9ca3af", "#6b7280", "#d1d5db", "#e5e7eb"),

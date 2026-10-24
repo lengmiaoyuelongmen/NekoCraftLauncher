@@ -170,6 +170,7 @@ public class HelloApplication extends Application {
     private String installerExpandedLoader;
     private TextField installerNameField;
     private Label installerStatus;
+    private javafx.scene.control.ProgressBar installerProgress;
     private VBox installerAccordion;
     private String currentLoader = "Fabric";
     private String currentProjectType = "整合包";
@@ -866,6 +867,41 @@ public class HelloApplication extends Application {
         avatarPane.setPrefSize(112, 112);
         avatarPane.setMinSize(112, 112);
         avatarPane.setMaxSize(112, 112);
+        javafx.scene.control.Tooltip skinTip = new javafx.scene.control.Tooltip("把皮肤 PNG 拖到这里预览");
+        javafx.scene.control.Tooltip.install(avatarPane, skinTip);
+        avatarPane.setOnDragOver(event -> {
+            if (event.getDragboard().hasFiles() || event.getDragboard().hasUrl()
+                    || event.getDragboard().hasString()) {
+                event.acceptTransferModes(javafx.scene.input.TransferMode.COPY);
+            }
+            event.consume();
+        });
+        avatarPane.setOnDragDropped(event -> {
+            javafx.scene.input.Dragboard board = event.getDragboard();
+            try {
+                javafx.scene.image.Image skin = null;
+                if (board.hasFiles()) {
+                    for (java.io.File file : board.getFiles()) {
+                        String name = file.getName().toLowerCase(java.util.Locale.ROOT);
+                        if (name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg")) {
+                            skin = new javafx.scene.image.Image(file.toURI().toString(), true);
+                            break;
+                        }
+                    }
+                } else if (board.hasUrl()) {
+                    skin = new javafx.scene.image.Image(board.getUrl(), true);
+                }
+                if (skin != null && !skin.isError()) {
+                    avatarImageView.setImage(skin);
+                    Toast.ok("皮肤已加载预览");
+                    logArea.appendText("🧵 已载入皮肤预览\n");
+                }
+            } catch (Exception ex) {
+                Toast.error("皮肤图片读取失败");
+            }
+            event.setDropCompleted(true);
+            event.consume();
+        });
 
         usernameLabel = new Label("未登录");
         usernameLabel.setStyle("-fx-font-size: 27px; -fx-font-weight: bold; -fx-text-fill: -app-text;");
@@ -2325,10 +2361,19 @@ public class HelloApplication extends Application {
         return menu;
     }
 
+    private void setInstallerProgress(boolean running) {
+        if (installerProgress == null) return;
+        installerProgress.setVisible(running);
+        installerProgress.setManaged(running);
+        if (running) installerProgress.setProgress(javafx.scene.control.ProgressIndicator.INDETERMINATE_PROGRESS);
+        else installerProgress.setProgress(0);
+    }
+
     private void startInstall(MinecraftVersion version, String loader, String loaderVersion,
                               javafx.scene.control.ButtonBase trigger) {
         trigger.setDisable(true);
         trigger.setText("安装中...");
+        setInstallerProgress(true);
         logMessage("📥 开始安装 Minecraft " + version.getId() + "（" + loader
                 + (loaderVersion == null ? " · 最新加载器" : " · " + loaderVersion) + "）");
         executeInstallProcess(version, loader, loaderVersion, trigger);
@@ -2540,6 +2585,11 @@ public class HelloApplication extends Application {
         download.setMinWidth(Region.USE_PREF_SIZE);
         download.setOnAction(e -> startInstallerFromPanel(download));
 
+        installerProgress = new javafx.scene.control.ProgressBar();
+        installerProgress.setMaxWidth(Double.MAX_VALUE);
+        installerProgress.setVisible(false);
+        installerProgress.setManaged(false);
+        installerProgress.setStyle("-fx-accent: -app-accent;");
         installerStatus = new Label("先选游戏版本，再展开加载器选择具体版本。");
         installerStatus.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11.5px;");
         installerStatus.setWrapText(true);
@@ -2547,6 +2597,7 @@ public class HelloApplication extends Application {
 
         HBox bottom = new HBox(12, download, installerStatus);
         bottom.setAlignment(Pos.CENTER_LEFT);
+        VBox bottomBox = new VBox(6, bottom, installerProgress);
 
         ScrollPane accordionScroll = new ScrollPane(installerAccordion);
         accordionScroll.setFitToWidth(true);
@@ -2557,7 +2608,7 @@ public class HelloApplication extends Application {
         accordionScroll.setStyle("-fx-background: transparent; -fx-background-color: transparent;"
                 + " -fx-border-color: transparent;");
 
-        VBox card = new VBox(10, versionRow, accordionScroll, bottom);
+        VBox card = new VBox(10, versionRow, accordionScroll, bottomBox);
         card.setPadding(new Insets(14));
         card.setMaxWidth(780);
         card.setMaxHeight(Double.MAX_VALUE);
@@ -2756,6 +2807,7 @@ public class HelloApplication extends Application {
             return;
         }
         String loaderVersion = installerSelectedVersions.get(loader);
+        setInstallerProgress(true);
         if (installerStatus != null) {
             installerStatus.setText("正在安装 " + game.getId() + " · " + loader
                     + (loaderVersion == null ? "" : " " + loaderVersion) + "…");
@@ -3252,14 +3304,16 @@ public class HelloApplication extends Application {
                     addInstalledToCombo(installedId);
                     btn.setDisable(false);
                     btn.setText("开始下载");
-                    if (installerStatus != null) installerStatus.setText("安装完成：" + installedId);
+                    setInstallerProgress(false);
+                   if (installerStatus != null) installerStatus.setText("安装完成：" + installedId);
                 });
             } catch (Exception e) {
                 Platform.runLater(() -> {
                     logArea.appendText("❌ 安装失败: " + e.getMessage() + "\n");
                     btn.setDisable(false);
                     btn.setText("开始下载");
-                    if (installerStatus != null) installerStatus.setText("安装失败：" + e.getMessage());
+                    setInstallerProgress(false);
+                   if (installerStatus != null) installerStatus.setText("安装失败：" + e.getMessage());
                 });
             }
         });
