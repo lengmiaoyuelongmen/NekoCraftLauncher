@@ -1170,6 +1170,7 @@ public class HelloApplication extends Application {
         loginBtn.setOnAction(e -> handleLogin(loginTypeCombo, serverField, usernameField, passwordField, loginBtn));
         versionComboBox.valueProperty().addListener((obs, old, value) -> {
             launchVersionLabel.setText(value == null ? "" : value.getId());
+            if (playerInfoInstance != null) playerInfoInstance.setText(value == null ? "未选择" : value.getId());
             if (value != null && !suppressInstancePersist) {
                 userPickedInstance = true;
                 config.setLastInstance(value.getId());

@@ -648,7 +648,13 @@ public final class ModsPanel extends VBox {
                 + " -fx-background-radius: 8; -fx-padding: 6 18; -fx-cursor: hand;");
         detail.setOnAction(e -> openCfDetail(hit));
         row.setOnMouseClicked(e -> openCfDetail(hit));
-        row.getChildren().addAll(icon, info, detail);
+        Button quick = new Button("安装");
+        quick.setStyle("-fx-background-color: #e11d2e; -fx-text-fill: white; -fx-font-weight: bold;"
+                + " -fx-background-radius: 8; -fx-padding: 6 12; -fx-cursor: hand;");
+        quick.setMinWidth(Region.USE_PREF_SIZE);
+        quick.setOnAction(e -> installCfMirror(hit, quick));
+        quick.setOnMouseClicked(e -> e.consume());
+        row.getChildren().addAll(icon, info, quick, detail);
         return row;
     }
 
@@ -884,7 +890,13 @@ public final class ModsPanel extends VBox {
         Button detail = miniButton("详情");
         detail.setOnAction(e -> openModDetail(projectId, title));
         row.setOnMouseClicked(e -> openModDetail(projectId, title));
-        row.getChildren().addAll(icon, info, star, detail);
+        Button quick = new Button("安装");
+        quick.setStyle("-fx-background-color: #e11d2e; -fx-text-fill: white; -fx-font-weight: bold;"
+                + " -fx-background-radius: 8; -fx-padding: 5 10; -fx-cursor: hand; -fx-font-size: 11px;");
+        quick.setMinWidth(Region.USE_PREF_SIZE);
+        quick.setOnAction(e -> installMod(projectId, slug, title, quick));
+        quick.setOnMouseClicked(e -> e.consume());
+        row.getChildren().addAll(icon, info, star, quick, detail);
         return row;
     }
 
