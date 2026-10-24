@@ -4669,6 +4669,11 @@ public class HelloApplication extends Application {
         if (stats.failed > 0) summary += "，失败 " + stats.failed;
         log.accept(summary);
         if (stats.failed > 0) {
+            synchronized (stats.failures) {
+                for (String failedUrl : stats.failures) {
+                    log.accept("   ✗ " + failedUrl);
+                }
+            }
             throw new Exception("有 " + stats.failed + " 个依赖库没下载成功，请检查网络后重试（已下载的会保留）");
         }
     }

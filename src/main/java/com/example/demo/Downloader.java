@@ -31,6 +31,10 @@ public class Downloader {
         List<String> candidateUrls = new ArrayList<>();
         if (!mirrorUrl.equals(officialUrl)) candidateUrls.add(mirrorUrl);
         candidateUrls.add(officialUrl);
+        if (officialUrl.contains("libraries.minecraft.net/")) {
+            candidateUrls.add(officialUrl.replace("https://libraries.minecraft.net/",
+                    "https://repo1.maven.org/maven2/"));
+        }
 
         File partFile = new File(targetFile.getAbsolutePath() + ".part");
 

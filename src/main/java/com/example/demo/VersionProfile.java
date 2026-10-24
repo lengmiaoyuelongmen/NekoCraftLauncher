@@ -219,6 +219,11 @@ public final class VersionProfile {
             JsonObject lib = el.getAsJsonObject();
             if (!allowed(lib)) continue;
             if (libraryPath(lib) == null) continue;
+            // natives-only 条目（lwjgl-platform / jinput-platform / twitch）没有主 jar，不能进 classpath
+            if (lib.has("natives")) continue;
+            JsonObject downloads = lib.has("downloads") && lib.get("downloads").isJsonObject()
+                    ? lib.getAsJsonObject("downloads") : null;
+            if (downloads != null && downloads.has("classifiers") && !downloads.has("artifact")) continue;
             result.add(lib);
         }
         return result;

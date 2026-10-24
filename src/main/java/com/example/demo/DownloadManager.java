@@ -97,6 +97,8 @@ public final class DownloadManager {
         public int failed;
         public int repaired;
         public long bytes;
+        public final java.util.List<String> failures =
+                java.util.Collections.synchronizedList(new ArrayList<>());
     }
 
     /** 并发下载一批任务；已存在且大小一致的直接跳过。 */
@@ -151,6 +153,7 @@ public final class DownloadManager {
                         if (task.size > 0) stats.bytes += task.size;
                     } else {
                         stats.failed++;
+                        stats.failures.add(task.url);
                     }
                 }
                 int finished = done.incrementAndGet();
@@ -426,6 +429,12 @@ public final class DownloadManager {
         boolean useOfficial = !"mirror".equals(currentSource);
         if (useMirror) list.add(mirror);
         if (useOfficial || list.isEmpty()) list.add(officialUrl);
+        // 旧版本库经常在 BMCLAPI/官方源缺失，补 Maven Central
+        if (officialUrl.contains("libraries.minecraft.net/")) {
+            String central = officialUrl.replace("https://libraries.minecraft.net/",
+                    "https://repo1.maven.org/maven2/");
+            if (!list.contains(central)) list.add(central);
+        }
         return list;
     }
 

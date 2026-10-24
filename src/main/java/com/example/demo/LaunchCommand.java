@@ -87,6 +87,8 @@ public final class LaunchCommand {
         vars.put("clientid", "");
         vars.put("user_type", session.getUserType() == null ? "legacy" : session.getUserType());
         vars.put("version_type", profile.getType());
+        // 1.7.10 及更早版本要求 --userProperties 是合法 JSON 对象
+        vars.put("user_properties", "{}");
         String nativesPath = nativesDir.getAbsolutePath();
         vars.put("natives_directory", nativesPath);
         vars.put("launcher_name", "MCLauncher");
