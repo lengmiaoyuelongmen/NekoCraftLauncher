@@ -139,6 +139,9 @@ public class LauncherConfig {
     /** 游戏运行时暂停启动器实时背景，降低占用 */
     private boolean pauseVisualsInGame = true;
 
+    /** 关闭窗口行为：ask / tray / exit */
+    private String closeAction = "ask";
+
     /** 优先使用高性能独显（启动前写入 HKCU 显卡首选项） */
     private boolean preferDiscreteGpu = true;
 
@@ -512,6 +515,14 @@ public class LauncherConfig {
 
     public boolean isPauseVisualsInGame() {
         return pauseVisualsInGame;
+    }
+
+    public String getCloseAction() {
+        return closeAction == null || closeAction.isBlank() ? "ask" : closeAction;
+    }
+
+    public void setCloseAction(String closeAction) {
+        this.closeAction = closeAction;
     }
 
     public void setPauseVisualsInGame(boolean pauseVisualsInGame) {

@@ -100,6 +100,11 @@ public class HelloApplication extends Application {
     private long lastLaunchPrepMs;
     private boolean minimizedForGame;
     private boolean gameRunning;
+    private boolean trayInstalled;
+    private boolean quitting;
+    private java.awt.TrayIcon trayIcon;
+    private Label geekTelemetry;
+    private final long appStartedAt = System.currentTimeMillis();
     private AmbientBackground ambientBackground;
     private String gameInstanceId;
     private ComboBox<String> loginTypeComboRef;
@@ -241,7 +246,10 @@ public class HelloApplication extends Application {
             Platform.exit();
             return;
         }
-        stage.setOnCloseRequest(e -> SingleInstance.release());
+        stage.setOnCloseRequest(e -> {
+            e.consume();
+            requestClose();
+        });
         try (java.io.InputStream iconStream = HelloApplication.class.getResourceAsStream("/icon.png")) {
             if (iconStream != null) stage.getIcons().add(new Image(iconStream));
         } catch (Exception ignored) {
@@ -314,6 +322,34 @@ public class HelloApplication extends Application {
         });
         rootWrap.setStyle("-fx-background-color: transparent;");
 
+        javafx.scene.canvas.Canvas crt = new javafx.scene.canvas.Canvas();
+        crt.setMouseTransparent(true);
+        crt.widthProperty().bind(rootWrap.widthProperty());
+        crt.heightProperty().bind(rootWrap.heightProperty());
+        Runnable paintCrt = () -> {
+            double w = crt.getWidth();
+            double h = crt.getHeight();
+            if (w < 4 || h < 4) return;
+            javafx.scene.canvas.GraphicsContext g = crt.getGraphicsContext2D();
+            g.clearRect(0, 0, w, h);
+            g.setFill(Color.web("#ff3b30", 0.018));
+            for (double y = 0; y < h; y += 3) g.fillRect(0, y, w, 1);
+            g.setStroke(Color.web("#ff5a48", 0.22));
+            g.setLineWidth(1);
+            double inset = 12;
+            double len = 18;
+            g.strokeLine(inset, inset, inset + len, inset);
+            g.strokeLine(inset, inset, inset, inset + len);
+            g.strokeLine(w - inset, inset, w - inset - len, inset);
+            g.strokeLine(w - inset, inset, w - inset, inset + len);
+            g.strokeLine(inset, h - inset, inset + len, h - inset);
+            g.strokeLine(inset, h - inset, inset, h - inset - len);
+            g.strokeLine(w - inset, h - inset, w - inset - len, h - inset);
+            g.strokeLine(w - inset, h - inset, w - inset, h - inset - len);
+        };
+        crt.widthProperty().addListener((o, a, b) -> paintCrt.run());
+        crt.heightProperty().addListener((o, a, b) -> paintCrt.run());
+        rootWrap.getChildren().add(1, crt);
 
         Scene scene = new Scene(rootWrap, 1060, 700);
         scene.setFill(Color.TRANSPARENT);
@@ -324,6 +360,11 @@ public class HelloApplication extends Application {
         scene.setOnKeyPressed(e -> {
             if (e.isControlDown() && e.getCode() == javafx.scene.input.KeyCode.K) {
                 showCommandPalette();
+                e.consume();
+                return;
+            }
+            if (e.isControlDown() && e.getCode() == javafx.scene.input.KeyCode.Q) {
+                requestClose();
                 e.consume();
                 return;
             }
@@ -360,6 +401,7 @@ public class HelloApplication extends Application {
 
         Toast.install(rootWrap);
 
+        javafx.application.Platform.setImplicitExit(false);
         stage.setOpacity(Math.max(0.7, Math.min(1.0, config.getUiOpacity())));
         stage.setTitle("Neko Craft Launcher");
         stage.iconifiedProperty().addListener((obs, was, iconified) -> {
@@ -396,6 +438,11 @@ public class HelloApplication extends Application {
             });
         }
         DownloadManager.addStatusListener(status -> Platform.runLater(() -> updateDownloadBar(status)));
+        updateGeekTelemetry();
+        javafx.animation.Timeline telemetryTimer = new javafx.animation.Timeline(
+                new javafx.animation.KeyFrame(javafx.util.Duration.seconds(1), e -> updateGeekTelemetry()));
+        telemetryTimer.setCycleCount(javafx.animation.Animation.INDEFINITE);
+        telemetryTimer.play();
         refreshInstalledVersions();
         if (!config.isHardwareAcceleration()) {
             logArea.appendText("🖥 已按设置禁用硬件加速（软件渲染）。如果界面明显变卡，"
@@ -526,7 +573,7 @@ public class HelloApplication extends Application {
         maximizeWindowButton = windowButton(WindowIcon.MAXIMIZE);
         maximizeWindowButton.setOnAction(e -> primaryStage.setMaximized(!primaryStage.isMaximized()));
         Button close = windowButton(WindowIcon.CLOSE);
-        close.setOnAction(e -> primaryStage.close());
+        close.setOnAction(e -> requestClose());
         HBox windowControls = new HBox(0, minimize, maximizeWindowButton, close);
         windowControls.setAlignment(Pos.CENTER_RIGHT);
         windowControls.getStyleClass().add("window-controls");
@@ -1046,7 +1093,12 @@ public class HelloApplication extends Application {
         downloadStatsLabel.setVisible(false);
         downloadStatsLabel.setManaged(false);
 
-        HBox downloadHeader = new HBox(8, downloadTitle, downloadFileLabel);
+        geekTelemetry = new Label("[SYS] INIT");
+        geekTelemetry.setStyle("-fx-text-fill: #ff8a72; -fx-font-size: 8.5px;"
+                + " -fx-font-family: 'Cascadia Mono', 'Consolas', monospace;");
+        Region telemetrySpacer = new Region();
+        HBox.setHgrow(telemetrySpacer, Priority.ALWAYS);
+        HBox downloadHeader = new HBox(8, downloadTitle, downloadFileLabel, telemetrySpacer, geekTelemetry);
         downloadHeader.setAlignment(Pos.CENTER_LEFT);
         VBox downloadBar = new VBox(4, downloadHeader, downloadProgress, downloadStatsLabel);
         downloadBarPanel = downloadBar;
@@ -4819,6 +4871,147 @@ public class HelloApplication extends Application {
 
     /** 启动失败时给一个「去校验文件」的入口。 */
     /** 首次启动显示全屏引导页，而不是弹窗。 */
+    private void updateGeekTelemetry() {
+        if (geekTelemetry == null) return;
+        long seconds = Math.max(0, (System.currentTimeMillis() - appStartedAt) / 1000);
+        String up = String.format(java.util.Locale.ROOT, "%02d:%02d:%02d",
+                seconds / 3600, (seconds % 3600) / 60, seconds % 60);
+        Runtime runtime = Runtime.getRuntime();
+        long heap = (runtime.totalMemory() - runtime.freeMemory()) / 1024 / 1024;
+        geekTelemetry.setText("[SYS] UP " + up + " · HEAP " + heap + "M · THR " + Thread.activeCount());
+    }
+
+    /** 关闭窗口：询问 / 最小化到托盘 / 直接退出。 */
+    private void requestClose() {
+        if (quitting) return;
+        String action = config.getCloseAction();
+        if ("tray".equals(action) && installTray()) {
+            hideToTray();
+            return;
+        }
+        if ("exit".equals(action)) {
+            quitLauncher();
+            return;
+        }
+        showCloseChoice();
+    }
+
+    private void showCloseChoice() {
+        if (stageRef == null) {
+            quitLauncher();
+            return;
+        }
+        boolean canTray = java.awt.SystemTray.isSupported();
+        javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+                javafx.scene.control.Alert.AlertType.CONFIRMATION);
+        alert.initOwner(stageRef);
+        alert.setTitle("Neko Craft Launcher");
+        alert.setHeaderText("终止启动器？");
+        javafx.scene.control.ButtonType tray = new javafx.scene.control.ButtonType(
+                "最小化到托盘", javafx.scene.control.ButtonBar.ButtonData.OK_DONE);
+        javafx.scene.control.ButtonType exit = new javafx.scene.control.ButtonType(
+                "退出启动器", javafx.scene.control.ButtonBar.ButtonData.OK_DONE);
+        javafx.scene.control.ButtonType cancel = new javafx.scene.control.ButtonType(
+                "取消", javafx.scene.control.ButtonBar.ButtonData.CANCEL_CLOSE);
+        if (canTray) alert.getButtonTypes().setAll(tray, exit, cancel);
+        else alert.getButtonTypes().setAll(exit, cancel);
+        alert.getDialogPane().getStyleClass().add("dialog-pane");
+        if (THEME_URL != null) alert.getDialogPane().getStylesheets().add(THEME_URL);
+
+        javafx.scene.control.CheckBox remember = new javafx.scene.control.CheckBox("记住我的选择");
+        remember.setStyle("-fx-text-fill: -app-text-2;");
+        Label note = new Label(gameRunning
+                ? "游戏正在运行。最小化到托盘后，启动器会继续在后台守护进程。"
+                : "最小化到托盘后，启动器仍会在后台运行。");
+        note.setWrapText(true);
+        note.setStyle("-fx-text-fill: -app-text-dim; -fx-font-size: 12px;");
+        VBox content = new VBox(10, note, remember);
+        content.setPadding(new Insets(6, 0, 0, 0));
+        alert.getDialogPane().setContent(content);
+
+        javafx.scene.control.ButtonType result = alert.showAndWait().orElse(cancel);
+        if (result == cancel) return;
+        if (remember.isSelected()) {
+            config.setCloseAction(result == tray ? "tray" : "exit");
+            config.save();
+        }
+        if (result == tray) {
+            if (installTray()) hideToTray();
+        } else if (result == exit) {
+            quitLauncher();
+        }
+    }
+
+    private boolean installTray() {
+        if (trayInstalled) return true;
+        if (!java.awt.SystemTray.isSupported()) return false;
+        try {
+            java.awt.Image image = null;
+            try (java.io.InputStream in = HelloApplication.class.getResourceAsStream("/icon.png")) {
+                if (in != null) image = javax.imageio.ImageIO.read(in);
+            }
+            if (image == null) {
+                java.awt.image.BufferedImage fallback = new java.awt.image.BufferedImage(
+                        16, 16, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                java.awt.Graphics2D g = fallback.createGraphics();
+                g.setColor(new java.awt.Color(225, 29, 46));
+                g.fillOval(1, 1, 14, 14);
+                g.setColor(new java.awt.Color(255, 207, 106));
+                g.fillOval(6, 6, 4, 4);
+                g.dispose();
+                image = fallback;
+            }
+            java.awt.PopupMenu menu = new java.awt.PopupMenu();
+            java.awt.MenuItem show = new java.awt.MenuItem("显示 Neko Craft Launcher");
+            show.addActionListener(e -> Platform.runLater(this::restoreFromTray));
+            java.awt.MenuItem quit = new java.awt.MenuItem("退出启动器");
+            quit.addActionListener(e -> Platform.runLater(this::quitLauncher));
+            menu.add(show);
+            menu.addSeparator();
+            menu.add(quit);
+            trayIcon = new java.awt.TrayIcon(image, "Neko Craft Launcher", menu);
+            trayIcon.setImageAutoSize(true);
+            trayIcon.addActionListener(e -> Platform.runLater(this::restoreFromTray));
+            java.awt.SystemTray.getSystemTray().add(trayIcon);
+            trayInstalled = true;
+            return true;
+        } catch (Exception ex) {
+            logArea.appendText("⚠ 系统托盘不可用: " + ex.getMessage() + "\n");
+            return false;
+        }
+    }
+
+    private void hideToTray() {
+        if (stageRef == null || trayIcon == null) return;
+        stageRef.hide();
+        trayIcon.displayMessage("Neko Craft Launcher",
+                gameRunning ? "已最小化到托盘，游戏进程仍在守护中。" : "已最小化到托盘。",
+                java.awt.TrayIcon.MessageType.INFO);
+    }
+
+    private void restoreFromTray() {
+        if (stageRef == null) return;
+        stageRef.show();
+        stageRef.setIconified(false);
+        stageRef.toFront();
+        stageRef.requestFocus();
+    }
+
+    private void quitLauncher() {
+        if (quitting) return;
+        quitting = true;
+        if (trayIcon != null) {
+            try {
+                java.awt.SystemTray.getSystemTray().remove(trayIcon);
+            } catch (Exception ignored) {
+            }
+            trayIcon = null;
+        }
+        SingleInstance.release();
+        Platform.exit();
+        System.exit(0);
+    }
+
     private void maybeOfferPerformanceOptimization() {
         if (config.isPerformanceAsked() || config.isPerformanceApplied()
                 || !PerformanceOptimizer.isWindows() || stageRef == null) return;
@@ -5029,6 +5222,10 @@ public class HelloApplication extends Application {
         process.onExit().thenAccept(exited -> Platform.runLater(() -> {
             gameRunning = false;
             setGameStatus(false);
+            if (stageRef != null && !stageRef.isShowing() && trayIcon != null) {
+                trayIcon.displayMessage("Neko Craft Launcher", "游戏进程已退出。",
+                        java.awt.TrayIcon.MessageType.INFO);
+            }
             if (minimizedForGame && stageRef != null) {
                 minimizedForGame = false;
                 stageRef.setIconified(false);
