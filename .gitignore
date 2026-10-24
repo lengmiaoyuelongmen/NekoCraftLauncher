@@ -46,3 +46,5 @@ build/
 cache/
 favorites.json
 release/
+
+.idea/vcs.xml

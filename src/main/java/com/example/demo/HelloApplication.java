@@ -864,6 +864,7 @@ public class HelloApplication extends Application {
         loginBtnLabel = new Label("登录");
         loginBtnLabel.setStyle("-fx-text-fill: #ffffff; -fx-font-weight: bold; -fx-font-size: 12.5px;");
         loginBtn.setGraphic(loginBtnLabel);
+        loginBtn.setDefaultButton(true);
         loginBtn.setMaxWidth(Double.MAX_VALUE);
         loginBtn.setStyle("-fx-background-color: linear-gradient(to bottom, #e62937, #9c101b);"
                 + " -fx-text-fill: #ffffff; -fx-font-weight: bold; -fx-cursor: hand;"
