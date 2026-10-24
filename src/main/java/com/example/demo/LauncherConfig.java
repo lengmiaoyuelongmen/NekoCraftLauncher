@@ -122,7 +122,9 @@ public class LauncherConfig {
     private boolean performanceApplied;
 
     /** 更新检查地址（静态 JSON，空 = 不检查） */
-    private String updateUrl = "https://api.github.com/repos/lengmiaoyuelongmen/NekoCraftLauncher/releases/latest";
+    public static final String DEFAULT_UPDATE_URL =
+            "https://api.github.com/repos/lengmiaoyuelongmen/NekoCraftLauncher/releases/latest";
+    private String updateUrl = DEFAULT_UPDATE_URL;
 
     /** 浅色模式（顶栏保持深色） */
     private boolean lightTheme = true;
@@ -163,7 +165,9 @@ public class LauncherConfig {
             try (Reader reader = new FileReader(CONFIG_FILE)) {
                 LauncherConfig loaded = GSON.fromJson(reader, LauncherConfig.class);
                 if (loaded != null) {
+                    String before = loaded.updateUrl;
                     loaded.normalize();
+                    if (before == null || !before.equals(loaded.updateUrl)) loaded.save();
                     return loaded;
                 }
             } catch (Exception ignored) {
@@ -240,6 +244,11 @@ public class LauncherConfig {
         if (animationSpeed < 0.5) animationSpeed = 1.0;
         if (animationSpeed > 2.0) animationSpeed = 2.0;
         if (lastInstance == null) lastInstance = "";
+        if (updateUrl == null || updateUrl.isBlank()
+                || updateUrl.contains("qwe1314qwe2023/NekoCraftLauncher")
+                || updateUrl.contains("/qwe1314qwe2023/")) {
+            updateUrl = DEFAULT_UPDATE_URL;
+        }
     }
 
     public int getMemoryMb() {
@@ -578,7 +587,7 @@ public class LauncherConfig {
     }
 
     public String getUpdateUrl() {
-        return updateUrl == null ? "https://api.github.com/repos/lengmiaoyuelongmen/NekoCraftLauncher/releases/latest" : updateUrl;
+        return updateUrl == null || updateUrl.isBlank() ? DEFAULT_UPDATE_URL : updateUrl;
     }
 
     public void setUpdateUrl(String updateUrl) {

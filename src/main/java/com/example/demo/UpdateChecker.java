@@ -35,7 +35,23 @@ public final class UpdateChecker {
     private UpdateChecker() {
     }
 
+    private static final String FALLBACK_URL = LauncherConfig.DEFAULT_UPDATE_URL;
+
     public static Info fetch(String url) throws Exception {
+        try {
+            return fetchOnce(url);
+        } catch (Exception first) {
+            // 旧版配置可能仍指向已失效的旧仓库；自动回退到当前仓库。
+            if (url != null && url.contains("lengmiaoyuelongmen/NekoCraftLauncher")) throw first;
+            try {
+                return fetchOnce(FALLBACK_URL);
+            } catch (Exception ignored) {
+                throw first;
+            }
+        }
+    }
+
+    private static Info fetchOnce(String url) throws Exception {
         if (url == null || url.isBlank()) throw new IllegalArgumentException("请先填写更新地址");
         String requestUrl = normalize(url.trim());
         HttpRequest request = HttpRequest.newBuilder(URI.create(requestUrl))
