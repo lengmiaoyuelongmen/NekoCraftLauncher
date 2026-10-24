@@ -94,6 +94,7 @@ public class HelloApplication extends Application {
     private Label launchMainLabel;
     private VBox downloadBarPanel;
     private int downloadBarSeq;
+    private volatile long downloadExpectedBytes = -1;
     private int lastLaunchLogStart;
     private long gameStartAt;
     private long launchPrepareStart;
@@ -558,7 +559,6 @@ public class HelloApplication extends Application {
                 {"download", "下载", "download"},
                 {"settings", "设置", "gear"},
                 {"tools", "工具", "tools"},
-                {"optimize", "优化", "sparkles"}
         };
         for (String[] entry : entries) {
             Button button = createTopButton(entry[1], entry[2]);
@@ -1048,47 +1048,38 @@ public class HelloApplication extends Application {
 
         launchBtn = new Button();
         launchMainLabel = new Label("★ 启动游戏");
-        launchMainLabel.setStyle("-fx-text-fill: #3f7d36; -fx-font-size: 20px; -fx-font-weight: bold;");
+        launchMainLabel.setOpacity(0);
+        launchMainLabel.setManaged(false);
         launchVersionLabel = new Label("");
-        launchVersionLabel.setStyle("-fx-text-fill: #5c9650; -fx-font-size: 11px; -fx-font-weight: bold;");
-        VBox launchBox = new VBox(1, launchMainLabel, launchVersionLabel);
-        launchBox.setAlignment(Pos.CENTER_LEFT);
+        launchVersionLabel.setStyle("-fx-text-fill: #6aa95b; -fx-font-size: 10px; -fx-font-weight: bold;");
 
-        javafx.scene.image.ImageView launchCat = new javafx.scene.image.ImageView();
-        try (java.io.InputStream in = HelloApplication.class.getResourceAsStream("/launch-cat.png")) {
-            if (in != null) launchCat.setImage(new javafx.scene.image.Image(in));
+        javafx.scene.image.ImageView launchArt = new javafx.scene.image.ImageView();
+        try (java.io.InputStream in = HelloApplication.class.getResourceAsStream("/launch-banner.png")) {
+            if (in != null) launchArt.setImage(new javafx.scene.image.Image(in));
         } catch (Exception ignored) {
         }
-        launchCat.setFitWidth(58);
-        launchCat.setFitHeight(58);
-        launchCat.setPreserveRatio(true);
-        launchCat.setSmooth(true);
-
-        Region launchSpacer = new Region();
-        HBox.setHgrow(launchSpacer, Priority.ALWAYS);
-        HBox launchContent = new HBox(8, launchBox, launchSpacer, launchCat);
-        launchContent.setAlignment(Pos.CENTER_LEFT);
-        launchContent.setPadding(new Insets(0, 10, 0, 22));
-        launchContent.setMaxWidth(Double.MAX_VALUE);
-        launchBtn.setGraphic(launchContent);
+        launchArt.setFitWidth(250);
+        launchArt.setFitHeight(87);
+        launchArt.setPreserveRatio(true);
+        launchArt.setSmooth(true);
+        StackPane launchBanner = new StackPane(launchArt, launchVersionLabel);
+        StackPane.setAlignment(launchVersionLabel, Pos.BOTTOM_CENTER);
+        StackPane.setMargin(launchVersionLabel, new Insets(0, 0, 12, 0));
+        launchBtn.setGraphic(launchBanner);
         launchBtn.setContentDisplay(javafx.scene.control.ContentDisplay.GRAPHIC_ONLY);
         launchBtn.setMaxWidth(Double.MAX_VALUE);
-        launchBtn.setPrefHeight(64);
-        launchBtn.setMinHeight(64);
-        String launchNormal = "-fx-background-color: linear-gradient(to right, #e8f8df, #d2edc5);"
-                + " -fx-background-radius: 20; -fx-border-radius: 20; -fx-border-color: #a9d49a;"
-                + " -fx-border-width: 1.4; -fx-padding: 0; -fx-cursor: hand;";
-        String launchHover = "-fx-background-color: linear-gradient(to right, #f0fbeb, #e0f4d6);"
-                + " -fx-background-radius: 20; -fx-border-radius: 20; -fx-border-color: #7db86a;"
-                + " -fx-border-width: 1.8; -fx-padding: 0; -fx-cursor: hand;";
+        launchBtn.setPrefHeight(92);
+        launchBtn.setMinHeight(92);
+        String launchNormal = "-fx-background-color: transparent; -fx-padding: 0; -fx-cursor: hand;";
+        String launchHover = "-fx-background-color: transparent; -fx-padding: 0; -fx-cursor: hand;";
         launchBtn.setStyle(launchNormal);
-        javafx.scene.effect.DropShadow launchGlow = new javafx.scene.effect.DropShadow(18, Color.web("#7fb56d", 0.28));
+        javafx.scene.effect.DropShadow launchGlow = new javafx.scene.effect.DropShadow(18, Color.web("#7fb56d", 0.26));
         launchBtn.setEffect(launchGlow);
         javafx.animation.Timeline glowPulse = new javafx.animation.Timeline(
                 new javafx.animation.KeyFrame(javafx.util.Duration.ZERO,
-                        new javafx.animation.KeyValue(launchGlow.radiusProperty(), 14)),
+                        new javafx.animation.KeyValue(launchGlow.radiusProperty(), 12)),
                 new javafx.animation.KeyFrame(javafx.util.Duration.seconds(2.8),
-                        new javafx.animation.KeyValue(launchGlow.radiusProperty(), 24)));
+                        new javafx.animation.KeyValue(launchGlow.radiusProperty(), 22)));
         glowPulse.setAutoReverse(true);
         glowPulse.setCycleCount(javafx.animation.Animation.INDEFINITE);
         if (Motion.isEnabled()) glowPulse.play();
@@ -1156,7 +1147,7 @@ public class HelloApplication extends Application {
         downloadProgress.setMaxWidth(Double.MAX_VALUE);
         downloadProgress.setPrefHeight(7);
         downloadProgress.setMinHeight(7);
-        downloadProgress.setStyle("-fx-accent: -app-accent; -fx-control-inner-background: -app-border-2;");
+        downloadProgress.setStyle("-fx-accent: #14b8a6; -fx-background-color: #cfe8dc;");
 
         downloadProgress.setVisible(false);
         downloadProgress.setManaged(false);
@@ -4055,6 +4046,7 @@ public class HelloApplication extends Application {
             File mods = InstanceDirs.mods(new File(config.getGameDir()), currentInstanceId(), config.isIsolation());
             if (!mods.isDirectory()) mods.mkdirs();
             File save = new File(mods, fileName);
+            downloadExpectedBytes = target.has("size") ? target.get("size").getAsLong() : -1;
             logArea.appendText("📥 下载 " + title + " → " + fileName + "\n");
             downloadFileAsync(url, save, logArea, saved -> {
                 logArea.appendText("✅ 已安装到 mods: " + saved.getName()
@@ -4143,6 +4135,7 @@ public class HelloApplication extends Application {
                     String downloadUrl = targetFile.get("url").getAsString();
                     String fileName = targetFile.get("filename").getAsString();
                     long fileSize = targetFile.get("size").getAsLong() / 1024;
+                    downloadExpectedBytes = targetFile.get("size").getAsLong();
 
                     logArea.appendText("🎯 找到适配版本: v" + versionName + " (" + fileName + ", " + fileSize + " KB)\n");
                     logArea.appendText("🔗 下载地址: " + downloadUrl + "\n");
@@ -4999,9 +4992,11 @@ public class HelloApplication extends Application {
         downloadStatsLabel.setManaged(true);
         downloadProgress.setVisible(true);
         downloadProgress.setManaged(true);
-        double ratio = Math.min(1.0, (double) status.done() / status.total());
-        // 单文件下载时 done 一直是 0，用不确定进度条避免看起来“失效/消失”
-        downloadProgress.setProgress(status.total() == 1 && status.done() == 0 ? -1 : ratio);
+        long expected = downloadExpectedBytes;
+        double ratio = status.total() == 1 && expected > 0
+                ? Math.min(1.0, (double) status.bytes() / expected)
+                : Math.min(1.0, (double) status.done() / status.total());
+        downloadProgress.setProgress(ratio);
         downloadFileLabel.setText(status.file() == null || status.file().isBlank()
                 ? "正在下载…"
                 : "正在下载：" + status.file());
@@ -5015,8 +5010,9 @@ public class HelloApplication extends Application {
         } else {
             speed = (bps / 1024) + " KB/s";
         }
+        int percent = (int) Math.round(ratio * 100);
         downloadStatsLabel.setText(status.done() + "/" + status.total() + " 个文件 · "
-                + String.format(java.util.Locale.ROOT, "%.1f MB", mb) + " · " + speed);
+                + String.format(java.util.Locale.ROOT, "%.1f MB", mb) + " · " + speed + " · " + percent + "%");
     }
 
     /** 启动前自检：目录可写、磁盘空间、Java 版本。 */
