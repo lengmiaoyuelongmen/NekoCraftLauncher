@@ -3884,18 +3884,7 @@ public class HelloApplication extends Application {
                 return;
             }
             JsonArray all = new Gson().fromJson(body, JsonArray.class);
-            JsonArray matched = new JsonArray();
-            String mc = instance.mcVersion;
-            String loader = instance.loader == null ? "" : instance.loader.toLowerCase();
-            for (int i = 0; i < all.size(); i++) {
-                JsonObject version = all.get(i).getAsJsonObject();
-                boolean gameOk = containsJson(version, "game_versions", mc);
-                boolean loaderOk = "原版".equals(instance.loader) || containsJson(version, "loaders", loader);
-                if (gameOk && loaderOk) matched.add(version);
-            }
-            page.getChildren().removeIf(node -> node instanceof Label label
-                    && label.getText() != null && label.getText().startsWith("正在读取"));
-            page.getChildren().add(buildModVersionList(project, matched, mc, instance.loader));
+            page.getChildren().add(buildModVersionList(project, all, "全部", "全部"));
         }));
     }
 
@@ -3922,8 +3911,9 @@ public class HelloApplication extends Application {
         Label desc = new Label(project.getDescription());
         desc.setWrapText(true);
         desc.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 13px;");
-        Label filter = new Label("已按当前实例筛选：" + instance.mcVersion + " / " + instance.loader);
+        Label filter = new Label("显示全部游戏版本与加载器，按版本/加载器折叠；不会自动套用当前实例。");
         filter.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
+        filter.setWrapText(true);
         VBox hero = new VBox(6, desc, filter);
         hero.setPadding(new Insets(14));
         hero.setStyle("-fx-background-color: -app-card; -fx-background-radius: 12;"
@@ -3936,64 +3926,39 @@ public class HelloApplication extends Application {
     }
 
     private VBox buildModVersionList(com.example.demo.ModpackProject project, JsonArray versions,
-                                     String mc, String loader) {
-        VBox box = new VBox(6);
-        Label heading = new Label("可安装版本（" + versions.size() + "）· " + mc + " / " + loader);
+                                     String ignoredMc, String ignoredLoader) {
+        VBox box = new VBox(8);
+        Label heading = new Label("全部可下载文件（" + versions.size() + "）· 按游戏版本 / 加载器折叠");
         heading.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 12px; -fx-font-weight: bold;");
         box.getChildren().add(heading);
 
-        int limit = Math.min(40, versions.size());
-        for (int i = 0; i < limit; i++) {
+        java.util.LinkedHashMap<String, java.util.List<JsonObject>> groups = new java.util.LinkedHashMap<>();
+        for (int i = 0; i < versions.size(); i++) {
             JsonObject version = versions.get(i).getAsJsonObject();
-            String number = jsonString(version, "version_number");
-            String type = jsonString(version, "version_type");
-            JsonArray files = version.has("files") && version.get("files").isJsonArray()
-                    ? version.getAsJsonArray("files") : new JsonArray();
-            String fileName = "";
-            long size = 0;
-            if (!files.isEmpty()) {
-                JsonObject file = files.get(0).getAsJsonObject();
-                fileName = jsonString(file, "filename");
-                size = file.has("size") ? file.get("size").getAsLong() : 0;
-            }
-            int deps = version.has("dependencies") && version.get("dependencies").isJsonArray()
-                    ? version.getAsJsonArray("dependencies").size() : 0;
-
-            Label name = new Label(number.isBlank() ? "未知版本" : number);
-            name.setStyle("-fx-text-fill: -app-text-strong; -fx-font-size: 13px; -fx-font-weight: bold;");
-            Label typeLabel = new Label("release".equals(type) ? "正式版" : type);
-            typeLabel.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 10px;");
-            HBox titleRow = new HBox(8, name, typeLabel);
-            titleRow.setAlignment(Pos.CENTER_LEFT);
-
-            Label fileLabel = new Label((fileName.isBlank() ? "无文件名" : fileName)
-                    + (size > 0 ? " · " + (size / 1024) + " KB" : ""));
-            fileLabel.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
-            Label meta = new Label("支持 " + jsonArrayText(version, "game_versions")
-                    + " · " + jsonArrayText(version, "loaders")
-                    + (deps > 0 ? " · 前置 " + deps + " 个" : ""));
-            meta.setStyle("-fx-text-fill: -app-text-dim-2; -fx-font-size: 10.5px;");
-            VBox info = new VBox(3, titleRow, fileLabel, meta);
-            HBox.setHgrow(info, Priority.ALWAYS);
-
-            Button download = new Button("下载此文件");
-            download.setStyle("-fx-background-color: #9ca3af; -fx-text-fill: #111827; -fx-font-weight: bold;"
-                    + " -fx-background-radius: 8; -fx-padding: 6 14; -fx-cursor: hand;");
-            download.setOnAction(e -> {
-                download.setDisable(true);
-                download.setText("下载中…");
-                downloadModVersion(version, project.getTitle(), download);
-            });
-
-            HBox row = new HBox(12, info, download);
-            row.setAlignment(Pos.CENTER_LEFT);
-            row.setPadding(new Insets(10, 12, 10, 12));
-            row.setStyle("-fx-background-color: -app-row2; -fx-background-radius: 10;"
-                    + " -fx-border-color: -app-border-soft; -fx-border-radius: 10;");
-            box.getChildren().add(row);
+            String mcGroup = firstJsonValue(version, "game_versions");
+            String loaderGroup = firstJsonValue(version, "loaders");
+            String key = mcGroup + " / " + loaderGroup;
+            groups.computeIfAbsent(key, k -> new java.util.ArrayList<>()).add(version);
         }
-        if (limit == 0) {
-            Label hint = new Label("当前实例没有可安装版本，可以先在实例设置里调整游戏版本/加载器。");
+        boolean first = true;
+        for (var entry : groups.entrySet()) {
+            VBox rows = new VBox(6);
+            for (JsonObject version : entry.getValue()) {
+                rows.getChildren().add(buildModVersionRow(project, version));
+            }
+            ScrollPane groupScroll = new ScrollPane(rows);
+            groupScroll.setFitToWidth(true);
+            groupScroll.setPrefViewportHeight(Math.min(300, 74 * entry.getValue().size()));
+            groupScroll.setStyle("-fx-background: transparent; -fx-background-color: transparent; -fx-border-color: transparent;");
+            javafx.scene.control.TitledPane pane = new javafx.scene.control.TitledPane(
+                    entry.getKey() + "  ·  " + entry.getValue().size() + " 个文件", groupScroll);
+            pane.setExpanded(first);
+            first = false;
+            pane.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 12px;");
+            box.getChildren().add(pane);
+        }
+        if (versions.isEmpty()) {
+            Label hint = new Label("这个项目没有可下载文件。");
             hint.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 12px;");
             box.getChildren().add(hint);
         }
@@ -4004,6 +3969,60 @@ public class HelloApplication extends Application {
         VBox wrapper = new VBox(scroll);
         VBox.setVgrow(scroll, Priority.ALWAYS);
         return wrapper;
+    }
+
+    private String firstJsonValue(JsonObject object, String key) {
+        if (!object.has(key) || !object.get(key).isJsonArray()) return "其他";
+        JsonArray array = object.getAsJsonArray(key);
+        return array.isEmpty() ? "其他" : array.get(0).getAsString();
+    }
+
+    private HBox buildModVersionRow(com.example.demo.ModpackProject project, JsonObject version) {
+        String number = jsonString(version, "version_number");
+        String type = jsonString(version, "version_type");
+        JsonArray files = version.has("files") && version.get("files").isJsonArray()
+                ? version.getAsJsonArray("files") : new JsonArray();
+        String fileName = "";
+        long size = 0;
+        if (!files.isEmpty()) {
+            JsonObject file = files.get(0).getAsJsonObject();
+            fileName = jsonString(file, "filename");
+            size = file.has("size") ? file.get("size").getAsLong() : 0;
+        }
+        int deps = version.has("dependencies") && version.get("dependencies").isJsonArray()
+                ? version.getAsJsonArray("dependencies").size() : 0;
+
+        Label name = new Label(number.isBlank() ? "未知版本" : number);
+        name.setStyle("-fx-text-fill: -app-text-strong; -fx-font-size: 13px; -fx-font-weight: bold;");
+        Label typeLabel = new Label("release".equals(type) ? "正式版" : type);
+        typeLabel.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 10px;");
+        HBox titleRow = new HBox(8, name, typeLabel);
+        titleRow.setAlignment(Pos.CENTER_LEFT);
+        Label fileLabel = new Label((fileName.isBlank() ? "无文件名" : fileName)
+                + (size > 0 ? " · " + (size / 1024) + " KB" : ""));
+        fileLabel.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
+        Label meta = new Label("支持 " + jsonArrayText(version, "game_versions")
+                + " · " + jsonArrayText(version, "loaders")
+                + (deps > 0 ? " · 前置 " + deps + " 个" : ""));
+        meta.setStyle("-fx-text-fill: -app-text-dim-2; -fx-font-size: 10.5px;");
+        VBox info = new VBox(3, titleRow, fileLabel, meta);
+        HBox.setHgrow(info, Priority.ALWAYS);
+
+        Button download = new Button("下载此文件");
+        download.setStyle("-fx-background-color: #14b8a6; -fx-text-fill: white; -fx-font-weight: bold;"
+                + " -fx-background-radius: 8; -fx-padding: 6 14; -fx-cursor: hand;");
+        download.setOnAction(e -> {
+            download.setDisable(true);
+            download.setText("下载中…");
+            downloadModVersion(version, project.getTitle(), download);
+        });
+
+        HBox row = new HBox(12, info, download);
+        row.setAlignment(Pos.CENTER_LEFT);
+        row.setPadding(new Insets(10, 12, 10, 12));
+        row.setStyle("-fx-background-color: -app-row2; -fx-background-radius: 10;"
+                + " -fx-border-color: -app-border-soft; -fx-border-radius: 10;");
+        return row;
     }
 
     private void downloadModVersion(JsonObject version, String title, Button button) {
