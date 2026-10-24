@@ -2066,7 +2066,7 @@ public class HelloApplication extends Application {
                     loaderCombo.setValue("DataPack");
                 } else {
                     loaderCombo.setValue("任意");
-                    if (text.equals("模组")) applyCurrentInstanceFilter();
+                    // 打开下载页不自动按实例筛选，用户自己选择版本和加载器
                 }
                 performSearch();
             }
@@ -2105,16 +2105,9 @@ public class HelloApplication extends Application {
             if (mc != null && !mc.isBlank()) versions.add(mc);
         }
         gameVersionCombo.getItems().setAll(versions);
-        String current = currentInstanceId();
-        if (current == null) return;
-        String mc = extractMcVersion(current);
-        if (mc != null && versions.contains(mc)) gameVersionCombo.setValue(mc);
-        String lower = current.toLowerCase(java.util.Locale.ROOT);
-        String loader = lower.contains("neoforge") ? "NeoForge"
-                : lower.contains("forge") ? "Forge"
-                : lower.contains("fabric") ? "Fabric"
-                : lower.contains("quilt") ? "Quilt" : null;
-        if (loader != null && loaderCombo.getItems().contains(loader)) loaderCombo.setValue(loader);
+        // 默认保持“任意”，不自动套用当前实例条件
+        gameVersionCombo.setValue("任意");
+        loaderCombo.setValue("任意");
     }
 
     private String extractMcVersion(String id) {
@@ -2136,7 +2129,7 @@ public class HelloApplication extends Application {
         combo.setStyle("-fx-background-radius: 6; -fx-font-size: 13px;");
         combo.setButtonCell(createDarkListCell());
         combo.valueProperty().addListener((obs, oldVal, newVal) -> {
-            if (!suppressFilterSearch && communityPanel != null && communityPanel.isVisible()) {
+            if (!suppressFilterSearch && communityPanel != null) {
                 performSearch();
             }
         });
@@ -3606,12 +3599,8 @@ public class HelloApplication extends Application {
             }
 
             boolean isMod = "mod".equals(project.getProjectType());
-            downloadBtn.setText(isMod ? "详情" : "下载");
+            downloadBtn.setText("下载");
             downloadBtn.setOnAction(e -> {
-                if (isMod) {
-                    openCommunityModDetail(project);
-                    return;
-                }
                 Toast.info("开始解析 " + project.getTitle() + " 的下载地址…");
                 logArea.appendText("📥 开始解析 [" + project.getTitle() + "] 的下载链路...\n");
                 fetchVersionsAndDownload(project.getId(), project.getTitle(), project.getProjectType());
