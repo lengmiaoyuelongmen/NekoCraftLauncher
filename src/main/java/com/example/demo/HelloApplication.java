@@ -557,7 +557,8 @@ public class HelloApplication extends Application {
                 {"launch", "启动", "play"},
                 {"download", "下载", "download"},
                 {"settings", "设置", "gear"},
-                {"tools", "工具", "tools"}
+                {"tools", "工具", "tools"},
+                {"optimize", "优化", "sparkles"}
         };
         for (String[] entry : entries) {
             Button button = createTopButton(entry[1], entry[2]);
@@ -714,8 +715,11 @@ public class HelloApplication extends Application {
                 settingsPanel = new SettingsPanel(config, this::logMessage);
                 yield settingsPanel;
             }
-            case "tools" -> {
-                toolsPanel = new ToolsPanel(config, this::logMessage, this::refreshInstalledVersions);
+            case "tools", "optimize" -> {
+                if (toolsPanel == null) {
+                    toolsPanel = new ToolsPanel(config, this::logMessage, this::refreshInstalledVersions);
+                }
+                if ("optimize".equals(name)) toolsPanel.openPerformanceTab();
                 yield toolsPanel;
             }
             case "logs" -> new LogsPanel(new File(config.getGameDir()), this::logMessage);
@@ -1150,7 +1154,9 @@ public class HelloApplication extends Application {
 
         downloadProgress = new ProgressBar(0);
         downloadProgress.setMaxWidth(Double.MAX_VALUE);
-        downloadProgress.setPrefHeight(6);
+        downloadProgress.setPrefHeight(7);
+        downloadProgress.setMinHeight(7);
+        downloadProgress.setStyle("-fx-accent: -app-accent; -fx-control-inner-background: -app-border-2;");
 
         downloadProgress.setVisible(false);
         downloadProgress.setManaged(false);
@@ -4994,7 +5000,8 @@ public class HelloApplication extends Application {
         downloadProgress.setVisible(true);
         downloadProgress.setManaged(true);
         double ratio = Math.min(1.0, (double) status.done() / status.total());
-        downloadProgress.setProgress(ratio);
+        // 单文件下载时 done 一直是 0，用不确定进度条避免看起来“失效/消失”
+        downloadProgress.setProgress(status.total() == 1 && status.done() == 0 ? -1 : ratio);
         downloadFileLabel.setText(status.file() == null || status.file().isBlank()
                 ? "正在下载…"
                 : "正在下载：" + status.file());

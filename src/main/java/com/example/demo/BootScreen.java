@@ -148,6 +148,22 @@ public final class BootScreen extends StackPane {
         overlay.setBottom(bottom);
         overlay.setPickOnBounds(false);
         BorderPane.setAlignment(centerGroup, Pos.CENTER);
+
+        javafx.scene.image.ImageView chibi = new javafx.scene.image.ImageView();
+        try (java.io.InputStream in = BootScreen.class.getResourceAsStream("/neko-chibi.png")) {
+            if (in != null) chibi.setImage(new javafx.scene.image.Image(in));
+        } catch (Exception ignored) {
+        }
+        chibi.setFitHeight(190);
+        chibi.setFitWidth(134);
+        chibi.setPreserveRatio(true);
+        StackPane chibiCard = new StackPane(chibi);
+        chibiCard.setMaxSize(170, 210);
+        chibiCard.setStyle("-fx-background-color: rgba(220,244,212,0.96); -fx-background-radius: 24;"
+                + " -fx-border-color: rgba(94,234,212,0.65); -fx-border-radius: 24; -fx-padding: 8;");
+        StackPane.setAlignment(chibiCard, Pos.BOTTOM_RIGHT);
+        StackPane.setMargin(chibiCard, new Insets(0, 34, 88, 0));
+        getChildren().add(chibiCard);
         getChildren().add(overlay);
 
         setOnMouseMoved(e -> {
