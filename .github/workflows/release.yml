@@ -1,0 +1,62 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Resolve version from tag
+        id: version
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          if ([string]::IsNullOrWhiteSpace($version) -or $version -eq 'workflow_dispatch') {
+            $version = "1.0.0"
+          }
+          $path = "src/main/java/com/example/demo/AppVersion.java"
+          $content = Get-Content $path -Raw
+          $content = $content -replace 'CURRENT = "[^"]+"', "CURRENT = `"$version`""
+          Set-Content -Path $path -Value $content -Encoding UTF8
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Build app image and run tests
+        shell: pwsh
+        run: .\package-exe.ps1 -JavaHome $env:JAVA_HOME -AppVersion "${{ steps.version.outputs.version }}"
+
+      - name: Ensure Inno Setup
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup --no-progress -y
+          }
+
+      - name: Build installer
+        shell: pwsh
+        run: .\package-inno.ps1 -SkipAppImage -AppVersion "${{ steps.version.outputs.version }}"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Neko Craft Launcher v${{ steps.version.outputs.version }}
+          generate_release_notes: true
+          files: |
+            release/installer-inno/NekoCraftLauncher-Setup-*-x64.exe
+            release/NekoCraftLauncher-exe.zip

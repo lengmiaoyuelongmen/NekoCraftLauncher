@@ -1,0 +1,174 @@
+/* 浅色模式：覆盖 -app-* 变量，界面颜色由 CSS 变量驱动；降低纯白面积、加深文字对比 */
+.root {
+    -app-launch-top: rgba(15,23,42,0.10);
+    -app-launch-bottom: rgba(15,23,42,0.035);
+    -app-launch-top-hover: rgba(15,23,42,0.17);
+    -app-launch-bottom-hover: rgba(15,23,42,0.06);
+    -app-launch-border: rgba(15,23,42,0.30);
+    -app-launch-border-hover: rgba(15,23,42,0.48);
+    -app-bg: #dfe5ec;
+    -app-root-1: #eef2f7;
+    -app-root-2: #e8edf4;
+    -app-root-3: #e1e7ef;
+    -app-bg-2: #e9eef5;
+    -app-bg-3: #dfe5ec;
+    -app-surface: #f7f9fc;
+    -app-surface-2: #eef2f7;
+    -app-nav: #eef2f7;
+    -app-nav-2: #e7edf4;
+    -app-card: #f8fafc;
+    -app-card-alt: #f8fafc;
+    -app-card-alt2: #f1f5f9;
+    -app-card-top: #f8fafc;
+    -app-card-top2: #f8fafc;
+    -app-card-hover: #eef2f7;
+    -app-row: #f8fafc;
+    -app-row2: #f8fafc;
+    -app-row3: #f8fafc;
+    -app-hover: #e6ecf3;
+    -app-hover-2: #e6ecf3;
+    -app-hover-3: #dbe3ec;
+    -app-border: #b9c5d3;
+    -app-border-2: #cbd5e1;
+    -app-border-3: #c3cedb;
+    -app-border-4: #b9c5d3;
+    -app-border-5: #d5dde7;
+    -app-panel: #f1f5f9;
+    -app-panel-2: #e9eef5;
+    -app-text: #0b1220;
+    -app-text-strong: #020617;
+    -app-text-2: #1e293b;
+    -app-text-dim: #334155;
+    -app-text-dim-2: #3f4c5c;
+    -app-text-dim-3: #475569;
+    -app-text-muted: #475569;
+    -app-text-muted-2: #334155;
+    -app-text-muted-3: #475569;
+    -app-border-soft: rgba(15, 23, 42, 0.12);
+    -app-input: #ffffff;
+    -app-btn-2: #e2e8f0;
+    -app-btn-3: #cbd5e1;
+    -app-arrow: #334155;
+    -app-arrow-2: #1e293b;
+    -app-border-6: #b9c5d3;
+    -app-log-bg: #f8fafc;
+    -app-text-nav: #334155;
+    -app-text-muted-c: #64748b;
+}
+
+/* 顶栏始终深色 */
+.app-topbar {
+    -fx-background-color: #171a21;
+    -fx-background-radius: 12 12 0 0;
+    -fx-border-color: transparent transparent #2b303a transparent;
+}
+
+.text-field,
+.text-area,
+.combo-box,
+.spinner,
+.list-view {
+    -fx-control-inner-background: #ffffff;
+    -fx-background-color: #ffffff;
+    -fx-text-fill: #0b1220;
+    -fx-border-color: #b9c5d3;
+}
+
+.text-field,
+.text-area {
+    -fx-text-fill: #0b1220;
+    -fx-prompt-text-fill: #64748b;
+}
+
+.text-area .content {
+    -fx-background-color: #f8fafc;
+}
+
+.text-field:focused,
+.password-field:focused,
+.combo-box:focused,
+.spinner:focused {
+    -fx-border-color: #475569;
+}
+
+.combo-box .list-cell,
+.list-view .list-cell {
+    -fx-text-fill: #0b1220;
+    -fx-background-color: transparent;
+}
+
+.combo-box .arrow {
+    -fx-background-color: #334155;
+}
+
+.combo-box-popup .list-view {
+    -fx-background-color: #f8fafc;
+    -fx-border-color: #b9c5d3;
+}
+
+.combo-box-popup .list-view .list-cell:filled:selected {
+    -fx-background-color: #475569;
+    -fx-text-fill: #ffffff;
+}
+
+.combo-box-popup .list-view .list-cell:hover {
+    -fx-background-color: #e6ecf3;
+    -fx-text-fill: #0b1220;
+}
+
+.check-box,
+.radio-button {
+    -fx-text-fill: #1e293b;
+}
+
+.check-box .box,
+.radio-button .radio {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #64748b;
+}
+
+.check-box:selected .box {
+    -fx-background-color: #475569;
+    -fx-border-color: #475569;
+}
+
+.check-box:selected .mark {
+    -fx-background-color: #ffffff;
+}
+
+.radio-button:selected .dot {
+    -fx-background-color: #475569;
+}
+
+.mod-row,
+.instance-row,
+.log-row {
+    -fx-background-color: #f8fafc;
+    -fx-border-color: #cbd5e1;
+    -fx-border-radius: 10;
+}
+
+.mod-row:hover,
+.instance-row:hover,
+.log-row:hover {
+    -fx-background-color: #eef2f7;
+}
+
+.scroll-bar {
+    -fx-background-color: #dfe5ec;
+}
+
+.scroll-bar .thumb {
+    -fx-background-color: #94a3b8;
+}
+
+/* 禁用态不要淡到看不清 */
+.spinner:disabled,
+.text-field:disabled,
+.combo-box:disabled {
+    -fx-opacity: 0.85;
+}
+
+.instance-nav-item.selected {
+    -fx-background-color: #ffffff;
+}

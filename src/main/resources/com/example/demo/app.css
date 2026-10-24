@@ -1,0 +1,516 @@
+/*
+ * 全局样式：集中放在资源里，避免每次启动拼接字符串 + 写临时文件。
+ * 颜色用 JavaFX 的 looked-up color（-app-*），以后换主题只改 .root 里的变量。
+ */
+
+.root {
+    -app-bg: #12080a;
+    -app-root-1: #2a1014;
+    -app-root-2: #1c0b0e;
+    -app-root-3: #120709;
+    -app-input: #241013;
+    -app-btn-2: #2a303b;
+    -app-btn-3: #38404e;
+    -app-arrow: #7b8494;
+    -app-arrow-2: #9aa3b2;
+    -app-border-6: #3a4150;
+    -app-log-bg: #170b0d;
+    -app-text-nav: #a4abba;
+    -app-text-muted-c: #5c6572;
+    -app-surface: #1b0d10;
+    -app-card: #2a1418;
+    -app-card-hover: #351a1e;
+    -app-border: #3b2024;
+    -app-border-soft: rgba(255, 255, 255, 0.08);
+    -app-text: #f5e8e6;
+    -app-text-dim: #bb9c98;
+    -app-text-muted: #946f6b;
+    -app-launch-top: rgba(225,29,46,0.38);
+    -app-launch-bottom: rgba(120,10,20,0.22);
+    -app-launch-top-hover: rgba(255,70,60,0.52);
+    -app-launch-bottom-hover: rgba(160,15,25,0.30);
+    -app-launch-border: rgba(255,140,110,0.55);
+    -app-launch-border-hover: rgba(255,205,110,0.75);
+    -app-accent: #e11d2e;
+    -app-accent-soft: rgba(225, 29, 46, 0.24);
+    /* 界面里实际用到的深色值，统一成变量，浅色模式只改这里 */
+    -app-bg-2: #15090b;
+    -app-bg-3: #170b0e;
+    -app-surface-2: #1a0c0f;
+    -app-nav: #190c0f;
+    -app-nav-2: #180b0e;
+    -app-card-alt: #220f12;
+    -app-card-alt2: #241014;
+    -app-card-top: #2e151a;
+    -app-card-top2: #32171c;
+    -app-row: #251114;
+    -app-row2: #281216;
+    -app-row3: #2b1418;
+    -app-hover: #351a1e;
+    -app-hover-2: #2c1418;
+    -app-hover-3: #3a1c20;
+    -app-border-2: #3a1f23;
+    -app-border-3: #3d2226;
+    -app-border-4: #4a292d;
+    -app-border-5: #351b1f;
+    -app-panel: #2a1418;
+    -app-panel-2: #200f12;
+    -app-text-strong: #f2e4e1;
+    -app-text-2: #eed7d3;
+    -app-text-dim-2: #b5928e;
+    -app-text-dim-3: #9a756f;
+    -app-text-muted-2: #666666;
+    -app-text-muted-3: #888888;
+    -fx-font-family: 'Microsoft YaHei UI', 'Microsoft YaHei', 'Segoe UI', sans-serif;
+    -fx-focus-color: -app-accent;
+    -fx-faint-focus-color: transparent;
+}
+
+/* ---------------- 输入框 / 下拉框 ---------------- */
+
+.text-field,
+.password-field {
+    -fx-background-radius: 9;
+    -fx-border-radius: 9;
+    -fx-border-color: #343a46;
+    -fx-background-color: -app-input;
+    -fx-text-fill: -app-text;
+    -fx-prompt-text-fill: -app-text-muted-c;
+    -fx-padding: 7 10;
+}
+
+.text-field:focused,
+.password-field:focused {
+    -fx-border-color: -app-accent;
+    -fx-background-color: #1f242e;
+}
+
+.combo-box {
+    -fx-background-color: -app-input;
+    -fx-border-color: #343a46;
+    -fx-background-radius: 9;
+    -fx-border-radius: 9;
+    -fx-padding: 2;
+}
+
+.combo-box:hover {
+    -fx-border-color: #48505f;
+}
+
+.combo-box:focused {
+    -fx-border-color: -app-accent;
+}
+
+.combo-box > .list-cell {
+    -fx-text-fill: -app-text !important;
+    -fx-background-color: transparent !important;
+    -fx-padding: 0 8;
+}
+
+.combo-box .arrow-button {
+    -fx-background-color: transparent;
+}
+
+.combo-box .arrow {
+    -fx-background-color: -app-arrow;
+}
+
+.combo-box-popup .list-view {
+    -fx-background-color: -app-input;
+    -fx-border-color: #343a46;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-padding: 4;
+}
+
+.combo-box-popup .list-view .list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: -app-text;
+    -fx-padding: 7 14;
+    -fx-background-radius: 7;
+}
+
+.combo-box-popup .list-view .list-cell:hover {
+    -fx-background-color: #2a2f3a;
+    -fx-text-fill: white;
+}
+
+.combo-box-popup .list-view .list-cell:filled:selected {
+    -fx-background-color: -app-accent;
+    -fx-text-fill: white;
+}
+
+.combo-box .text-field {
+    -fx-background-color: transparent;
+    -fx-text-fill: -app-text;
+}
+
+.spinner {
+    -fx-background-color: transparent;
+}
+
+.spinner .text-field {
+    -fx-background-color: -app-input;
+    -fx-text-fill: -app-text;
+    -fx-background-radius: 7;
+    -fx-border-radius: 7;
+    -fx-border-color: #343a46;
+}
+
+.spinner .increment-arrow-button,
+.spinner .decrement-arrow-button {
+    -fx-background-color: -app-btn-2;
+}
+
+.spinner .increment-arrow-button:hover,
+.spinner .decrement-arrow-button:hover {
+    -fx-background-color: -app-btn-3;
+}
+
+.spinner .increment-arrow,
+.spinner .decrement-arrow {
+    -fx-background-color: -app-arrow-2;
+}
+
+.text-area {
+    -fx-background-color: -app-log-bg;
+    -fx-border-color: -app-btn-2;
+    -fx-border-radius: 10;
+    -fx-background-radius: 10;
+}
+
+.text-area .content {
+    -fx-background-color: -app-log-bg;
+}
+
+.text-area .scroll-pane,
+.text-area .scroll-pane .viewport {
+    -fx-background-color: transparent;
+}
+
+/* ---------------- 滚动条 ---------------- */
+
+.scroll-pane {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+    -fx-padding: 0;
+}
+
+.scroll-pane .viewport {
+    -fx-background-color: transparent;
+}
+
+.scroll-pane .corner {
+    -fx-background-color: transparent;
+}
+
+.scroll-bar:vertical {
+    -fx-background-color: transparent;
+    -fx-pref-width: 8px;
+}
+
+.scroll-bar:vertical .track {
+    -fx-background-color: transparent;
+}
+
+.scroll-bar:vertical .thumb {
+    -fx-background-color: -app-border-6;
+    -fx-background-radius: 5;
+}
+
+.scroll-bar:vertical .thumb:hover {
+    -fx-background-color: #4b5464;
+}
+
+.scroll-bar:vertical .increment-button,
+.scroll-bar:vertical .decrement-button {
+    -fx-pref-height: 0;
+    -fx-pref-width: 0;
+}
+
+.scroll-bar:horizontal {
+    -fx-pref-height: 0;
+    -fx-opacity: 0;
+    -fx-max-height: 0;
+}
+
+/* ---------------- 列表 ---------------- */
+
+.list-view {
+    -fx-background-color: transparent;
+    -fx-control-inner-background: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+    -fx-border-width: 0;
+}
+
+.list-view .list-cell {
+    -fx-background-color: transparent;
+    -fx-padding: 6 0;
+    -fx-text-fill: -app-text;
+}
+
+.list-view .list-cell:filled:hover,
+.list-view .list-cell:filled:selected,
+.list-view .list-cell:empty {
+    -fx-background-color: transparent;
+}
+
+.list-view .virtual-flow,
+.list-view .virtual-flow .clipped-container,
+.list-view .virtual-flow .clipped-container .sheet {
+    -fx-background-color: transparent;
+}
+
+/* ---------------- 其它控件 ---------------- */
+
+.check-box {
+    -fx-text-fill: #c7ccd4;
+}
+
+.check-box .box {
+    -fx-background-color: -app-input;
+    -fx-border-color: -app-border-6;
+    -fx-border-radius: 5;
+    -fx-background-radius: 5;
+}
+
+.check-box:selected .box {
+    -fx-background-color: -app-accent;
+    -fx-border-color: -app-accent;
+}
+
+.check-box:selected .mark {
+    -fx-background-color: white;
+}
+
+.slider .track {
+    -fx-background-color: -app-btn-2;
+}
+
+.slider .thumb {
+    -fx-background-color: -app-accent;
+}
+
+.progress-bar .track {
+    -fx-background-color: -app-input;
+    -fx-background-radius: 6;
+}
+
+.progress-bar .bar {
+    -fx-background-color: linear-gradient(to right, #d1d5db, #6b7280);
+    -fx-background-radius: 6;
+    -fx-background-insets: 0;
+}
+
+.tooltip {
+    -fx-background-color: rgba(28, 31, 39, 0.98);
+    -fx-text-fill: #e8eaee;
+    -fx-background-radius: 8;
+    -fx-border-color: rgba(255, 255, 255, 0.10);
+    -fx-border-radius: 8;
+    -fx-font-size: 11.5px;
+    -fx-padding: 6 10;
+}
+
+/* ---------------- 自定义组件 ---------------- */
+
+.card {
+    -fx-background-color: linear-gradient(to bottom, #252a34, #1f232c);
+    -fx-background-radius: 14;
+    -fx-border-color: rgba(255, 255, 255, 0.06);
+    -fx-border-radius: 14;
+}
+
+.card-title {
+    -fx-text-fill: -app-text;
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+}
+
+.row-hover {
+    -fx-background-radius: 10;
+    -fx-cursor: hand;
+}
+
+.mod-row {
+    -fx-background-color: #262a32;
+    -fx-background-radius: 10;
+}
+
+.mod-row:hover {
+    -fx-background-color: #30353e;
+}
+
+.instance-row {
+    -fx-background-color: #1f232c;
+    -fx-background-radius: 10;
+}
+
+.instance-row:hover {
+    -fx-background-color: #262c37;
+}
+
+/* 导航按钮：由代码加 styleClass，悬停交给 CSS，避免每次 hover 重解析内联样式 */
+.nav-btn {
+    -fx-background-color: transparent;
+    -fx-text-fill: -app-text-nav;
+    -fx-font-size: 13.5px;
+    -fx-padding: 7 16;
+    -fx-background-radius: 9;
+    -fx-cursor: hand;
+}
+
+.nav-btn:hover {
+    -fx-background-color: rgba(225, 29, 46, 0.12);
+    -fx-text-fill: #ffffff;
+}
+
+.nav-btn-active {
+    -fx-background-color: rgba(225, 29, 46, 0.18);
+    -fx-border-color: rgba(255, 110, 90, 0.45);
+    -fx-border-width: 1;
+    -fx-border-radius: 9;
+    -fx-text-fill: #ffe1d8;
+    -fx-font-weight: bold;
+}
+
+/* 上下文菜单 / 批量菜单 */
+.context-menu {
+    -fx-background-color: -app-input;
+    -fx-border-color: #343a46;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-padding: 4;
+}
+
+.menu-item {
+    -fx-background-color: transparent;
+    -fx-background-radius: 7;
+    -fx-padding: 6 16;
+}
+
+.menu-item .label {
+    -fx-text-fill: #d7dce5;
+    -fx-font-size: 12px;
+}
+
+.menu-item:focused {
+    -fx-background-color: #2a2f3a;
+}
+
+.menu-item:focused .label {
+    -fx-text-fill: #ffffff;
+}
+
+.menu-button .arrow {
+    -fx-background-color: -app-arrow-2;
+}
+.menu-button {
+    -fx-text-fill: #c7ccd4;
+}
+
+.menu-button > .label {
+    -fx-text-fill: #c7ccd4;
+    -fx-padding: 0 2 0 0;
+}
+
+.menu-button:hover {
+    -fx-background-color: -app-border-6;
+}
+.log-row {
+    -fx-background-color: #20252f;
+    -fx-background-radius: 10;
+    -fx-border-color: rgba(255, 255, 255, 0.04);
+    -fx-border-radius: 10;
+}
+
+.log-row:hover {
+    -fx-background-color: #262c37;
+}
+/* 设置页左侧页签（学习 PCL-CE 的选项卡布局） */
+.app-tab {
+    -fx-background-radius: 9;
+    -fx-cursor: hand;
+}
+
+.app-tab:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.05);
+}
+
+.app-tab-active {
+    -fx-background-color: rgba(156, 163, 175, 0.16);
+}
+
+.app-tab-active:hover {
+    -fx-background-color: rgba(156, 163, 175, 0.22);
+}
+/* PCL-CE 风格：蓝色标题栏 + 白色胶囊导航 */
+.nav-btn {
+    -fx-text-fill: rgba(255, 255, 255, 0.86);
+    -fx-padding: 6 16;
+    -fx-background-radius: 16;
+}
+
+.nav-btn:hover {
+    -fx-background-color: rgba(225, 29, 46, 0.14);
+    -fx-text-fill: #ffffff;
+}
+
+.nav-btn-active {
+    -fx-background-color: rgba(225, 29, 46, 0.20);
+    -fx-border-color: rgba(255, 110, 90, 0.65);
+    -fx-border-width: 1.2;
+    -fx-border-radius: 16;
+    -fx-text-fill: #ffe1d8;
+    -fx-font-weight: bold;
+    -fx-padding: 5 15;
+}
+/* 顶部标题栏：始终深色（含浅色模式），所以单独写死 */
+.app-topbar {
+    -fx-background-color: #171a21;
+    -fx-background-radius: 12 12 0 0;
+    -fx-border-color: transparent transparent #2b303a transparent;
+}
+/* 对话框：跟随主题，避免深色界面里出现白色按钮区 */
+.dialog-pane {
+    -fx-background-color: -app-bg-2;
+}
+.dialog-pane .header-panel {
+    -fx-background-color: -app-bg-2;
+}
+.dialog-pane .header-panel .label {
+    -fx-text-fill: -app-text;
+}
+.dialog-pane .content.label {
+    -fx-text-fill: -app-text-2;
+}
+.dialog-pane .button-bar .container {
+    -fx-background-color: -app-bg-2;
+}
+.dialog-pane .button {
+    -fx-background-color: -app-btn-2;
+    -fx-text-fill: -app-text;
+    -fx-background-radius: 8;
+    -fx-padding: 6 18;
+    -fx-cursor: hand;
+}
+.dialog-pane .button:hover {
+    -fx-background-color: -app-btn-3;
+}
+.dialog-pane .button:default {
+    -fx-background-color: #9ca3af;
+    -fx-text-fill: #111827;
+    -fx-font-weight: bold;
+}
+/* 实例设置侧栏：hover 交给 CSS，选中单独标记，避免手动 hover 残留 */
+.instance-nav-item {
+    -fx-background-color: transparent;
+}
+.instance-nav-item.selected {
+    -fx-background-color: #232730;
+}
+
+.mod-card:hover {
+    -fx-effect: dropshadow(gaussian, rgba(156,163,175,0.22), 20, 0.12, 0, 5);
+}
