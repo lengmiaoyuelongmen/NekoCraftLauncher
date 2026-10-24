@@ -105,8 +105,10 @@ public final class UpdateChecker {
 
     /** 下载安装包到本地，progress 为 0~1，未知总大小时为 -1。 */
     public static void download(String url, Path target, DoubleConsumer progress) throws Exception {
-        if (url == null || !url.startsWith("https://")) {
-            throw new IllegalArgumentException("只允许 HTTPS 下载地址");
+        boolean localHttp = url != null && (url.startsWith("http://127.0.0.1")
+                || url.startsWith("http://localhost"));
+        if (url == null || (!url.startsWith("https://") && !localHttp)) {
+            throw new IllegalArgumentException("只允许 HTTPS 或本机 HTTP 下载地址");
         }
         HttpRequest request = HttpRequest.newBuilder(URI.create(url))
                 .timeout(Duration.ofMinutes(10))
