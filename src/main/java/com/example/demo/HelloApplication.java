@@ -3755,8 +3755,13 @@ public class HelloApplication extends Application {
             })).exceptionally(ex -> {
                 Platform.runLater(() -> {
                     loadingMoreResults = false;
-                    statusBox.setVisible(false);
-                    statusLabel.setText("请求失败: " + ex.getMessage());
+                    statusBox.setVisible(true);
+                    statusBox.getChildren().setAll(statusLabel);
+                    statusLabel.setText("请求失败：" + ex.getMessage() + "（点击重试）");
+                    statusBox.setOnMouseClicked(ev -> {
+                        statusLabel.setText("正在重新加载...");
+                        loadSearchPage(true);
+                    });
                     updateLoadMoreButton();
                 });
                 return null;
