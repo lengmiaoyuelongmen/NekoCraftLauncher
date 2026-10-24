@@ -4385,9 +4385,11 @@ public class HelloApplication extends Application {
         logArea.appendText("📥 正在下载: " + targetFile.getName() + "\n");
         CompletableFuture.runAsync(() -> {
             try {
-                long size = Downloader.downloadFileSync(url, targetFile);
+                DownloadManager.Stats stats = DownloadManager.downloadAll(
+                        List.of(new DownloadManager.Task(url, targetFile, null, -1)), 1, null);
+                long size = targetFile.length();
                 Platform.runLater(() -> {
-                    if (size <= 0) {
+                    if (stats.failed > 0 || size <= 0) {
                         logArea.appendText("❌ 下载失败: " + targetFile.getName() + "\n");
                         return;
                     }
