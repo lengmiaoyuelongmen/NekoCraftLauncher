@@ -4753,6 +4753,8 @@ public class HelloApplication extends Application {
             File target = nativesSubDir(nativesDir, artifact[1]);
             if (!target.exists()) target.mkdirs();
             extracted += extractDlls(jarFile, target);
+            // 兼容 1.18 及更早版本：它们只读取 java.library.path 根目录
+            if (!target.equals(nativesDir)) extracted += extractDlls(jarFile, nativesDir);
         }
         if (extracted > 0) {
             System.out.println("[natives] 解压出 " + extracted + " 个 dll -> " + nativesDir.getAbsolutePath());
