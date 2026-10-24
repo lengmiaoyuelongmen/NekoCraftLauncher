@@ -4706,6 +4706,21 @@ public class HelloApplication extends Application {
     private void ensureAssets(VersionProfile profile, File gameDir, java.util.function.Consumer<String> log) throws Exception {
         String indexId = profile.getAssetIndexId();
         File indexFile = new File(gameDir, "assets/indexes/" + indexId + ".json");
+        boolean validIndex = false;
+        if (indexFile.isFile() && indexFile.length() > 2) {
+            try (java.io.InputStream in = Files.newInputStream(indexFile.toPath())) {
+                int b;
+                do {
+                    b = in.read();
+                } while (b == ' ' || b == '\n' || b == '\r' || b == '\t');
+                validIndex = b == '{';
+            } catch (Exception ignored) {
+            }
+        }
+        if (!validIndex && indexFile.exists()) {
+            log.accept("索引文件损坏，正在重新下载: " + indexId);
+            indexFile.delete();
+        }
         if (!indexFile.isFile()) {
             String indexUrl = profile.getAssetIndexUrl();
             if (indexUrl == null) return;
