@@ -69,6 +69,7 @@ public final class DownloadManager {
     private static volatile int currentTotal = 0;
     private static final java.util.concurrent.atomic.AtomicLong transferredBytes =
             new java.util.concurrent.atomic.AtomicLong();
+    private static final AtomicInteger activeDownloads = new AtomicInteger();
 
     public static Status status() {
         return status;
@@ -132,6 +133,7 @@ public final class DownloadManager {
             return stats;
         }
 
+        activeDownloads.addAndGet(total);
         AtomicInteger done = new AtomicInteger();
         AtomicLong bytes = new AtomicLong();
         AtomicLong lastReport = new AtomicLong(0);
@@ -162,6 +164,7 @@ public final class DownloadManager {
                 long elapsed = Math.max(1, System.currentTimeMillis() - startedAt);
                 publishStatus(finished, total, transferredBytes.get(), currentFile,
                         transferredBytes.get() * 1000 / elapsed);
+                activeDownloads.decrementAndGet();
             }, pool));
         }
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
@@ -300,6 +303,8 @@ public final class DownloadManager {
         if (total < 2L * 1024 * 1024 || connections <= 1) {
             return downloadAll(List.of(task), 1, progress);
         }
+        activeDownloads.incrementAndGet();
+        try {
         int parts = Math.max(2, Math.min(8, connections));
         long chunk = (total + parts - 1) / parts;
         java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(parts);
@@ -370,6 +375,9 @@ public final class DownloadManager {
         }
         for (File part : partFiles) part.delete();
         return downloadAll(List.of(task), 1, progress);
+        } finally {
+            activeDownloads.decrementAndGet();
+        }
     }
 
     private static long headSize(String url) {
@@ -387,6 +395,24 @@ public final class DownloadManager {
         } catch (Exception ignored) {
         }
         return -1;
+    }
+
+    /** 等待所有正在进行/排队的下载结束，供启动游戏前做全局闸门。 */
+    public static boolean awaitIdle(long timeoutMs) {
+        long deadline = System.currentTimeMillis() + Math.max(1000, timeoutMs);
+        while (activeDownloads.get() > 0 && System.currentTimeMillis() < deadline) {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
+        return activeDownloads.get() == 0;
+    }
+
+    public static int activeCount() {
+        return activeDownloads.get();
     }
 
     private static List<String> candidates(String officialUrl) {

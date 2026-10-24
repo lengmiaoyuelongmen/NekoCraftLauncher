@@ -6,6 +6,7 @@ import com.google.gson.JsonObject;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.StringJoiner;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -86,7 +87,8 @@ public final class LaunchCommand {
         vars.put("clientid", "");
         vars.put("user_type", session.getUserType() == null ? "legacy" : session.getUserType());
         vars.put("version_type", profile.getType());
-        vars.put("natives_directory", nativesDir.getAbsolutePath());
+        String nativesPath = nativesPath(nativesDir);
+        vars.put("natives_directory", nativesPath);
         vars.put("launcher_name", "MCLauncher");
         vars.put("launcher_version", "1.0");
         vars.put("classpath", classpath.toString());
@@ -120,7 +122,7 @@ public final class LaunchCommand {
         if (jvm != null && jvm.size() > 0) {
             expand(jvm, vars, features, command);
         } else {
-            command.add("-Djava.library.path=" + nativesDir.getAbsolutePath());
+            command.add("-Djava.library.path=" + nativesPath);
             command.add("-cp");
             command.add(classpath.toString());
         }
@@ -178,5 +180,17 @@ public final class LaunchCommand {
 
     private static String nvl(String s) {
         return s == null ? "" : s;
+    }
+
+    /** 1.19+ 的 natives 分目录存放；java.library.path 必须包含根目录和这些子目录。 */
+    private static String nativesPath(File nativesDir) {
+        StringJoiner joiner = new StringJoiner(File.pathSeparator);
+        joiner.add(nativesDir.getAbsolutePath());
+        File[] subs = nativesDir.listFiles(File::isDirectory);
+        if (subs != null) {
+            java.util.Arrays.sort(subs, java.util.Comparator.comparing(File::getName));
+            for (File sub : subs) joiner.add(sub.getAbsolutePath());
+        }
+        return joiner.toString();
     }
 }

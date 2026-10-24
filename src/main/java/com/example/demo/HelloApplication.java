@@ -4559,6 +4559,16 @@ public class HelloApplication extends Application {
                         }
                     }
                 }
+                log.accept("⏳ 等待所有下载任务完成后再启动游戏…");
+                if (!DownloadManager.awaitIdle(30L * 60 * 1000)) {
+                    log.accept("⚠ 仍有下载任务未完成，已取消本次启动；请等待下载完成后重试。");
+                    Platform.runLater(() -> {
+                        launchBtn.setDisable(false);
+                        if (launchMainLabel != null) launchMainLabel.setText("启动游戏");
+                    });
+                    return;
+                }
+                log.accept("✅ 下载任务全部完成，开始启动游戏。");
                 Platform.runLater(() -> startGame(profile));
             } catch (Exception e) {
                 Platform.runLater(() -> {
@@ -4800,7 +4810,7 @@ public class HelloApplication extends Application {
             downloadBarPanel.setVisible(true);
             downloadBarPanel.setManaged(true);
         }
-        if (status.total() <= 0) {
+        if (status.total() <= 0 || status.done() >= status.total()) {
             downloadFileLabel.setText("空闲");
             downloadFileLabel.setVisible(true);
             downloadFileLabel.setManaged(true);
@@ -5084,7 +5094,7 @@ public class HelloApplication extends Application {
     private void startGame(VersionProfile profile) {
         launchPrepareStart = System.currentTimeMillis();
         File gameDir = new File(config.getGameDir());
-        File nativesDir = new File(gameDir, "natives");
+        File nativesDir = InstanceDirs.natives(gameDir, profile.getId(), config.isIsolation());
 
         CompletableFuture<File> injectorFuture = currentSession.getType() == UserSession.LoginType.THIRD_PARTY
                 ? AuthlibInjectorManager.ensureInjectorAsync(gameDir, msg -> Platform.runLater(() -> logArea.appendText(msg + "\n")))

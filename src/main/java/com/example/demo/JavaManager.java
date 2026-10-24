@@ -32,10 +32,19 @@ public class JavaManager {
             File javaDir = new File(gameDir, "java");
             File javaExe = new File(javaDir, "zulu" + majorVersion + "/bin/java.exe");
 
-            if (javaExe.exists()) {
+            if (javaExe.exists() && !isCracBuild(javaExe.getParentFile().getParentFile())) {
                 logConsumer.accept("✅ 检测到本地 Azul Zulu " + majorVersion + "："
                         + javaExe.getAbsolutePath());
                 return javaExe.getAbsolutePath();
+            }
+            if (javaExe.exists()) {
+                File home = javaExe.getParentFile().getParentFile();
+                File backup = new File(home.getParentFile(),
+                        "zulu" + majorVersion + "-crac-backup-" + System.currentTimeMillis());
+                logConsumer.accept("⚠ 检测到 Azul CRaC 实验版，正在替换为标准 Zulu " + majorVersion + "…");
+                if (!home.renameTo(backup)) {
+                    logConsumer.accept("⚠ 无法移动旧运行时，将继续使用 " + home);
+                }
             }
 
             logConsumer.accept("🌐 正在查询 Azul Zulu " + majorVersion + " 最新版本信息...");
@@ -48,7 +57,16 @@ public class JavaManager {
                 JsonArray arr = new Gson().fromJson(apiResp.body(), JsonArray.class);
                 if (arr.size() == 0) throw new RuntimeException("未获取到 Zulu " + majorVersion + " 可用版本");
 
-                JsonObject latest = arr.get(0).getAsJsonObject();
+                JsonObject latest = null;
+                for (com.google.gson.JsonElement element : arr) {
+                    JsonObject candidate = element.getAsJsonObject();
+                    if (!candidate.has("download_url")) continue;
+                    String candidateUrl = candidate.get("download_url").getAsString();
+                    if (candidateUrl.toLowerCase(java.util.Locale.ROOT).contains("crac")) continue;
+                    latest = candidate;
+                    break;
+                }
+                if (latest == null) throw new RuntimeException("没有找到标准（非 CRaC）Zulu " + majorVersion);
                 String downloadUrl = latest.get("download_url").getAsString();
                 String fileName = downloadUrl.substring(downloadUrl.lastIndexOf("/") + 1);
 
@@ -104,5 +122,17 @@ public class JavaManager {
                 throw new RuntimeException(e);
             }
         });
+    }
+
+    /** CRaC 实验版运行时容易与旧 LWJGL/Forge 冲突，优先使用标准 Zulu。 */
+    private static boolean isCracBuild(File javaHome) {
+        File release = new File(javaHome, "release");
+        if (!release.isFile()) return false;
+        try {
+            String text = java.nio.file.Files.readString(release.toPath());
+            return text.contains("CRaC") || text.contains("jdk.crac");
+        } catch (Exception e) {
+            return false;
+        }
     }
 }
