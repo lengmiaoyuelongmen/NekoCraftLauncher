@@ -513,7 +513,7 @@ public class HelloApplication extends Application {
         appTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
         appTitle.setTextFill(javafx.scene.paint.Color.web("#e8eaee"));
         Label badge = new Label("NEKO");
-        badge.setStyle("-fx-font-size: 9.5px; -fx-font-weight: bold;");
+        badge.setStyle("-fx-font-size: 10.5px; -fx-font-weight: bold;");
         badge.setTextFill(javafx.scene.paint.Color.web("#5eead4"));
         Label liveClock = new Label();
         liveClock.setStyle("-fx-text-fill: #7b818b; -fx-font-size: 10.5px; -fx-font-family: 'Cascadia Mono', 'Consolas', monospace;");
@@ -863,10 +863,10 @@ public class HelloApplication extends Application {
         panel.setPadding(new Insets(25));
 
         VBox userArea = new VBox(12);
-        userArea.setPrefWidth(346);
+        userArea.setPrefWidth(370);
         userArea.setAlignment(Pos.TOP_CENTER);
         userArea.setStyle("-fx-background-color: -app-card;"
-                + " -fx-background-radius: 20; -fx-padding: 20;"
+                + " -fx-background-radius: 20; -fx-padding: 16;"
                 + " -fx-border-color: -app-border-2; -fx-border-width: 1; -fx-border-radius: 20;"
                 + " -fx-effect: dropshadow(gaussian, rgba(15,23,42,0.12), 24, 0.12, 0, 8);");
 
@@ -1051,28 +1051,28 @@ public class HelloApplication extends Application {
         launchMainLabel.setOpacity(0);
         launchMainLabel.setManaged(false);
         launchVersionLabel = new Label("");
-        launchVersionLabel.setStyle("-fx-text-fill: #6aa95b; -fx-font-size: 9.5px; -fx-font-weight: bold;");
+        launchVersionLabel.setStyle("-fx-text-fill: #6aa95b; -fx-font-size: 10.5px; -fx-font-weight: bold;");
 
         javafx.scene.image.ImageView launchArt = new javafx.scene.image.ImageView();
         try (java.io.InputStream in = HelloApplication.class.getResourceAsStream("/launch-banner.png")) {
             if (in != null) launchArt.setImage(new javafx.scene.image.Image(in));
         } catch (Exception ignored) {
         }
-        launchArt.setFitWidth(300);
-        launchArt.setFitHeight(104);
+        launchArt.setFitWidth(330);
+        launchArt.setFitHeight(115);
         launchArt.setPreserveRatio(true);
         launchArt.setSmooth(true);
         StackPane launchBanner = new StackPane(launchArt, launchVersionLabel);
-        launchBanner.setPrefSize(300, 104);
-        launchBanner.setMaxSize(300, 104);
+        launchBanner.setPrefSize(330, 115);
+        launchBanner.setMaxSize(330, 115);
         StackPane.setAlignment(launchVersionLabel, Pos.BOTTOM_RIGHT);
         launchVersionLabel.setAlignment(Pos.CENTER_RIGHT);
-        StackPane.setMargin(launchVersionLabel, new Insets(0, 78, 14, 0));
+        StackPane.setMargin(launchVersionLabel, new Insets(0, 137, 15, 0));
         launchBtn.setGraphic(launchBanner);
         launchBtn.setContentDisplay(javafx.scene.control.ContentDisplay.GRAPHIC_ONLY);
         launchBtn.setMaxWidth(Double.MAX_VALUE);
-        launchBtn.setPrefHeight(118);
-        launchBtn.setMinHeight(118);
+        launchBtn.setPrefHeight(130);
+        launchBtn.setMinHeight(130);
         String launchNormal = "-fx-background-color: transparent; -fx-padding: 0; -fx-cursor: hand;";
         String launchHover = "-fx-background-color: transparent; -fx-padding: 0; -fx-cursor: hand;";
         launchBtn.setStyle(launchNormal);
@@ -1211,7 +1211,7 @@ public class HelloApplication extends Application {
             alert.showAndWait();
         });
         Label promise = new Label("NEKO · 为爱发电");
-        promise.setStyle("-fx-text-fill: -app-accent; -fx-font-size: 9.5px; -fx-font-weight: bold;");
+        promise.setStyle("-fx-text-fill: -app-accent; -fx-font-size: 10.5px; -fx-font-weight: bold;");
         Region promiseSpacer = new Region();
         HBox.setHgrow(promiseSpacer, Priority.ALWAYS);
         HBox logActions = new HBox(8, clearLog, copyLog, openLogDir, shortcuts, promiseSpacer, promise);
@@ -4425,7 +4425,7 @@ public class HelloApplication extends Application {
 
     private Label infoCaption(String text) {
         Label label = new Label(text);
-        label.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 9.5px; -fx-font-weight: bold;");
+        label.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 10.5px; -fx-font-weight: bold;");
         return label;
     }
 
