@@ -2096,6 +2096,38 @@ public class HelloApplication extends Application {
         performSearch();
     }
 
+    /** 下载页优先按当前实例的 MC 版本 + 加载器筛选。 */
+    private void configureVersionLoaderFilters() {
+        if (gameVersionCombo == null || loaderCombo == null) return;
+        java.util.LinkedHashSet<String> versions = new java.util.LinkedHashSet<>(gameVersionCombo.getItems());
+        for (String id : VersionProfile.installedIds(new File(config.getGameDir()))) {
+            String mc = extractMcVersion(id);
+            if (mc != null && !mc.isBlank()) versions.add(mc);
+        }
+        gameVersionCombo.getItems().setAll(versions);
+        String current = currentInstanceId();
+        if (current == null) return;
+        String mc = extractMcVersion(current);
+        if (mc != null && versions.contains(mc)) gameVersionCombo.setValue(mc);
+        String lower = current.toLowerCase(java.util.Locale.ROOT);
+        String loader = lower.contains("neoforge") ? "NeoForge"
+                : lower.contains("forge") ? "Forge"
+                : lower.contains("fabric") ? "Fabric"
+                : lower.contains("quilt") ? "Quilt" : null;
+        if (loader != null && loaderCombo.getItems().contains(loader)) loaderCombo.setValue(loader);
+    }
+
+    private String extractMcVersion(String id) {
+        if (id == null) return null;
+        String value = id;
+        int forge = value.indexOf("-forge-");
+        if (forge > 0) value = value.substring(0, forge);
+        if (value.startsWith("fabric-loader-")) value = value.substring(value.lastIndexOf('-') + 1);
+        java.util.regex.Matcher matcher = java.util.regex.Pattern
+                .compile("^(1\\.\\d+(?:\\.\\d+)?|\\d+\\.\\d+(?:\\.\\d+)?)").matcher(value);
+        return matcher.find() ? matcher.group(1) : null;
+    }
+
     private ComboBox<String> createFilterCombo(String defaultVal, String... items) {
         ComboBox<String> combo = new ComboBox<>();
         combo.getItems().add(defaultVal);
@@ -2161,7 +2193,7 @@ public class HelloApplication extends Application {
         tagBox.setAlignment(Pos.CENTER_LEFT);
         tagBox.getChildren().get(0).setStyle("-fx-text-fill: -app-text-muted-3; -fx-font-size: 12px;");
 
-        HBox verBox = new HBox(6, new Label("版本"), gameVersionCombo = createFilterCombo("任意", "1.21", "1.20.1", "1.19.2", "1.12.2"));
+        HBox verBox = new HBox(6, new Label("游戏版本"), gameVersionCombo = createFilterCombo("任意", "1.21", "1.20.1", "1.19.2", "1.16.5", "1.12.2", "1.7.10"));
         verBox.setAlignment(Pos.CENTER_LEFT);
         verBox.getChildren().get(0).setStyle("-fx-text-fill: -app-text-muted-3; -fx-font-size: 12px;");
 
@@ -2187,13 +2219,14 @@ public class HelloApplication extends Application {
 
         sourceCombo.setPrefWidth(125); sourceCombo.setMinWidth(110);
         tagCombo.setPrefWidth(125); tagCombo.setMinWidth(110);
-        gameVersionCombo.setPrefWidth(125); gameVersionCombo.setMinWidth(110);
-        loaderCombo.setPrefWidth(145); loaderCombo.setMinWidth(125);
+        gameVersionCombo.setPrefWidth(155); gameVersionCombo.setMinWidth(135);
+        loaderCombo.setPrefWidth(165); loaderCombo.setMinWidth(145);
         sortCombo.setPrefWidth(135); sortCombo.setMinWidth(115);
-        HBox row2 = new HBox(12, loaderBox, sortBox, spacer, refreshBtn, taskBtn);
+        HBox row2 = new HBox(12, sourceBox, tagBox, sortBox);
         row2.setAlignment(Pos.CENTER_LEFT);
-        row1.getChildren().addAll(sourceBox, tagBox, verBox);
+        row1.getChildren().addAll(verBox, loaderBox, spacer, refreshBtn, taskBtn);
         filterBox.getChildren().addAll(row1, row2);
+        configureVersionLoaderFilters();
 
         modpackListView = new ListView<>(modpackData);
         modpackListView.setStyle("-fx-background-color: transparent; -fx-control-inner-background: transparent; -fx-border-color: transparent;");
