@@ -876,7 +876,7 @@ public final class SettingsPanel extends VBox {
                 section("版本信息"),
                 version,
                 hint("支持 GitHub Releases API、仓库地址，或静态 JSON：version / url / notes。"),
-                hint("GitHub 仓库地址会自动转换为 releases/latest；本机服务可填 http://127.0.0.1:8787/update.json；留空则不检查。"),
+                hint("GitHub 仓库地址会自动转换为 releases/latest；留空则不检查。"),
                 new HBox(10, urlField, saveUrl, check, download),
                 status);
         return scroll(card);
