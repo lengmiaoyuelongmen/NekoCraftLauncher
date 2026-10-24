@@ -364,16 +364,16 @@
 }
 
 .nav-btn:hover {
-    -fx-background-color: rgba(225, 29, 46, 0.12);
+    -fx-background-color: rgba(20, 184, 166, 0.14);
     -fx-text-fill: #ffffff;
 }
 
 .nav-btn-active {
-    -fx-background-color: rgba(225, 29, 46, 0.18);
-    -fx-border-color: rgba(255, 110, 90, 0.45);
+    -fx-background-color: rgba(20, 184, 166, 0.20);
+    -fx-border-color: rgba(94, 234, 212, 0.55);
     -fx-border-width: 1;
     -fx-border-radius: 9;
-    -fx-text-fill: #ffe1d8;
+    -fx-text-fill: #ccfbf1;
     -fx-font-weight: bold;
 }
 
@@ -455,16 +455,16 @@
 }
 
 .nav-btn:hover {
-    -fx-background-color: rgba(225, 29, 46, 0.14);
+    -fx-background-color: rgba(20, 184, 166, 0.16);
     -fx-text-fill: #ffffff;
 }
 
 .nav-btn-active {
-    -fx-background-color: rgba(225, 29, 46, 0.20);
-    -fx-border-color: rgba(255, 110, 90, 0.65);
+    -fx-background-color: rgba(20, 184, 166, 0.22);
+    -fx-border-color: rgba(94, 234, 212, 0.65);
     -fx-border-width: 1.2;
     -fx-border-radius: 16;
-    -fx-text-fill: #ffe1d8;
+    -fx-text-fill: #ccfbf1;
     -fx-font-weight: bold;
     -fx-padding: 5 15;
 }

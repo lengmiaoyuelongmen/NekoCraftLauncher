@@ -807,7 +807,7 @@ public class HelloApplication extends Application {
             button.getStyleClass().remove("nav-btn-active");
             if (active) button.getStyleClass().add("nav-btn-active");
             if (button.getUserData() instanceof String iconName) {
-                button.setGraphic(Icons.node(iconName, 14, active ? "#ffcf6a" : "#d8b0aa"));
+                button.setGraphic(Icons.node(iconName, 14, active ? "#5eead4" : "#b8c7d9"));
             }
         }
         moveNavIndicator(highlight);
@@ -2196,14 +2196,16 @@ public class HelloApplication extends Application {
         loadingIndicator = new ProgressIndicator();
         loadingIndicator.setMaxSize(60, 60);
         statusLabel = new Label("正在加载...");
-        statusLabel.setStyle("-fx-text-fill: -app-text-muted-3; -fx-font-size: 14px; -fx-font-weight: bold;");
+        statusLabel.setStyle("-fx-text-fill: " + (Theme.isLight() ? "#0f172a" : "#e5e7eb")
+                + "; -fx-font-size: 14px; -fx-font-weight: bold;");
 
         statusBox = new VBox(15, loadingIndicator, statusLabel);
         statusBox.setAlignment(Pos.CENTER);
         statusBox.setVisible(false);
 
         StackPane overlay = new StackPane(statusBox);
-        overlay.setStyle("-fx-background-color: rgba(18,18,18,0.7); -fx-background-radius: 16;");
+        overlay.setStyle("-fx-background-color: " + (Theme.isLight() ? "rgba(255,255,255,0.88)" : "rgba(18,18,18,0.72)")
+                + "; -fx-background-radius: 16;");
         overlay.setVisible(false);
         statusBox.visibleProperty().addListener((obs, old, isVisible) -> overlay.setVisible(isVisible));
 
