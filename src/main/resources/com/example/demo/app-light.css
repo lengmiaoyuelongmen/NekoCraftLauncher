@@ -1,11 +1,13 @@
 /* 浅色模式：覆盖 -app-* 变量，界面颜色由 CSS 变量驱动；降低纯白面积、加深文字对比 */
 .root {
-    -app-launch-top: rgba(15,23,42,0.10);
-    -app-launch-bottom: rgba(15,23,42,0.035);
-    -app-launch-top-hover: rgba(15,23,42,0.17);
-    -app-launch-bottom-hover: rgba(15,23,42,0.06);
-    -app-launch-border: rgba(15,23,42,0.30);
-    -app-launch-border-hover: rgba(15,23,42,0.48);
+    -app-launch-top: rgba(211,24,40,0.94);
+    -app-launch-bottom: rgba(137,10,22,0.94);
+    -app-launch-top-hover: rgba(235,45,55,0.98);
+    -app-launch-bottom-hover: rgba(160,15,25,0.98);
+    -app-launch-border: rgba(140,12,24,0.75);
+    -app-launch-border-hover: rgba(255,180,90,0.85);
+    -app-launch-text: #ffe9c8;
+    -app-launch-text-dim: #ffd6c2;
     -app-bg: #dfe5ec;
     -app-root-1: #eef2f7;
     -app-root-2: #e8edf4;

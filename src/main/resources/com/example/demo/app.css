@@ -31,6 +31,8 @@
     -app-launch-bottom-hover: rgba(160,15,25,0.30);
     -app-launch-border: rgba(255,140,110,0.55);
     -app-launch-border-hover: rgba(255,205,110,0.75);
+    -app-launch-text: #ffd98a;
+    -app-launch-text-dim: #e8b4a8;
     -app-accent: #e11d2e;
     -app-accent-soft: rgba(225, 29, 46, 0.24);
     /* 界面里实际用到的深色值，统一成变量，浅色模式只改这里 */

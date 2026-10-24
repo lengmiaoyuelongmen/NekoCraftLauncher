@@ -949,15 +949,15 @@ public class HelloApplication extends Application {
         launchMainLabel = new Label("★ 启动游戏");
         launchMainLabel.setStyle("-fx-text-fill: -app-text; -fx-font-size: 18px; -fx-font-weight: bold;");
         launchVersionLabel = new Label("");
-        launchVersionLabel.setStyle("-fx-text-fill: #e8b4a8; -fx-font-size: 11px;");
+        launchVersionLabel.setStyle("-fx-text-fill: -app-launch-text-dim; -fx-font-size: 11px;");
         VBox launchBox = new VBox(1, launchMainLabel, launchVersionLabel);
         launchBox.setAlignment(Pos.CENTER);
         launchBtn.setGraphic(launchBox);
         launchBtn.setMaxWidth(Double.MAX_VALUE);
         launchBtn.setPrefHeight(56);
         launchBtn.setMinHeight(56);
-        launchMainLabel.setStyle("-fx-text-fill: #ffd98a; -fx-font-size: 19px; -fx-font-weight: bold;");
-        launchVersionLabel.setStyle("-fx-text-fill: -app-text-dim; -fx-font-size: 11px;");
+        launchMainLabel.setStyle("-fx-text-fill: -app-launch-text; -fx-font-size: 19px; -fx-font-weight: bold;");
+        launchVersionLabel.setStyle("-fx-text-fill: -app-launch-text-dim; -fx-font-size: 11px;");
         String launchNormal = "-fx-background-color: linear-gradient(to bottom, -app-launch-top, -app-launch-bottom);"
                 + " -fx-text-fill: -app-text; -fx-font-size: 19px; -fx-font-weight: bold;"
                 + " -fx-background-radius: 13; -fx-border-radius: 13;"
@@ -1095,7 +1095,7 @@ public class HelloApplication extends Application {
             alert.showAndWait();
         });
         Label promise = new Label("为爱发电 · 永远免费更新");
-        promise.setStyle("-fx-text-fill: #ffcf6a; -fx-font-size: 9.5px; -fx-font-weight: bold;");
+        promise.setStyle("-fx-text-fill: -app-accent; -fx-font-size: 9.5px; -fx-font-weight: bold;");
         Region promiseSpacer = new Region();
         HBox.setHgrow(promiseSpacer, Priority.ALWAYS);
         HBox logActions = new HBox(8, clearLog, copyLog, openLogDir, shortcuts, promiseSpacer, promise);
