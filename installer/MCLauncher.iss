@@ -1,4 +1,4 @@
-﻿#define MyAppName "Neko Craft Launcher"
+#define MyAppName "Neko Craft Launcher"
 #ifndef MyAppVersion
 #define MyAppVersion "1.0.0"
 #endif
@@ -16,7 +16,7 @@ DisableProgramGroupPage=yes
 PrivilegesRequired=admin
 OutputDir=..\release\installer-inno
 OutputBaseFilename=NekoCraftLauncher-Setup-{#MyAppVersion}-x64
-SetupIconFile=..\src\main\resources\icon-bw.ico
+SetupIconFile=..\src\main\resources\icon.ico
 WizardImageFile=wizard.bmp
 WizardSmallImageFile=wizard-small.bmp
 WizardStyle=modern dark includetitlebar
