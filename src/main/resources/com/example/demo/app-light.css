@@ -60,9 +60,9 @@
 
 /* 顶栏始终深色 */
 .app-topbar {
-    -fx-background-color: #171a21;
+    -fx-background-color: #0e2f26;
     -fx-background-radius: 12 12 0 0;
-    -fx-border-color: transparent transparent #2b303a transparent;
+    -fx-border-color: transparent transparent #1f5a46 transparent;
 }
 
 .text-field,

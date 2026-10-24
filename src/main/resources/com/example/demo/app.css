@@ -369,11 +369,11 @@
 }
 
 .nav-btn-active {
-    -fx-background-color: rgba(20, 184, 166, 0.20);
+    -fx-background-color: #17614a;
     -fx-border-color: rgba(94, 234, 212, 0.55);
     -fx-border-width: 1;
     -fx-border-radius: 9;
-    -fx-text-fill: #ccfbf1;
+    -fx-text-fill: #ffffff;
     -fx-font-weight: bold;
 }
 
@@ -460,19 +460,19 @@
 }
 
 .nav-btn-active {
-    -fx-background-color: rgba(20, 184, 166, 0.22);
+    -fx-background-color: #17614a;
     -fx-border-color: rgba(94, 234, 212, 0.65);
     -fx-border-width: 1.2;
     -fx-border-radius: 16;
-    -fx-text-fill: #ccfbf1;
+    -fx-text-fill: #ffffff;
     -fx-font-weight: bold;
     -fx-padding: 5 15;
 }
 /* 顶部标题栏：始终深色（含浅色模式），所以单独写死 */
 .app-topbar {
-    -fx-background-color: #171a21;
+    -fx-background-color: #0e2f26;
     -fx-background-radius: 12 12 0 0;
-    -fx-border-color: transparent transparent #2b303a transparent;
+    -fx-border-color: transparent transparent #1f5a46 transparent;
 }
 /* 对话框：跟随主题，避免深色界面里出现白色按钮区 */
 .dialog-pane {
