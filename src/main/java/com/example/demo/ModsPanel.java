@@ -309,7 +309,9 @@ public final class ModsPanel extends VBox {
     }
 
     private void startWatcher() {
-        watcher = new Timeline(new KeyFrame(Duration.seconds(2), e -> refreshLocal(false)));
+        watcher = new Timeline(new KeyFrame(Duration.seconds(5), e -> {
+            if (isVisible()) refreshLocal(false);
+        }));
         watcher.setCycleCount(Animation.INDEFINITE);
         visibleProperty().addListener((obs, was, now) -> {
             if (now) {
@@ -320,7 +322,7 @@ public final class ModsPanel extends VBox {
                 watcher.stop();
             }
         });
-        watcher.play();
+        if (isVisible()) watcher.play();
     }
 
     private String signature(File[] files) {

@@ -38,7 +38,7 @@ public class LauncherConfig {
     private String javaPath = "";
 
     /** 游戏根目录（相当于官方的 .minecraft 目录） */
-    private String gameDir = "game";
+    private String gameDir = ".minecraft";
 
     /** 所有已添加的游戏目录（第一个是当前激活目录） */
     private java.util.List<String> gameDirs = new java.util.ArrayList<>();
@@ -218,7 +218,7 @@ public class LauncherConfig {
         if (memoryMb > 16384) memoryMb = 16384;
         if (javaPath == null) javaPath = "";
         if (jvmArgs == null) jvmArgs = "";
-        if (gameDir == null || gameDir.isBlank()) gameDir = "game";
+        if (gameDir == null || gameDir.isBlank()) gameDir = ".minecraft";
         if (gameDirs == null) gameDirs = new java.util.ArrayList<>();
         gameDirs.removeIf(dir -> dir == null || dir.isBlank());
         if (!gameDirs.contains(gameDir)) gameDirs.add(0, gameDir);

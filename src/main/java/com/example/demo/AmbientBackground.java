@@ -25,10 +25,10 @@ public final class AmbientBackground extends Canvas {
     private double smoothX;
     private double smoothY;
     private boolean wasAnimating = true;
-    private final double[] starX = new double[44];
-    private final double[] starY = new double[44];
-    private final double[] starSize = new double[44];
-    private final double[] starPhase = new double[44];
+    private final double[] starX = new double[24];
+    private final double[] starY = new double[24];
+    private final double[] starSize = new double[24];
+    private final double[] starPhase = new double[24];
 
     public AmbientBackground() {
         setMouseTransparent(true);
@@ -43,9 +43,17 @@ public final class AmbientBackground extends Canvas {
         timer = new AnimationTimer() {
             @Override
             public void handle(long now) {
-                if (now - lastFrame < 16_000_000L) return;
+                if (!Motion.isEnabled()) return;
+                if (getScene() == null
+                        || !(getScene().getWindow() instanceof javafx.stage.Stage stage)
+                        || stage.isIconified() || !stage.isShowing() || !stage.isFocused()) {
+                    lastFrame = 0;
+                    return;
+                }
+                // 24fps 足够表现缓动背景，显著降低空闲 CPU / GPU 占用
+                if (now - lastFrame < 120_000_000L) return;
                 lastFrame = now;
-                time += 0.016;
+                time += 0.120;
                 draw();
             }
         };

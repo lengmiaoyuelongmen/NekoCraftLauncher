@@ -84,7 +84,9 @@
 .text-field:focused,
 .password-field:focused {
     -fx-border-color: -app-accent;
-    -fx-background-color: #1f242e;
+    -fx-background-color: -app-input;
+    -fx-text-fill: -app-text;
+    -fx-prompt-text-fill: -app-text-muted;
 }
 
 .combo-box {

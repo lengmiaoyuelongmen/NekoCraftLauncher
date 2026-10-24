@@ -90,7 +90,16 @@
 .password-field:focused,
 .combo-box:focused,
 .spinner:focused {
-    -fx-border-color: #475569;
+    -fx-background-color: #ffffff;
+    -fx-control-inner-background: #ffffff;
+    -fx-text-fill: #0b1220;
+    -fx-prompt-text-fill: #64748b;
+    -fx-border-color: #0d9488;
+}
+
+.combo-box .text-field:focused {
+    -fx-background-color: transparent;
+    -fx-text-fill: #0b1220;
 }
 
 .combo-box .list-cell,

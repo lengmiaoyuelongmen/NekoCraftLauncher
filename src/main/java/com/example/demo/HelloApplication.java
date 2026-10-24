@@ -126,6 +126,8 @@ public class HelloApplication extends Application {
     private Label playerInfoUuid;
     private Label playerInfoServer;
     private Label playerInfoInstance;
+    private Label playerInfoVersion;
+    private Label playerInfoLoader;
     private Label playerInfoPlaytime;
     private final java.util.List<String> commandHistory = new java.util.ArrayList<>();
     private int commandHistoryIndex = 0;
@@ -189,6 +191,18 @@ public class HelloApplication extends Application {
     private ComboBox<String> loaderCombo;
 
     private ListView<ModpackProject> modpackListView;
+    private final java.util.Map<String, java.util.List<ModpackProject>> prewarmedCommunity =
+            new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.Set<String> prewarmStarted = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private static final java.util.concurrent.Semaphore ICON_SLOTS =
+            new java.util.concurrent.Semaphore(3);
+    private final java.util.Map<String, Image> iconMemoryCache =
+            new java.util.LinkedHashMap<>(128, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(java.util.Map.Entry<String, Image> eldest) {
+                    return size() > 480;
+                }
+            };
     private static final java.util.Map<String, Integer> PAGE_ORDER =
             java.util.Map.of("launch", 0, "download", 1, "settings", 2, "tools", 3);
     private volatile String lastSearchSource = "Modrinth";
@@ -415,6 +429,7 @@ public class HelloApplication extends Application {
         stage.setScene(scene);
         stage.show();
         stage.centerOnScreen();
+        prewarmCommunityResources();
 
         switchPage("launch");
         Bootstrap.ensureGameDir(new File(config.getGameDir()),
@@ -442,7 +457,7 @@ public class HelloApplication extends Application {
         DownloadManager.addStatusListener(status -> Platform.runLater(() -> updateDownloadBar(status)));
         updateGeekTelemetry();
         javafx.animation.Timeline telemetryTimer = new javafx.animation.Timeline(
-                new javafx.animation.KeyFrame(javafx.util.Duration.seconds(1), e -> updateGeekTelemetry()));
+                new javafx.animation.KeyFrame(javafx.util.Duration.seconds(3), e -> updateGeekTelemetry()));
         telemetryTimer.setCycleCount(javafx.animation.Animation.INDEFINITE);
         telemetryTimer.play();
         refreshInstalledVersions();
@@ -768,12 +783,7 @@ public class HelloApplication extends Application {
         Motion.pageIn(target);
         applyLaunchBackground();
         if ("launch".equals(pageName)) { applyAiMode(); refreshLaunchInsight(); }
-        Platform.runLater(() -> {
-            if (stageRef != null && stageRef.getScene() != null) {
-                Theme.apply(stageRef.getScene().getRoot());
-                Theme.scaleFonts(stageRef.getScene().getRoot(), config.getUiFontScale());
-            }
-        });
+        // 主题只在切换/设置变更时刷新，避免每次切页都重新应用整棵 CSS。
     }
 
     /** 启动页背景图片（个性化里设置）。 */
@@ -863,7 +873,7 @@ public class HelloApplication extends Application {
         panel.setPadding(new Insets(25));
 
         VBox userArea = new VBox(12);
-        userArea.setPrefWidth(370);
+        userArea.setPrefWidth(410);
         userArea.setAlignment(Pos.TOP_CENTER);
         userArea.setStyle("-fx-background-color: -app-card;"
                 + " -fx-background-radius: 20; -fx-padding: 16;"
@@ -967,14 +977,14 @@ public class HelloApplication extends Application {
         loginBtn.setGraphic(loginBtnLabel);
         loginBtn.setDefaultButton(true);
         loginBtn.setMaxWidth(Double.MAX_VALUE);
-        loginBtn.setStyle("-fx-background-color: linear-gradient(to bottom, #e62937, #9c101b);"
+        loginBtn.setStyle("-fx-background-color: linear-gradient(to bottom, #2dd4bf, #0f766e);"
                 + " -fx-text-fill: #ffffff; -fx-font-weight: bold; -fx-cursor: hand;"
                 + " -fx-background-radius: 9; -fx-padding: 8;");
         Motion.press(loginBtn);
-        loginBtn.setOnMouseEntered(e -> loginBtn.setStyle("-fx-background-color: linear-gradient(to bottom, #ff4b58, #b51422);"
+        loginBtn.setOnMouseEntered(e -> loginBtn.setStyle("-fx-background-color: linear-gradient(to bottom, #5eead4, #0d9488);"
                 + " -fx-text-fill: #ffffff; -fx-font-weight: bold; -fx-cursor: hand;"
                 + " -fx-background-radius: 9; -fx-padding: 8;"));
-        loginBtn.setOnMouseExited(e -> loginBtn.setStyle("-fx-background-color: linear-gradient(to bottom, #e62937, #9c101b);"
+        loginBtn.setOnMouseExited(e -> loginBtn.setStyle("-fx-background-color: linear-gradient(to bottom, #2dd4bf, #0f766e);"
                 + " -fx-text-fill: #ffffff; -fx-font-weight: bold; -fx-cursor: hand;"
                 + " -fx-background-radius: 9; -fx-padding: 8;"));
 
@@ -985,6 +995,8 @@ public class HelloApplication extends Application {
         msHint.setManaged(false);
 
         loginTypeCombo.setOnAction(e -> {
+            double lockedHeight = stageRef == null || stageRef.isMaximized() ? -1 : stageRef.getHeight();
+            double lockedWidth = stageRef == null || stageRef.isMaximized() ? -1 : stageRef.getWidth();
             String selected = loginTypeCombo.getValue();
             boolean is3rd = "第三方外置登录".equals(selected);
             boolean isMs = "正版登录 (微软)".equals(selected);
@@ -993,6 +1005,14 @@ public class HelloApplication extends Application {
             usernameField.setVisible(!isMs); usernameField.setManaged(!isMs);
             msHint.setVisible(isMs); msHint.setManaged(isMs);
             loginBtnLabel.setText(isMs ? "开始微软授权" : "登录");
+            if (lockedHeight > 0) {
+                Platform.runLater(() -> {
+                    if (stageRef != null && !stageRef.isMaximized()) {
+                        if (Math.abs(stageRef.getHeight() - lockedHeight) > 1) stageRef.setHeight(lockedHeight);
+                        if (Math.abs(stageRef.getWidth() - lockedWidth) > 1) stageRef.setWidth(lockedWidth);
+                    }
+                });
+            }
         });
 
         HBox credentialsRow = new HBox(8, usernameField, passwordField);
@@ -1017,14 +1037,36 @@ public class HelloApplication extends Application {
         playerInfoUuid = new Label("—");
         playerInfoServer = new Label("—");
         playerInfoInstance = new Label("—");
+        playerInfoVersion = new Label("—");
+        playerInfoLoader = new Label("—");
         playerInfoPlaytime = new Label("—");
-        playerInfoBox.getChildren().addAll(
-                infoCaption("账号信息"),
-                infoLine("类型", playerInfoType),
-                infoLine("UUID", playerInfoUuid),
-                infoLine("验证服务器", playerInfoServer),
-                infoLine("当前实例", playerInfoInstance),
-                infoLine("游戏时长", playerInfoPlaytime));
+        javafx.scene.layout.GridPane infoGrid = new javafx.scene.layout.GridPane();
+        infoGrid.setHgap(18);
+        infoGrid.setVgap(7);
+        javafx.scene.layout.ColumnConstraints half1 = new javafx.scene.layout.ColumnConstraints();
+        javafx.scene.layout.ColumnConstraints half2 = new javafx.scene.layout.ColumnConstraints();
+        half1.setPercentWidth(50);
+        half2.setPercentWidth(50);
+        infoGrid.getColumnConstraints().addAll(half1, half2);
+        for (int i = 0; i < 4; i++) {
+            javafx.scene.layout.RowConstraints row = new javafx.scene.layout.RowConstraints();
+            row.setPercentHeight(25);
+            infoGrid.getRowConstraints().add(row);
+        }
+        infoGrid.add(infoLine("类型", playerInfoType), 0, 0);
+        infoGrid.add(infoLine("UUID", playerInfoUuid), 1, 0);
+        infoGrid.add(infoLine("验证服务器", playerInfoServer), 0, 1);
+        infoGrid.add(infoLine("当前实例", playerInfoInstance), 1, 1);
+        infoGrid.add(infoLine("游戏版本", playerInfoVersion), 0, 2);
+        infoGrid.add(infoLine("加载器", playerInfoLoader), 1, 2);
+        infoGrid.add(infoLine("游戏时长", playerInfoPlaytime), 0, 3);
+        infoGrid.add(infoLine("启动器", new Label(AppVersion.CURRENT)), 1, 3);
+        infoGrid.setMaxHeight(Double.MAX_VALUE);
+        VBox.setVgrow(infoGrid, Priority.ALWAYS);
+        playerInfoBox.setMaxWidth(Double.MAX_VALUE);
+        playerInfoBox.setPrefHeight(190);
+        playerInfoBox.setMaxHeight(Double.MAX_VALUE);
+        playerInfoBox.getChildren().addAll(infoCaption("账号信息"), infoGrid);
         playerInfoBox.setVisible(false);
         playerInfoBox.setManaged(false);
 
@@ -1051,41 +1093,36 @@ public class HelloApplication extends Application {
         launchMainLabel.setOpacity(0);
         launchMainLabel.setManaged(false);
         launchVersionLabel = new Label("");
-        launchVersionLabel.setStyle("-fx-text-fill: #6aa95b; -fx-font-size: 10.5px; -fx-font-weight: bold;");
+        launchVersionLabel.setStyle("-fx-text-fill: #6aa95b; -fx-font-size: 11.5px; -fx-font-weight: bold;");
 
         javafx.scene.image.ImageView launchArt = new javafx.scene.image.ImageView();
         try (java.io.InputStream in = HelloApplication.class.getResourceAsStream("/launch-banner.png")) {
             if (in != null) launchArt.setImage(new javafx.scene.image.Image(in));
         } catch (Exception ignored) {
         }
-        launchArt.setFitWidth(330);
-        launchArt.setFitHeight(115);
+        launchArt.setFitWidth(378);
+        launchArt.setFitHeight(132);
         launchArt.setPreserveRatio(true);
         launchArt.setSmooth(true);
         StackPane launchBanner = new StackPane(launchArt, launchVersionLabel);
-        launchBanner.setPrefSize(330, 115);
-        launchBanner.setMaxSize(330, 115);
+        StackPane.setAlignment(launchVersionLabel, Pos.BOTTOM_CENTER);
+        launchVersionLabel.setTranslateX(-64);
+        StackPane.setMargin(launchVersionLabel, new Insets(0, 0, 16, 0));
+        launchBanner.setPrefSize(378, 132);
+        launchBanner.setMaxSize(378, 132);
         StackPane.setAlignment(launchVersionLabel, Pos.BOTTOM_RIGHT);
         launchVersionLabel.setAlignment(Pos.CENTER_RIGHT);
-        StackPane.setMargin(launchVersionLabel, new Insets(0, 137, 15, 0));
+        StackPane.setMargin(launchVersionLabel, new Insets(0, 115, 16, 0));
         launchBtn.setGraphic(launchBanner);
         launchBtn.setContentDisplay(javafx.scene.control.ContentDisplay.GRAPHIC_ONLY);
         launchBtn.setMaxWidth(Double.MAX_VALUE);
-        launchBtn.setPrefHeight(130);
-        launchBtn.setMinHeight(130);
+        launchBtn.setPrefHeight(146);
+        launchBtn.setMinHeight(146);
         String launchNormal = "-fx-background-color: transparent; -fx-padding: 0; -fx-cursor: hand;";
         String launchHover = "-fx-background-color: transparent; -fx-padding: 0; -fx-cursor: hand;";
         launchBtn.setStyle(launchNormal);
         javafx.scene.effect.DropShadow launchGlow = new javafx.scene.effect.DropShadow(18, Color.web("#7fb56d", 0.26));
         launchBtn.setEffect(launchGlow);
-        javafx.animation.Timeline glowPulse = new javafx.animation.Timeline(
-                new javafx.animation.KeyFrame(javafx.util.Duration.ZERO,
-                        new javafx.animation.KeyValue(launchGlow.radiusProperty(), 12)),
-                new javafx.animation.KeyFrame(javafx.util.Duration.seconds(2.8),
-                        new javafx.animation.KeyValue(launchGlow.radiusProperty(), 22)));
-        glowPulse.setAutoReverse(true);
-        glowPulse.setCycleCount(javafx.animation.Animation.INDEFINITE);
-        if (Motion.isEnabled()) glowPulse.play();
         Motion.press(launchBtn);
         Motion.hoverScale(launchBtn, 1.014);
         launchBtn.setOnMouseEntered(e -> launchBtn.setStyle(launchHover));
@@ -1235,6 +1272,7 @@ public class HelloApplication extends Application {
         versionComboBox.valueProperty().addListener((obs, old, value) -> {
             launchVersionLabel.setText(value == null ? "" : value.getId());
             if (playerInfoInstance != null) playerInfoInstance.setText(value == null ? "未选择" : value.getId());
+            updateInstanceInfo(value == null ? null : value.getId());
             if (value != null && !suppressInstancePersist) {
                 userPickedInstance = true;
                 config.setLastInstance(value.getId());
@@ -2236,6 +2274,9 @@ public class HelloApplication extends Application {
         configureVersionLoaderFilters();
 
         modpackListView = new ListView<>(modpackData);
+        modpackListView.setFixedCellSize(88);
+        modpackListView.setCache(true);
+        modpackListView.setCacheHint(javafx.scene.CacheHint.SPEED);
         modpackListView.setStyle("-fx-background-color: transparent; -fx-control-inner-background: transparent; -fx-border-color: transparent;");
         modpackListView.setCellFactory(param -> new ModpackCell());
         modpackListView.setMaxHeight(Double.MAX_VALUE);
@@ -3556,6 +3597,17 @@ public class HelloApplication extends Application {
             card.getChildren().addAll(iconPane, info, actions);
         }
 
+        private ImageView iconView(Image img) {
+            ImageView iconView = new ImageView(img);
+            iconView.setFitWidth(70);
+            iconView.setFitHeight(70);
+            Rectangle clip = new Rectangle(70, 70);
+            clip.setArcWidth(20);
+            clip.setArcHeight(20);
+            iconView.setClip(clip);
+            return iconView;
+        }
+
         @Override
         protected void updateItem(ModpackProject project, boolean empty) {
             super.updateItem(project, empty);
@@ -3573,43 +3625,36 @@ public class HelloApplication extends Application {
 
             // 【核心修复】使用异步加载，防止网络阻塞UI线程
             iconPane.getChildren().clear();
-            Label placeholder = new Label(project.getTitle().substring(0, 1).toUpperCase());
-            placeholder.setStyle("-fx-text-fill: -app-text-muted-2; -fx-font-size: 28px; -fx-font-weight: bold;");
-            iconPane.getChildren().add(placeholder);
-
-            if (project.getIconUrl() != null && !project.getIconUrl().isEmpty()) {
-                String urlStr = project.getIconUrl();
-                if (!urlStr.startsWith("http")) {
-                    urlStr = "https://" + urlStr;
-                }
-                final String finalUrl = urlStr;
-
-                CompletableFuture.runAsync(() -> {
-                    try {
-                        HttpRequest req = HttpRequest.newBuilder(URI.create(IconProxy.resolve(finalUrl)))
-                                .timeout(java.time.Duration.ofSeconds(10))
-                                .GET().build();
-                        HttpResponse<InputStream> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofInputStream());
-                        if (resp.statusCode() == 200) {
-                            byte[] bytes = resp.body().readAllBytes();
-                            Platform.runLater(() -> {
-                                // 防止复用导致图片错乱
-                                if (getItem() == project) {
-                                    Image img = decodeIcon(bytes);
-                                    if (img != null && !img.isError()) {
-                                        ImageView iconView = new ImageView(img);
-                                        iconView.setFitWidth(70);
-                                        iconView.setFitHeight(70);
-                                        Rectangle clip = new Rectangle(70, 70);
-                                        clip.setArcWidth(20); clip.setArcHeight(20);
-                                        iconView.setClip(clip);
-                                        iconPane.getChildren().setAll(iconView);
-                                    }
+            String iconKey = project.getIconUrl();
+            Image cachedIcon = iconKey == null || iconKey.isBlank() ? null : iconMemoryCache.get(iconKey);
+            if (cachedIcon != null) {
+                iconPane.getChildren().setAll(iconView(cachedIcon));
+            } else {
+                Label placeholder = new Label(project.getTitle().substring(0, 1).toUpperCase());
+                placeholder.setStyle("-fx-text-fill: -app-text-muted-2; -fx-font-size: 28px; -fx-font-weight: bold;");
+                iconPane.getChildren().add(placeholder);
+                if (iconKey != null && !iconKey.isEmpty()) {
+                    String urlStr = iconKey.startsWith("http") ? iconKey : "https://" + iconKey;
+                    CompletableFuture.runAsync(() -> {
+                        try {
+                            HttpRequest req = HttpRequest.newBuilder(URI.create(IconProxy.resolve(urlStr)))
+                                    .timeout(java.time.Duration.ofSeconds(10))
+                                    .GET().build();
+                            HttpResponse<InputStream> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofInputStream());
+                            if (resp.statusCode() == 200) {
+                                byte[] bytes = resp.body().readAllBytes();
+                                Image img = decodeIcon(bytes);
+                                if (img != null && !img.isError()) {
+                                    Platform.runLater(() -> {
+                                        iconMemoryCache.put(iconKey, img);
+                                        if (getItem() == project) iconPane.getChildren().setAll(iconView(img));
+                                    });
                                 }
-                            });
+                            }
+                        } catch (Exception ignored) {
                         }
-                    } catch (Exception ignored) {}
-                });
+                    });
+                }
             }
 
             boolean isMod = "mod".equals(project.getProjectType());
@@ -3641,6 +3686,79 @@ public class HelloApplication extends Application {
     // ================== 图标解码 ==================
 
     /** 先按 JavaFX 原生解码；失败（Modrinth 的 .webp）再用 ImageIO + webp 插件兜底。 */
+    /** 预加载界面期间先拉取模组/整合包首页，打开下载页时直接显示。 */
+    private void prewarmCommunityResources() {
+        for (String type : new String[]{"mod", "modpack"}) {
+            if (!prewarmStarted.add(type)) continue;
+            String facets = "[\"project_type:" + type + "\"]";
+            String url = "https://api.modrinth.com/v2/search?query=&facets="
+                    + URLEncoder.encode("[" + facets + "]", StandardCharsets.UTF_8)
+                    + "&index=relevance&limit=40&offset=0";
+            HttpRequest req = HttpRequest.newBuilder(URI.create(url))
+                    .header("User-Agent", "PCL-CE-Launcher/1.0")
+                    .GET().timeout(java.time.Duration.ofSeconds(15)).build();
+            CompletableFuture.runAsync(() -> {
+                try {
+                    HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+                    if (resp.statusCode() != 200 || !resp.body().startsWith("{")) return;
+                    JsonObject json = new Gson().fromJson(resp.body(), JsonObject.class);
+                    JsonArray hits = json.getAsJsonArray("hits");
+                    if (hits == null) return;
+                    java.util.List<ModpackProject> projects = new java.util.ArrayList<>();
+                    for (int i = 0; i < hits.size(); i++) {
+                        JsonObject hit = hits.get(i).getAsJsonObject();
+                        String icon = hit.has("icon_url") && !hit.get("icon_url").isJsonNull()
+                                ? hit.get("icon_url").getAsString() : null;
+                        String updated = hit.has("date_modified")
+                                ? hit.get("date_modified").getAsString().substring(0, 10) : "";
+                        projects.add(new ModpackProject(hit.get("project_id").getAsString(),
+                                hit.get("title").getAsString(), hit.get("description").getAsString(),
+                                hit.get("author").getAsString(), icon,
+                                hit.get("downloads").getAsLong(), updated, "Modrinth", type));
+                    }
+                    Platform.runLater(() -> {
+                        prewarmedCommunity.put(type, projects);
+                        prefetchIcons(projects);
+                    });
+                } catch (Exception ignored) {
+                }
+            });
+        }
+    }
+
+    /** 预取当前页最多 40 个图标到内存，滚动复用时直接命中缓存。 */
+    private void prefetchIcons(java.util.List<ModpackProject> projects) {
+        for (ModpackProject project : projects) {
+            String key = project.getIconUrl();
+            if (key == null || key.isBlank() || iconMemoryCache.containsKey(key)) continue;
+            String urlStr = key.startsWith("http") ? key : "https://" + key;
+            CompletableFuture.runAsync(() -> {
+                try {
+                    ICON_SLOTS.acquire();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                try {
+                    HttpRequest req = HttpRequest.newBuilder(URI.create(IconProxy.resolve(urlStr)))
+                            .timeout(java.time.Duration.ofSeconds(10))
+                            .GET().build();
+                    HttpResponse<InputStream> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofInputStream());
+                    if (resp.statusCode() == 200) {
+                        byte[] bytes = resp.body().readAllBytes();
+                        Image img = decodeIcon(bytes);
+                        if (img != null && !img.isError()) {
+                            Platform.runLater(() -> iconMemoryCache.put(key, img));
+                        }
+                    }
+                } catch (Exception ignored) {
+                } finally {
+                    ICON_SLOTS.release();
+                }
+            });
+        }
+    }
+
     private Image decodeIcon(byte[] bytes) {
         try {
             Image image = new Image(new ByteArrayInputStream(bytes));
@@ -3681,6 +3799,22 @@ public class HelloApplication extends Application {
     }
 
     private void performSearch() {
+        String warmedType = apiProjectType();
+        boolean defaultFilters = (searchField.getText() == null || searchField.getText().trim().isEmpty())
+                && "任意".equals(gameVersionCombo.getValue())
+                && "任意".equals(loaderCombo.getValue())
+                && "默认".equals(sortCombo.getValue());
+        java.util.List<ModpackProject> ready = defaultFilters ? prewarmedCommunity.remove(warmedType) : null;
+        if (ready != null) {
+            modpackData.setAll(ready);
+            searchOffset = ready.size();
+            searchTotal = -1;
+            loadingMoreResults = false;
+            statusBox.setVisible(false);
+            setLoadMoreHint();
+            prefetchIcons(ready);
+            return;
+        }
         searchOffset = 0;
         searchTotal = -1;
         loadingMoreResults = false;
@@ -3739,7 +3873,7 @@ public class HelloApplication extends Application {
             String encodedQuery = URLEncoder.encode(query, StandardCharsets.UTF_8.toString());
             String urlStr = "https://api.modrinth.com/v2/search?query=" + encodedQuery
                     + "&facets=" + encodedFacets + "&index=" + index
-                    + "&limit=24&offset=" + offset;
+                    + "&limit=40&offset=" + offset;
 
             HttpRequest req = HttpRequest.newBuilder(URI.create(urlStr))
                     .header("User-Agent", "PCL-CE-Launcher/1.0")
@@ -3794,8 +3928,10 @@ public class HelloApplication extends Application {
                     modpackData.add(new ModpackProject(id, title, desc, author, iconUrl, downloads, updated,
                             "Modrinth", pType));
                 }
+                int addedStart = Math.max(0, modpackData.size() - hits.size());
+                prefetchIcons(modpackData.subList(addedStart, modpackData.size()));
                 searchOffset = offset + hits.size();
-                if (searchTotal < 0 && hits.size() < 24) searchTotal = searchOffset;
+                if (searchTotal < 0 && hits.size() < 40) searchTotal = searchOffset;
                 updateLoadMoreButton();
             })).exceptionally(ex -> {
                 Platform.runLater(() -> {
@@ -3815,6 +3951,18 @@ public class HelloApplication extends Application {
             loadingMoreResults = false;
             statusLabel.setText("请求参数构建失败: " + e.getMessage());
         }
+    }
+
+    private String apiProjectType() {
+        if ("模组".equals(currentProjectType)) return "mod";
+        if ("资源包".equals(currentProjectType)) return "resourcepack";
+        if ("光影包".equals(currentProjectType)) return "shader";
+        if ("数据包".equals(currentProjectType)) return "datapack";
+        return "modpack";
+    }
+
+    private void setLoadMoreHint() {
+        updateLoadMoreButton();
     }
 
     private void updateLoadMoreButton() {
@@ -4434,10 +4582,27 @@ public class HelloApplication extends Application {
         keyLabel.setMinWidth(62);
         keyLabel.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 10.5px;");
         value.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 11px;");
-        value.setMaxWidth(205);
+        value.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(value, Priority.ALWAYS);
         HBox row = new HBox(8, keyLabel, value);
         row.setAlignment(Pos.CENTER_LEFT);
         return row;
+    }
+
+    private void updateInstanceInfo(String instanceId) {
+        if (playerInfoVersion == null || playerInfoLoader == null) return;
+        if (instanceId == null || instanceId.isBlank()) {
+            playerInfoVersion.setText("—");
+            playerInfoLoader.setText("—");
+            return;
+        }
+        String mc = extractMcVersion(instanceId);
+        playerInfoVersion.setText(mc == null ? "—" : mc);
+        String lower = instanceId.toLowerCase(java.util.Locale.ROOT);
+        playerInfoLoader.setText(lower.contains("neoforge") ? "NeoForge"
+                : lower.contains("forge") ? "Forge"
+                : lower.contains("fabric") ? "Fabric"
+                : lower.contains("quilt") ? "Quilt" : "原版");
     }
 
     private void updatePlayerInfo(String type, String server, UserSession session) {
@@ -4457,6 +4622,7 @@ public class HelloApplication extends Application {
         playerInfoServer.setText(host.isBlank() ? "官方 / 离线" : host);
         String instance = currentInstanceId();
         playerInfoInstance.setText(instance == null ? "未选择" : instance);
+        updateInstanceInfo(instance);
         long seconds = 0;
         try {
             if (instance != null) seconds = Playtime.seconds(new File(config.getGameDir()), instance);
@@ -5556,6 +5722,8 @@ public class HelloApplication extends Application {
         if (subs == null) return false;
         for (File sub : subs) {
             if (new File(sub, sub.getName() + ".json").isFile()) return true;
+            File[] jsons = sub.listFiles(f -> f.isFile() && f.getName().endsWith(".json"));
+            if (jsons != null && jsons.length > 0) return true;
         }
         return false;
     }

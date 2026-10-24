@@ -257,7 +257,7 @@ public final class SettingsPanel extends VBox {
         HBox.setHgrow(javaPathField, Priority.ALWAYS);
 
         gameDirField = new TextField(config.getGameDir());
-        gameDirField.setPromptText("例如 game 或 D:\\Minecraft");
+        gameDirField.setPromptText("例如 .minecraft 或 D:\\Minecraft");
         HBox.setHgrow(gameDirField, Priority.ALWAYS);
 
         jvmArgsField = new TextField(config.getJvmArgs());
@@ -1080,7 +1080,7 @@ public final class SettingsPanel extends VBox {
         heightSpinner.getValueFactory().setValue(480);
         javaPathField.setText("");
         autoJava.setSelected(true);
-        gameDirField.setText("game");
+        gameDirField.setText(".minecraft");
         jvmArgsField.setText("");
         sourceCombo.setValue("auto");
         concurrentSpinner.getValueFactory().setValue(16);

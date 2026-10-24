@@ -19,8 +19,8 @@ import java.util.List;
  */
 public final class Motion {
 
-    public static final Duration FAST = Duration.millis(140);
-    public static final Duration NORMAL = Duration.millis(260);
+    public static final Duration FAST = Duration.millis(100);
+    public static final Duration NORMAL = Duration.millis(180);
     public static final Duration SLOW = Duration.millis(420);
 
     /** ease-out-expo，起步快、收尾慢，比默认曲线更有“质感”。 */
@@ -60,9 +60,9 @@ public final class Motion {
         int seq = nextSeq(node);
         node.setOpacity(0);
         node.setTranslateX(fromX);
-        node.setTranslateY(8);
-        node.setScaleX(0.992);
-        node.setScaleY(0.992);
+        node.setTranslateY(6);
+        node.setScaleX(1);
+        node.setScaleY(1);
         if (!enabled) {
             resetPage(node);
             return;
@@ -74,11 +74,7 @@ public final class Motion {
         slide.setToX(0);
         slide.setToY(0);
         slide.setInterpolator(OUT);
-        ScaleTransition scale = new ScaleTransition(scaled(Duration.millis(300)), node);
-        scale.setToX(1);
-        scale.setToY(1);
-        scale.setInterpolator(SPRING);
-        ParallelTransition transition = new ParallelTransition(fade, slide, scale);
+        ParallelTransition transition = new ParallelTransition(fade, slide);
         transition.setOnFinished(e -> {
             if (seqOf(node) == seq) resetPage(node);
         });
@@ -110,11 +106,7 @@ public final class Motion {
         double currentX = node.getTranslateX();
         slide.setToX(currentX > 0 ? -18 : 18);
         slide.setInterpolator(IN_OUT);
-        ScaleTransition shrink = new ScaleTransition(scaled(FAST), node);
-        shrink.setToX(0.996);
-        shrink.setToY(0.996);
-        shrink.setInterpolator(IN_OUT);
-        ParallelTransition out = new ParallelTransition(fade, slide, shrink);
+        ParallelTransition out = new ParallelTransition(fade, slide);
         out.setOnFinished(e -> {
             if (seqOf(node) != seq) return;
             node.setVisible(false);
@@ -201,8 +193,8 @@ public final class Motion {
     /** 按压反馈：按下缩到 0.96，松开弹性回弹。不改布局，只改渲染变换。 */
     public static void press(Node node) {
         if (!enabled) return;
-        node.addEventHandler(MouseEvent.MOUSE_PRESSED, e -> scaleTo(node, 0.96, FAST, OUT));
-        node.addEventHandler(MouseEvent.MOUSE_RELEASED, e -> scaleTo(node, 1.0, NORMAL, SPRING));
+        node.addEventHandler(MouseEvent.MOUSE_PRESSED, e -> scaleTo(node, 0.975, FAST, OUT));
+        node.addEventHandler(MouseEvent.MOUSE_RELEASED, e -> scaleTo(node, 1.0, FAST, SPRING));
         node.addEventHandler(MouseEvent.MOUSE_EXITED, e -> scaleTo(node, 1.0, FAST, OUT));
     }
 
