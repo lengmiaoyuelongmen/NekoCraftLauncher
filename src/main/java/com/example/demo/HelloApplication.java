@@ -861,10 +861,10 @@ public class HelloApplication extends Application {
         VBox userArea = new VBox(12);
         userArea.setPrefWidth(346);
         userArea.setAlignment(Pos.TOP_CENTER);
-        userArea.setStyle("-fx-background-color: linear-gradient(to bottom, rgba(255,255,255,0.055), rgba(255,255,255,0.018));"
+        userArea.setStyle("-fx-background-color: -app-card;"
                 + " -fx-background-radius: 20; -fx-padding: 20;"
-                + " -fx-border-color: rgba(255,255,255,0.09); -fx-border-radius: 20;"
-                + " -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.35), 28, 0.15, 0, 10);");
+                + " -fx-border-color: -app-border-2; -fx-border-width: 1; -fx-border-radius: 20;"
+                + " -fx-effect: dropshadow(gaussian, rgba(15,23,42,0.12), 24, 0.12, 0, 8);");
 
         avatarImageView = new ImageView();
         avatarImageView.setFitWidth(104);
@@ -1115,10 +1115,10 @@ public class HelloApplication extends Application {
                 loginCard, logoutButton, playerInfoBox, profileSpacer, launchBtn, bottomRow);
 
         VBox logContainer = new VBox(4);
-        logContainer.setStyle("-fx-background-color: linear-gradient(to bottom, rgba(255,255,255,0.045), rgba(255,255,255,0.014));"
+        logContainer.setStyle("-fx-background-color: -app-card;"
                 + " -fx-background-radius: 20; -fx-padding: 6;"
-                + " -fx-border-color: rgba(255,255,255,0.08); -fx-border-radius: 20;"
-                + " -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.35), 26, 0.12, 0, 8);");
+                + " -fx-border-color: -app-border-2; -fx-border-width: 1; -fx-border-radius: 20;"
+                + " -fx-effect: dropshadow(gaussian, rgba(15,23,42,0.12), 24, 0.12, 0, 8);");
         logArea = new TextArea();
         logArea.setEditable(false);
         logArea.setWrapText(true);
@@ -2185,8 +2185,15 @@ public class HelloApplication extends Application {
         taskBtn.setGraphic(Icons.node("download", 15, "#9ca3af"));
         taskBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: #aaa; -fx-font-size: 16px; -fx-cursor: hand;");
 
-        row1.getChildren().addAll(sourceBox, tagBox, verBox, loaderBox, sortBox, spacer, refreshBtn, taskBtn);
-        filterBox.getChildren().add(row1);
+        sourceCombo.setPrefWidth(125); sourceCombo.setMinWidth(110);
+        tagCombo.setPrefWidth(125); tagCombo.setMinWidth(110);
+        gameVersionCombo.setPrefWidth(125); gameVersionCombo.setMinWidth(110);
+        loaderCombo.setPrefWidth(145); loaderCombo.setMinWidth(125);
+        sortCombo.setPrefWidth(135); sortCombo.setMinWidth(115);
+        HBox row2 = new HBox(12, loaderBox, sortBox, spacer, refreshBtn, taskBtn);
+        row2.setAlignment(Pos.CENTER_LEFT);
+        row1.getChildren().addAll(sourceBox, tagBox, verBox);
+        filterBox.getChildren().addAll(row1, row2);
 
         modpackListView = new ListView<>(modpackData);
         modpackListView.setStyle("-fx-background-color: transparent; -fx-control-inner-background: transparent; -fx-border-color: transparent;");
