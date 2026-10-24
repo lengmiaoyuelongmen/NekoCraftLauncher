@@ -30,7 +30,7 @@ public final class BootScreen extends StackPane {
 
     private static final long DURATION_MS = 3200;
     private static final String[] STEPS = {
-            "开源许可校验", "集体算力唤醒", "同志档案同步", "同志，欢迎回来"
+            "猫爪自检", "依赖校验", "资源同步", "欢迎回来，主人"
     };
 
     private final Canvas canvas = new Canvas();
@@ -64,7 +64,7 @@ public final class BootScreen extends StackPane {
                 + " -fx-font-family: 'Cascadia Mono', 'Consolas', monospace;");
         VBox brandBox = new VBox(2, brand, sub);
 
-        alertLabel = new Label("● COLLECTIVE CORE // ACTIVE  v" + AppVersion.CURRENT);
+        alertLabel = new Label("● NEKO ASSISTANT // ONLINE  v" + AppVersion.CURRENT);
         alertLabel.setStyle("-fx-text-fill: rgba(94,234,212,0.90); -fx-font-size: 9px;"
                 + " -fx-font-family: 'Cascadia Mono', 'Consolas', monospace;");
         Label right = alertLabel;
@@ -77,7 +77,7 @@ public final class BootScreen extends StackPane {
         Label title = new Label("N E K O   C O R E");
         title.setStyle("-fx-text-fill: #f4f4f4; -fx-font-size: 27px; -fx-font-weight: bold;"
                 + " -fx-font-family: 'Cascadia Mono', 'Consolas', monospace;");
-        Label tagline = new Label("猫娘助手 · 为爱发电 · 代码属于人民");
+        Label tagline = new Label("猫娘助手 · 为爱发电 · 今天也要一起冒险");
         tagline.setStyle("-fx-text-fill: rgba(255,255,255,0.55); -fx-font-size: 11px;");
         VBox centerText = new VBox(7, title, tagline);
         centerText.setAlignment(Pos.CENTER);
@@ -113,37 +113,37 @@ public final class BootScreen extends StackPane {
         terminal.setStyle("-fx-text-fill: rgba(255,205,110,0.55); -fx-font-size: 8.5px;"
                 + " -fx-font-family: 'Cascadia Mono', 'Consolas', monospace;");
         VBox bottom = new VBox(6, terminal, statusLabel, progressRow,
-                new Label("为爱发电 · 永远免费更新  //  Esc 跳过") {{
+                new Label("猫娘助手 · 为爱发电  //  Esc 跳过") {{
                     setStyle("-fx-text-fill: rgba(255,255,255,0.25); -fx-font-size: 8.5px;"
                             + " -fx-font-family: 'Cascadia Mono', 'Consolas', monospace;");
                 }});
         bottom.setPadding(new Insets(0, 28, 22, 28));
         bottom.setMaxWidth(Double.MAX_VALUE);
 
-        VBox leftThreat = new VBox(6,
-                threatLabel("★ 全世界无产者，联合起来！", "rgba(94,234,212,0.95)"),
-                threatLabel("为人民服务", "rgba(153,246,228,0.78)"),
-                threatLabel("各尽所能，按需分配", "rgba(125,211,252,0.65)"),
-                threatLabel("代码属于人民 · 开源共享", "rgba(125,211,252,0.42)"));
-        leftThreat.setPadding(new Insets(0, 0, 0, 28));
-        leftThreat.setMaxWidth(180);
-        leftThreat.setTranslateY(126);
-        VBox rightThreat = new VBox(6,
-                threatLabel("FREE AS IN FREEDOM", "rgba(153,246,228,0.85)"),
-                threatLabel("OPEN SOURCE / GPL", "rgba(125,211,252,0.65)"),
-                threatLabel("SHARED COMPUTE", "rgba(255,150,120,0.5)"),
-                threatLabel("POWER TO THE PEOPLE", "rgba(94,234,212,0.60)"));
-        rightThreat.setPadding(new Insets(0, 28, 0, 0));
-        rightThreat.setMaxWidth(180);
-        rightThreat.setAlignment(Pos.CENTER_RIGHT);
-        rightThreat.getChildren().forEach(node -> ((Label) node).setAlignment(Pos.CENTER_RIGHT));
+        VBox leftTips = new VBox(6,
+                threatLabel("NEKO ASSISTANT", "rgba(94,234,212,0.95)"),
+                threatLabel("猫娘正在准备启动", "rgba(153,246,228,0.82)"),
+                threatLabel("猫爪已就位", "rgba(125,211,252,0.68)"),
+                threatLabel("今天也要一起冒险", "rgba(125,211,252,0.45)"));
+        leftTips.setPadding(new Insets(0, 0, 0, 28));
+        leftTips.setMaxWidth(190);
+        leftTips.setTranslateY(126);
+        VBox rightTips = new VBox(6,
+                threatLabel("NYA~", "rgba(153,246,228,0.85)"),
+                threatLabel("COZY MODE", "rgba(125,211,252,0.65)"),
+                threatLabel("PAW POWERED", "rgba(125,211,252,0.55)"),
+                threatLabel("CUTE & OPEN", "rgba(94,234,212,0.60)"));
+        rightTips.setPadding(new Insets(0, 28, 0, 0));
+        rightTips.setMaxWidth(190);
+        rightTips.setAlignment(Pos.CENTER_RIGHT);
+        rightTips.getChildren().forEach(node -> ((Label) node).setAlignment(Pos.CENTER_RIGHT));
 
         BorderPane overlay = new BorderPane();
         overlay.setTop(top);
-        overlay.setLeft(leftThreat);
-        overlay.setRight(rightThreat);
-        BorderPane.setAlignment(leftThreat, Pos.CENTER_LEFT);
-        BorderPane.setAlignment(rightThreat, Pos.CENTER_RIGHT);
+        overlay.setLeft(leftTips);
+        overlay.setRight(rightTips);
+        BorderPane.setAlignment(leftTips, Pos.CENTER_LEFT);
+        BorderPane.setAlignment(rightTips, Pos.CENTER_RIGHT);
         overlay.setCenter(centerGroup);
         overlay.setBottom(bottom);
         overlay.setPickOnBounds(false);
@@ -188,9 +188,7 @@ public final class BootScreen extends StackPane {
                         stepLabels[i].setOpacity(1);
                     }
                 }
-                statusLabel.setText(progress < 0.32 ? "正在唤醒集体算力…"
-                        : progress < 0.62 ? "开源协议与依赖校验…"
-                        : progress < 0.9 ? "正在同步同志档案…" : "同志，欢迎回来");
+                statusLabel.setText(progress < 0.32 ? "猫爪准备中…" : progress < 0.62 ? "伸个懒腰，校验依赖…" : progress < 0.9 ? "同步猫猫资源…" : "欢迎回来，主人~");
                 if (alertLabel != null) {
                     alertLabel.setOpacity(0.55 + 0.35 * (0.5 + 0.5 * Math.sin(time * 3.2)));
                 }
@@ -214,10 +212,10 @@ public final class BootScreen extends StackPane {
     }
 
     private void drawFlag(GraphicsContext g, double x, double y, double w, double h, double time) {
-        g.setStroke(Color.web("#ffcf6a", 0.65));
+        g.setStroke(Color.web("#2dd4bf", 0.65));
         g.setLineWidth(1);
         g.strokeLine(x, y, x, y + h + 6);
-        g.setFill(Color.web("#d81e1e", 0.82));
+        g.setFill(Color.web("#14b8a6", 0.82));
         g.beginPath();
         g.moveTo(x + 3, y + 5);
         g.bezierCurveTo(x + w * 0.3, y + 1 + Math.sin(time * 1.7) * 3,
@@ -234,7 +232,7 @@ public final class BootScreen extends StackPane {
             sx[i] = star[i * 2];
             sy[i] = star[i * 2 + 1];
         }
-        g.setFill(Color.web("#ffcf6a", 0.9));
+        g.setFill(Color.web("#2dd4bf", 0.9));
         g.fillPolygon(sx, sy, 10);
     }
 
@@ -302,10 +300,9 @@ public final class BootScreen extends StackPane {
         }
         g.setFill(Color.web("#14b8a6", 0.04));
         g.fillPolygon(wmX, wmY, 10);
-        g.setStroke(Color.web("#ffcf6a", 0.06));
+        g.setStroke(Color.web("#2dd4bf", 0.06));
         g.strokePolygon(wmX, wmY, 10);
 
-        drawFlag(g, 30, 104, 88, 48, time);
 
         for (int i = 0; i < 4; i++) {
             double radius = 86 + i * 32 + Math.sin(time * 0.6 + i) * 2;
@@ -360,7 +357,7 @@ public final class BootScreen extends StackPane {
         g.setLineWidth(1.5);
         g.strokeOval(cx - 58, cy - 58, 116, 116);
         RadialGradient iris = new RadialGradient(0, 0, 0.5, 0.5, 0.5, true, CycleMethod.NO_CYCLE,
-                new Stop(0, Color.web("#ccfbf1")), new Stop(0.55, Color.web("#ff3020")),
+                new Stop(0, Color.web("#ccfbf1")), new Stop(0.55, Color.web("#2dd4bf")),
                 new Stop(1, Color.web("#042f2e")));
         g.setFill(iris);
         g.fillOval(ex - 30, ey - 30, 60, 60);
@@ -374,7 +371,7 @@ public final class BootScreen extends StackPane {
         g.fillOval(ex - 8, ey - 23, 16, 46);
         g.setStroke(Color.web("#7dd3fc", 0.35));
         g.strokeOval(ex - 8, ey - 23, 16, 46);
-        g.setFill(Color.web("#ffd8d0", 0.8));
+        g.setFill(Color.web("#2dd4bf", 0.8));
         g.fillOval(ex - 16, ey - 18, 8, 8);
         g.setStroke(Color.web("#7dd3fc", 0.55));
         g.strokeLine(cx - 78, cy, cx + 78, cy);

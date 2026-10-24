@@ -507,13 +507,13 @@ public class HelloApplication extends Application {
         javafx.scene.shape.Rectangle mark = new javafx.scene.shape.Rectangle(3, 18);
         mark.setArcWidth(3);
         mark.setArcHeight(3);
-        mark.setStyle("-fx-fill: #e11d2e;");
+        mark.setStyle("-fx-fill: #14b8a6;");
         Label appTitle = new Label("Neko Craft Launcher");
         appTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
         appTitle.setTextFill(javafx.scene.paint.Color.web("#e8eaee"));
-        Label badge = new Label("共产国际");
+        Label badge = new Label("NEKO");
         badge.setStyle("-fx-font-size: 10px; -fx-font-weight: bold;");
-        badge.setTextFill(javafx.scene.paint.Color.web("#ffcf6a"));
+        badge.setTextFill(javafx.scene.paint.Color.web("#5eead4"));
         Label liveClock = new Label();
         liveClock.setStyle("-fx-text-fill: #7b818b; -fx-font-size: 10.5px; -fx-font-family: 'Cascadia Mono', 'Consolas', monospace;");
         java.time.format.DateTimeFormatter clockFormat = java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss");
@@ -1196,7 +1196,7 @@ public class HelloApplication extends Application {
                     + "F5  下载\nF6  设置\nF7  工具\nF8  设置 · 查看日志\nEsc 关闭弹窗");
             alert.showAndWait();
         });
-        Label promise = new Label("为爱发电 · 永远免费更新");
+        Label promise = new Label("NEKO · 为爱发电");
         promise.setStyle("-fx-text-fill: -app-accent; -fx-font-size: 9.5px; -fx-font-weight: bold;");
         Region promiseSpacer = new Region();
         HBox.setHgrow(promiseSpacer, Priority.ALWAYS);
@@ -1213,8 +1213,8 @@ public class HelloApplication extends Application {
 
         HBox mainContent = new HBox(25, userArea, logContainer);
         VBox.setVgrow(mainContent, Priority.ALWAYS);
-        ModuleHeader launchHeader = new ModuleHeader("01 / COMINTERN", "启动",
-                "全世界无产者，联合起来！", "play", ModuleHeader.Badge.CIRCLE, "为爱发电 · 永远免费更新");
+        ModuleHeader launchHeader = new ModuleHeader("01 / NEKO", "启动",
+                "猫娘助手 · 今天也要一起冒险", "play", ModuleHeader.Badge.CIRCLE, "为爱发电 · 永远免费更新");
         panel.getChildren().addAll(launchHeader, mainContent);
 
         loginBtn.setOnAction(e -> handleLogin(loginTypeCombo, serverField, usernameField, passwordField, loginBtn));
@@ -3711,12 +3711,18 @@ public class HelloApplication extends Application {
                 }
             }).thenAccept(body -> Platform.runLater(() -> {
                 loadingMoreResults = false;
-                statusBox.setVisible(false);
                 if (body == null || !body.startsWith("{")) {
-                    statusLabel.setText("Modrinth 与 MCIM 镜像都不可用，请检查网络。");
+                    statusBox.setVisible(true);
+                    statusBox.getChildren().setAll(statusLabel);
+                    statusLabel.setText("加载失败：资源站不可用，点击这里重试");
+                    statusBox.setOnMouseClicked(e -> {
+                        statusLabel.setText("正在重新加载...");
+                        loadSearchPage(true);
+                    });
                     updateLoadMoreButton();
                     return;
                 }
+                statusBox.setVisible(false);
                 JsonObject json = new Gson().fromJson(body, JsonObject.class);
                 JsonArray hits = json.getAsJsonArray("hits");
                 if (json.has("total_hits") && !json.get("total_hits").isJsonNull()) {
