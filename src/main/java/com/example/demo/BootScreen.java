@@ -48,7 +48,7 @@ public final class BootScreen extends StackPane {
 
     public BootScreen(Runnable onFinished) {
         this.onFinished = onFinished;
-        setStyle("-fx-background-color: #050608;");
+        setStyle("-fx-background-color: #071212;");
         setPickOnBounds(true);
         setFocusTraversable(true);
 
@@ -57,15 +57,15 @@ public final class BootScreen extends StackPane {
         getChildren().add(canvas);
 
         Label brand = new Label("NEKO CORE");
-        brand.setStyle("-fx-text-fill: #ff5a4a; -fx-font-size: 15px; -fx-font-weight: bold;"
+        brand.setStyle("-fx-text-fill: #5eead4; -fx-font-size: 15px; -fx-font-weight: bold;"
                 + " -fx-font-family: 'Cascadia Mono', 'Consolas', monospace;");
         Label sub = new Label("BOOT SEQUENCE / LOCAL SYSTEM");
-        sub.setStyle("-fx-text-fill: rgba(255,90,74,0.55); -fx-font-size: 9px;"
+        sub.setStyle("-fx-text-fill: rgba(94,234,212,0.60); -fx-font-size: 9px;"
                 + " -fx-font-family: 'Cascadia Mono', 'Consolas', monospace;");
         VBox brandBox = new VBox(2, brand, sub);
 
         alertLabel = new Label("● COLLECTIVE CORE // ACTIVE  v" + AppVersion.CURRENT);
-        alertLabel.setStyle("-fx-text-fill: rgba(255,74,58,0.85); -fx-font-size: 9px;"
+        alertLabel.setStyle("-fx-text-fill: rgba(94,234,212,0.90); -fx-font-size: 9px;"
                 + " -fx-font-family: 'Cascadia Mono', 'Consolas', monospace;");
         Label right = alertLabel;
         Region topSpacer = new Region();
@@ -77,7 +77,7 @@ public final class BootScreen extends StackPane {
         Label title = new Label("N E K O   C O R E");
         title.setStyle("-fx-text-fill: #f4f4f4; -fx-font-size: 27px; -fx-font-weight: bold;"
                 + " -fx-font-family: 'Cascadia Mono', 'Consolas', monospace;");
-        Label tagline = new Label("开放协作 · 为人民服务 · 代码属于人民");
+        Label tagline = new Label("猫娘助手 · 为爱发电 · 代码属于人民");
         tagline.setStyle("-fx-text-fill: rgba(255,255,255,0.55); -fx-font-size: 11px;");
         VBox centerText = new VBox(7, title, tagline);
         centerText.setAlignment(Pos.CENTER);
@@ -100,16 +100,16 @@ public final class BootScreen extends StackPane {
 
         progressBar.setPrefWidth(360);
         progressBar.setPrefHeight(3);
-        progressBar.setStyle("-fx-accent: #ff453a;");
+        progressBar.setStyle("-fx-accent: #2dd4bf;");
         percentLabel.setStyle("-fx-text-fill: rgba(255,255,255,0.72); -fx-font-size: 10px;"
                 + " -fx-font-family: 'Cascadia Mono', 'Consolas', monospace;");
         percentLabel.setMinWidth(36);
-        statusLabel.setStyle("-fx-text-fill: rgba(255,90,74,0.72); -fx-font-size: 10px;"
+        statusLabel.setStyle("-fx-text-fill: rgba(94,234,212,0.80); -fx-font-size: 10px;"
                 + " -fx-font-family: 'Cascadia Mono', 'Consolas', monospace;");
         HBox progressRow = new HBox(10, progressBar, percentLabel);
         progressRow.setAlignment(Pos.CENTER_LEFT);
         HBox.setHgrow(progressBar, Priority.ALWAYS);
-        Label terminal = new Label("comrade@neko:~$ sudo ./boot --for-the-people");
+        Label terminal = new Label("neko@home:~$ ./nyan --boot --for-the-people");
         terminal.setStyle("-fx-text-fill: rgba(255,205,110,0.55); -fx-font-size: 8.5px;"
                 + " -fx-font-family: 'Cascadia Mono', 'Consolas', monospace;");
         VBox bottom = new VBox(6, terminal, statusLabel, progressRow,
@@ -121,18 +121,18 @@ public final class BootScreen extends StackPane {
         bottom.setMaxWidth(Double.MAX_VALUE);
 
         VBox leftThreat = new VBox(6,
-                threatLabel("★ 全世界无产者，联合起来！", "rgba(255,92,70,0.95)"),
-                threatLabel("为人民服务", "rgba(255,205,110,0.72)"),
-                threatLabel("各尽所能，按需分配", "rgba(255,150,120,0.55)"),
-                threatLabel("代码属于人民 · 开源共享", "rgba(255,150,120,0.38)"));
+                threatLabel("★ 全世界无产者，联合起来！", "rgba(94,234,212,0.95)"),
+                threatLabel("为人民服务", "rgba(153,246,228,0.78)"),
+                threatLabel("各尽所能，按需分配", "rgba(125,211,252,0.65)"),
+                threatLabel("代码属于人民 · 开源共享", "rgba(125,211,252,0.42)"));
         leftThreat.setPadding(new Insets(0, 0, 0, 28));
         leftThreat.setMaxWidth(180);
         leftThreat.setTranslateY(126);
         VBox rightThreat = new VBox(6,
-                threatLabel("FREE AS IN FREEDOM", "rgba(255,205,110,0.8)"),
-                threatLabel("OPEN SOURCE / GPL", "rgba(255,150,120,0.55)"),
+                threatLabel("FREE AS IN FREEDOM", "rgba(153,246,228,0.85)"),
+                threatLabel("OPEN SOURCE / GPL", "rgba(125,211,252,0.65)"),
                 threatLabel("SHARED COMPUTE", "rgba(255,150,120,0.5)"),
-                threatLabel("POWER TO THE PEOPLE", "rgba(255,92,70,0.55)"));
+                threatLabel("POWER TO THE PEOPLE", "rgba(94,234,212,0.60)"));
         rightThreat.setPadding(new Insets(0, 28, 0, 0));
         rightThreat.setMaxWidth(180);
         rightThreat.setAlignment(Pos.CENTER_RIGHT);
@@ -259,35 +259,35 @@ public final class BootScreen extends StackPane {
         g.fillRect(0, 0, w, h);
 
         g.setLineWidth(1);
-        g.setStroke(Color.web("#ff3b30", 0.035));
+        g.setStroke(Color.web("#2dd4bf", 0.035));
         for (double x = 0; x < w; x += 64) g.strokeLine(x, 0, x, h);
         for (double y = 0; y < h; y += 64) g.strokeLine(0, y, w, y);
 
         double scanY = (time * 130) % (h + 120) - 60;
-        g.setFill(Color.web("#ff2d20", 0.035));
+        g.setFill(Color.web("#14b8a6", 0.035));
         g.fillRect(0, scanY, w, 54);
-        g.setStroke(Color.web("#ff5a48", 0.13));
+        g.setStroke(Color.web("#5eead4", 0.13));
         g.strokeLine(0, scanY, w, scanY);
 
         if (((int) (time * 3)) % 7 < 2) {
             for (int i = 0; i < 4; i++) {
                 double gy = (time * 190 + i * 137) % h;
-                g.setFill(Color.web("#ff3b30", 0.055));
+                g.setFill(Color.web("#2dd4bf", 0.055));
                 g.fillRect(0, gy, w, i % 2 == 0 ? 1 : 3);
             }
         }
 
         RadialGradient vignette = new RadialGradient(0, 0, 0.5, 0.5, 0.72, true, CycleMethod.NO_CYCLE,
                 new Stop(0, Color.TRANSPARENT), new Stop(0.62, Color.TRANSPARENT),
-                new Stop(1, Color.web("#2a0300", 0.55)));
+                new Stop(1, Color.web("#031716", 0.55)));
         g.setFill(vignette);
         g.fillRect(0, 0, w, h);
 
         double cx = w / 2;
         double cy = h * 0.40;
         RadialGradient glow = new RadialGradient(0, 0, 0.5, 0.5, 0.5, true, CycleMethod.NO_CYCLE,
-                new Stop(0, Color.web("#ff2d20", 0.16)),
-                new Stop(0.45, Color.web("#ff2d20", 0.05)),
+                new Stop(0, Color.web("#14b8a6", 0.16)),
+                new Stop(0.45, Color.web("#14b8a6", 0.05)),
                 new Stop(1, Color.TRANSPARENT));
         g.setFill(glow);
         double glowSize = Math.max(w, h) * 0.55;
@@ -300,7 +300,7 @@ public final class BootScreen extends StackPane {
             wmX[i] = watermark[i * 2];
             wmY[i] = watermark[i * 2 + 1];
         }
-        g.setFill(Color.web("#ff2d20", 0.04));
+        g.setFill(Color.web("#14b8a6", 0.04));
         g.fillPolygon(wmX, wmY, 10);
         g.setStroke(Color.web("#ffcf6a", 0.06));
         g.strokePolygon(wmX, wmY, 10);
@@ -309,11 +309,11 @@ public final class BootScreen extends StackPane {
 
         for (int i = 0; i < 4; i++) {
             double radius = 86 + i * 32 + Math.sin(time * 0.6 + i) * 2;
-            g.setStroke(Color.web("#ff453a", 0.18 - i * 0.03));
+            g.setStroke(Color.web("#2dd4bf", 0.18 - i * 0.03));
             g.setLineWidth(1);
             g.strokeOval(cx - radius, cy - radius, radius * 2, radius * 2);
         }
-        g.setStroke(Color.web("#ff5a48", 0.45));
+        g.setStroke(Color.web("#5eead4", 0.45));
         g.setLineDashes(10, 18);
         g.setLineDashOffset(time * 26);
         g.strokeArc(cx - 154, cy - 154, 308, 308, time * 18 % 360, 110, javafx.scene.shape.ArcType.OPEN);
@@ -325,7 +325,7 @@ public final class BootScreen extends StackPane {
             double angle = Math.toRadians(i * (360.0 / ticks));
             double inner = 184;
             double outer = i % 4 == 0 ? 196 : 190;
-            g.setStroke(Color.web("#ff453a", i % 4 == 0 ? 0.5 : 0.18));
+            g.setStroke(Color.web("#2dd4bf", i % 4 == 0 ? 0.5 : 0.18));
             g.strokeLine(cx + Math.cos(angle) * inner, cy + Math.sin(angle) * inner,
                     cx + Math.cos(angle) * outer, cy + Math.sin(angle) * outer);
         }
@@ -335,12 +335,12 @@ public final class BootScreen extends StackPane {
             double a2 = Math.toRadians(i * 30 + 22 + time * 4);
             double r1 = 60;
             double r2 = 76;
-            g.setFill(Color.web(i % 2 == 0 ? "#0d0303" : "#170505"));
+            g.setFill(Color.web(i % 2 == 0 ? "#041f1d" : "#062a27"));
             g.fillPolygon(new double[]{cx + Math.cos(a1) * r1, cx + Math.cos(a1) * r2,
                             cx + Math.cos(a2) * r2, cx + Math.cos(a2) * r1},
                     new double[]{cy + Math.sin(a1) * r1, cy + Math.sin(a1) * r2,
                             cy + Math.sin(a2) * r2, cy + Math.sin(a2) * r1}, 4);
-            g.setStroke(Color.web("#ff453a", 0.16));
+            g.setStroke(Color.web("#2dd4bf", 0.16));
             g.strokeLine(cx + Math.cos(a1) * r1, cy + Math.sin(a1) * r1,
                     cx + Math.cos(a1) * r2, cy + Math.sin(a1) * r2);
         }
@@ -354,35 +354,35 @@ public final class BootScreen extends StackPane {
         double ex = cx + lookX;
         double ey = cy + lookY;
 
-        g.setFill(Color.web("#120405"));
+        g.setFill(Color.web("#052e2b"));
         g.fillOval(cx - 58, cy - 58, 116, 116);
-        g.setStroke(Color.web("#ff5a48", 0.75));
+        g.setStroke(Color.web("#5eead4", 0.75));
         g.setLineWidth(1.5);
         g.strokeOval(cx - 58, cy - 58, 116, 116);
         RadialGradient iris = new RadialGradient(0, 0, 0.5, 0.5, 0.5, true, CycleMethod.NO_CYCLE,
-                new Stop(0, Color.web("#ff8a72")), new Stop(0.55, Color.web("#ff3020")),
-                new Stop(1, Color.web("#4a0905")));
+                new Stop(0, Color.web("#ccfbf1")), new Stop(0.55, Color.web("#ff3020")),
+                new Stop(1, Color.web("#042f2e")));
         g.setFill(iris);
         g.fillOval(ex - 30, ey - 30, 60, 60);
         for (int i = 0; i < 28; i++) {
             double a = Math.toRadians(i * (360.0 / 28) + time * 8);
-            g.setStroke(Color.web("#ffb0a0", 0.16));
+            g.setStroke(Color.web("#99f6e4", 0.16));
             g.strokeLine(ex + Math.cos(a) * 14, ey + Math.sin(a) * 14,
                     ex + Math.cos(a) * 29, ey + Math.sin(a) * 29);
         }
-        g.setFill(Color.web("#070203"));
+        g.setFill(Color.web("#021716"));
         g.fillOval(ex - 8, ey - 23, 16, 46);
-        g.setStroke(Color.web("#ff6b57", 0.35));
+        g.setStroke(Color.web("#7dd3fc", 0.35));
         g.strokeOval(ex - 8, ey - 23, 16, 46);
         g.setFill(Color.web("#ffd8d0", 0.8));
         g.fillOval(ex - 16, ey - 18, 8, 8);
-        g.setStroke(Color.web("#ff6b57", 0.55));
+        g.setStroke(Color.web("#7dd3fc", 0.55));
         g.strokeLine(cx - 78, cy, cx + 78, cy);
         double sweepY = cy - 70 + (time * 36) % 140;
-        g.setStroke(Color.web("#ff6b57", 0.18));
+        g.setStroke(Color.web("#7dd3fc", 0.18));
         g.strokeLine(cx - 70, sweepY, cx + 70, sweepY);
 
-        g.setStroke(Color.web("#ff453a", 0.34));
+        g.setStroke(Color.web("#2dd4bf", 0.34));
         g.setLineWidth(1);
         double inset = 22;
         double len = 18;
@@ -395,9 +395,43 @@ public final class BootScreen extends StackPane {
         g.strokeLine(w - inset, h - inset, w - inset - len, h - inset);
         g.strokeLine(w - inset, h - inset, w - inset, h - inset - len);
 
-        g.setStroke(Color.web("#ff2d20", 0.18 + 0.12 * (0.5 + 0.5 * Math.sin(time * 4.4))));
+        g.setStroke(Color.web("#14b8a6", 0.18 + 0.12 * (0.5 + 0.5 * Math.sin(time * 4.4))));
         g.setLineWidth(1);
+        // Neko：猫耳 + 胡须 + 奔跑小猫加载动画
+        g.setFill(Color.web("#052e2b", 0.92));
+        g.fillPolygon(new double[]{cx - 62, cx - 38, cx - 20}, new double[]{cy - 52, cy - 96, cy - 52}, 3);
+        g.fillPolygon(new double[]{cx + 62, cx + 38, cx + 20}, new double[]{cy - 52, cy - 96, cy - 52}, 3);
+        g.setStroke(Color.web("#5eead4", 0.65));
+        g.setLineWidth(1.4);
+        g.strokePolygon(new double[]{cx - 62, cx - 38, cx - 20}, new double[]{cy - 52, cy - 96, cy - 52}, 3);
+        g.strokePolygon(new double[]{cx + 62, cx + 38, cx + 20}, new double[]{cy - 52, cy - 96, cy - 52}, 3);
+        g.setStroke(Color.web("#99f6e4", 0.35));
+        for (int i = -1; i <= 1; i++) {
+            g.strokeLine(cx - 34, cy + 8 + i * 6, cx - 72, cy + 2 + i * 9);
+            g.strokeLine(cx + 34, cy + 8 + i * 6, cx + 72, cy + 2 + i * 9);
+        }
+        double catX = 34 + Math.max(0, Math.min(1, progress)) * Math.max(0, w - 150);
+        drawRunningCat(g, catX, h - 78, 20, time);
         g.strokeRect(10, 10, w - 20, h - 20);
+    }
+
+    private void drawRunningCat(GraphicsContext g, double x, double y, double size, double time) {
+        g.setFill(Color.web("#5eead4", 0.85));
+        g.fillOval(x, y, size * 1.5, size * 0.75);
+        g.fillOval(x + size * 1.15, y - size * 0.45, size * 0.72, size * 0.62);
+        g.setFill(Color.web("#042f2e"));
+        g.fillPolygon(new double[]{x + size * 1.22, x + size * 1.34, x + size * 1.42},
+                new double[]{y - size * 0.34, y - size * 0.83, y - size * 0.42}, 3);
+        g.fillPolygon(new double[]{x + size * 1.55, x + size * 1.68, x + size * 1.76},
+                new double[]{y - size * 0.34, y - size * 0.83, y - size * 0.42}, 3);
+        g.setStroke(Color.web("#99f6e4", 0.85));
+        g.setLineWidth(2);
+        double phase = Math.sin(time * 14);
+        g.strokeLine(x + size * 0.30, y + size * 0.55, x + size * 0.18 + phase * 8, y + size * 0.95);
+        g.strokeLine(x + size * 0.70, y + size * 0.55, x + size * 0.82 - phase * 8, y + size * 0.95);
+        g.strokeLine(x + size * 1.25, y + size * 0.35, x + size * 1.42 + phase * 7, y + size * 0.72);
+        g.strokeLine(x + size * 1.48, y + size * 0.35, x + size * 1.66 - phase * 7, y + size * 0.72);
+        g.strokeLine(x - size * 0.02, y + size * 0.12, x - size * 0.38, y - size * 0.30 + phase * 6);
     }
 
     private void finish() {

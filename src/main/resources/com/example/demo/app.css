@@ -516,3 +516,6 @@
 .mod-card:hover {
     -fx-effect: dropshadow(gaussian, rgba(156,163,175,0.22), 20, 0.12, 0, 5);
 }
+
+.text-field, .text-area, .combo-box { -fx-text-fill: -app-text; -fx-prompt-text-fill: -app-text-muted; }
+

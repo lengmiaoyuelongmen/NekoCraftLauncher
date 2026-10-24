@@ -762,7 +762,8 @@ public class HelloApplication extends Application {
 
         target.setVisible(true);
         Motion.pageIn(target);
-        if ("launch".equals(pageName)) { applyLaunchBackground(); applyAiMode(); refreshLaunchInsight(); }
+        applyLaunchBackground();
+        if ("launch".equals(pageName)) { applyAiMode(); refreshLaunchInsight(); }
         Platform.runLater(() -> {
             if (stageRef != null && stageRef.getScene() != null) {
                 Theme.apply(stageRef.getScene().getRoot());
@@ -773,16 +774,29 @@ public class HelloApplication extends Application {
 
     /** 启动页背景图片（个性化里设置）。 */
     private void applyLaunchBackground() {
-        if (launchPanel == null) return;
         String path = config.getBackgroundImage();
         File file = path == null || path.isBlank() ? null : new File(path);
+        applyPanelBackground(launchPanel, file);
+        applyPanelBackground(downloadPanel, file);
+        applyPanelBackground(settingsPanel, file);
+        applyPanelBackground(toolsPanel, file);
+        applyPanelBackground(instancesPanel, file);
+        applyPanelBackground(instanceSettingsPanel, file);
+        applyPanelBackground(communityPanel, file);
+        applyPanelBackground(minecraftPanel, file);
+    }
+
+    private void applyPanelBackground(javafx.scene.Node panel, File file) {
+        if (panel == null) return;
+        String style = panel.getStyle() == null ? "" : panel.getStyle();
+        style = style.replaceAll("(?i)-fx-background-image\\s*:[^;]*;?", "")
+                .replaceAll("(?i)-fx-background-size\\s*:[^;]*;?", "")
+                .replaceAll("(?i)-fx-background-position\\s*:[^;]*;?", "");
         if (file != null && file.isFile()) {
-            launchPanel.setStyle("-fx-background-image: url('" + file.toURI() + "');"
-                    + " -fx-background-size: cover; -fx-background-position: center center;"
-                    + " -fx-background-color: transparent;");
-        } else {
-            launchPanel.setStyle("");
+            style += " -fx-background-image: url('" + file.toURI() + "');"
+                    + " -fx-background-size: cover; -fx-background-position: center center;";
         }
+        panel.setStyle(style.trim());
     }
 
     /** 高亮当前所在的导航项（实例设置页对应「模组」或「设置」）。 */
@@ -5414,11 +5428,53 @@ public class HelloApplication extends Application {
     /** 切换当前游戏目录（多目录支持）。 */
     private void switchGameDir(File dir) {
         if (dir == null) return;
-        config.setGameDir(dir.getAbsolutePath());
-        config.addGameDir(dir.getAbsolutePath());
+        File root = detectMinecraftRoot(dir);
+        if (root == null) {
+            Toast.error("没有检测到 Minecraft 目录：请选择包含 versions 的 .minecraft 文件夹");
+            logMessage("❌ 导入失败：未在 " + dir.getAbsolutePath() + " 找到 versions");
+            return;
+        }
+        config.setGameDir(root.getAbsolutePath());
+        config.addGameDir(root.getAbsolutePath());
         config.save();
         refreshInstalledVersions();
-        Toast.info("已切换到游戏目录 " + dir.getName());
+        int count = VersionProfile.installedIds(root).size();
+        if (count == 0) {
+            Toast.warn("目录已切换，但没有发现已安装版本：请确认 versions 内有版本 JSON");
+            logMessage("⚠ 已切换目录，但未发现已安装版本: " + root.getAbsolutePath());
+        } else {
+            Toast.ok("已导入 " + count + " 个版本：" + root.getName());
+            logMessage("✅ 已导入游戏目录 " + root.getAbsolutePath() + "，版本数 " + count);
+        }
+    }
+
+    /** 兼容 PCL / 官方启动器：自动向下寻找 .minecraft 或 versions 目录。 */
+    private File detectMinecraftRoot(File selected) {
+        if (selected == null || !selected.isDirectory()) return null;
+        File[] direct = {selected, new File(selected, ".minecraft")};
+        for (File candidate : direct) {
+            if (hasVersions(candidate)) return candidate;
+        }
+        File[] children = selected.listFiles(File::isDirectory);
+        if (children != null) {
+            for (File child : children) {
+                if (hasVersions(child)) return child;
+                File dot = new File(child, ".minecraft");
+                if (hasVersions(dot)) return dot;
+            }
+        }
+        return null;
+    }
+
+    private boolean hasVersions(File dir) {
+        File versions = new File(dir, "versions");
+        if (!versions.isDirectory()) return false;
+        File[] subs = versions.listFiles(File::isDirectory);
+        if (subs == null) return false;
+        for (File sub : subs) {
+            if (new File(sub, sub.getName() + ".json").isFile()) return true;
+        }
+        return false;
     }
 
     /** 实例选择页点了某个实例。 */
