@@ -1044,33 +1044,47 @@ public class HelloApplication extends Application {
 
         launchBtn = new Button();
         launchMainLabel = new Label("★ 启动游戏");
-        launchMainLabel.setStyle("-fx-text-fill: -app-text; -fx-font-size: 18px; -fx-font-weight: bold;");
+        launchMainLabel.setStyle("-fx-text-fill: #3f7d36; -fx-font-size: 20px; -fx-font-weight: bold;");
         launchVersionLabel = new Label("");
-        launchVersionLabel.setStyle("-fx-text-fill: -app-launch-text-dim; -fx-font-size: 11px;");
+        launchVersionLabel.setStyle("-fx-text-fill: #5c9650; -fx-font-size: 11px; -fx-font-weight: bold;");
         VBox launchBox = new VBox(1, launchMainLabel, launchVersionLabel);
-        launchBox.setAlignment(Pos.CENTER);
-        launchBtn.setGraphic(launchBox);
+        launchBox.setAlignment(Pos.CENTER_LEFT);
+
+        javafx.scene.image.ImageView launchCat = new javafx.scene.image.ImageView();
+        try (java.io.InputStream in = HelloApplication.class.getResourceAsStream("/launch-cat.png")) {
+            if (in != null) launchCat.setImage(new javafx.scene.image.Image(in));
+        } catch (Exception ignored) {
+        }
+        launchCat.setFitWidth(58);
+        launchCat.setFitHeight(58);
+        launchCat.setPreserveRatio(true);
+        launchCat.setSmooth(true);
+
+        Region launchSpacer = new Region();
+        HBox.setHgrow(launchSpacer, Priority.ALWAYS);
+        HBox launchContent = new HBox(8, launchBox, launchSpacer, launchCat);
+        launchContent.setAlignment(Pos.CENTER_LEFT);
+        launchContent.setPadding(new Insets(0, 10, 0, 22));
+        launchContent.setMaxWidth(Double.MAX_VALUE);
+        launchBtn.setGraphic(launchContent);
+        launchBtn.setContentDisplay(javafx.scene.control.ContentDisplay.GRAPHIC_ONLY);
         launchBtn.setMaxWidth(Double.MAX_VALUE);
-        launchBtn.setPrefHeight(56);
-        launchBtn.setMinHeight(56);
-        launchMainLabel.setStyle("-fx-text-fill: -app-launch-text; -fx-font-size: 19px; -fx-font-weight: bold;");
-        launchVersionLabel.setStyle("-fx-text-fill: -app-launch-text-dim; -fx-font-size: 11px;");
-        String launchNormal = "-fx-background-color: linear-gradient(to bottom, -app-launch-top, -app-launch-bottom);"
-                + " -fx-text-fill: -app-text; -fx-font-size: 19px; -fx-font-weight: bold;"
-                + " -fx-background-radius: 13; -fx-border-radius: 13;"
-                + " -fx-border-color: -app-launch-border; -fx-border-width: 1.2; -fx-cursor: hand;";
-        String launchHover = "-fx-background-color: linear-gradient(to bottom, -app-launch-top-hover, -app-launch-bottom-hover);"
-                + " -fx-text-fill: -app-text; -fx-font-size: 19px; -fx-font-weight: bold;"
-                + " -fx-background-radius: 13; -fx-border-radius: 13;"
-                + " -fx-border-color: -app-launch-border-hover; -fx-border-width: 1.2; -fx-cursor: hand;";
+        launchBtn.setPrefHeight(64);
+        launchBtn.setMinHeight(64);
+        String launchNormal = "-fx-background-color: linear-gradient(to right, #e8f8df, #d2edc5);"
+                + " -fx-background-radius: 20; -fx-border-radius: 20; -fx-border-color: #a9d49a;"
+                + " -fx-border-width: 1.4; -fx-padding: 0; -fx-cursor: hand;";
+        String launchHover = "-fx-background-color: linear-gradient(to right, #f0fbeb, #e0f4d6);"
+                + " -fx-background-radius: 20; -fx-border-radius: 20; -fx-border-color: #7db86a;"
+                + " -fx-border-width: 1.8; -fx-padding: 0; -fx-cursor: hand;";
         launchBtn.setStyle(launchNormal);
-        javafx.scene.effect.DropShadow launchGlow = new javafx.scene.effect.DropShadow(22, Color.web("#9ca3af", 0.28));
+        javafx.scene.effect.DropShadow launchGlow = new javafx.scene.effect.DropShadow(18, Color.web("#7fb56d", 0.28));
         launchBtn.setEffect(launchGlow);
         javafx.animation.Timeline glowPulse = new javafx.animation.Timeline(
                 new javafx.animation.KeyFrame(javafx.util.Duration.ZERO,
-                        new javafx.animation.KeyValue(launchGlow.radiusProperty(), 16)),
+                        new javafx.animation.KeyValue(launchGlow.radiusProperty(), 14)),
                 new javafx.animation.KeyFrame(javafx.util.Duration.seconds(2.8),
-                        new javafx.animation.KeyValue(launchGlow.radiusProperty(), 30)));
+                        new javafx.animation.KeyValue(launchGlow.radiusProperty(), 24)));
         glowPulse.setAutoReverse(true);
         glowPulse.setCycleCount(javafx.animation.Animation.INDEFINITE);
         if (Motion.isEnabled()) glowPulse.play();
