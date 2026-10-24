@@ -122,7 +122,7 @@ public class LauncherConfig {
     private boolean performanceApplied;
 
     /** 更新检查地址（静态 JSON，空 = 不检查） */
-    private String updateUrl = "https://api.github.com/repos/qwe1314qwe2023/NekoCraftLauncher/releases/latest";
+    private String updateUrl = "https://api.github.com/repos/lengmiaoyuelongmen/NekoCraftLauncher/releases/latest";
 
     /** 浅色模式（顶栏保持深色） */
     private boolean lightTheme = true;
@@ -578,7 +578,7 @@ public class LauncherConfig {
     }
 
     public String getUpdateUrl() {
-        return updateUrl == null ? "https://api.github.com/repos/qwe1314qwe2023/NekoCraftLauncher/releases/latest" : updateUrl;
+        return updateUrl == null ? "https://api.github.com/repos/lengmiaoyuelongmen/NekoCraftLauncher/releases/latest" : updateUrl;
     }
 
     public void setUpdateUrl(String updateUrl) {
