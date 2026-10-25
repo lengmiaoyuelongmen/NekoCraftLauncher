@@ -337,12 +337,8 @@ public class HelloApplication extends Application {
         resizeGrip.setArcWidth(6);
         resizeGrip.setArcHeight(6);
         resizeGrip.setCursor(Cursor.SE_RESIZE);
-        javafx.scene.shape.Rectangle windowClip = new javafx.scene.shape.Rectangle();
-        windowClip.setArcWidth(32);
-        windowClip.setArcHeight(32);
-        windowClip.widthProperty().bind(root.widthProperty());
-        windowClip.heightProperty().bind(root.heightProperty());
-        root.setClip(windowClip);
+        // 透明 Stage 下使用全局 clip 会在部分 Windows/JavaFX 组合上导致整窗重绘异常。
+        // 圆角由 root 背景和顶栏 CSS 提供，不再裁剪整个根节点。
         StackPane rootWrap = new StackPane(root, resizeGrip);
         rootWrap.setAlignment(Pos.TOP_LEFT);
 
