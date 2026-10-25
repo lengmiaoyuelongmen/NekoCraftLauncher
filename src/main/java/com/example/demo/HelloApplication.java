@@ -138,6 +138,7 @@ public class HelloApplication extends Application {
     private boolean aiBusy;
     private final java.util.List<DeepSeekClient.Message> aiHistory = new java.util.ArrayList<>();
     private Process gameProcess;
+    private volatile boolean gameStopRequested;
     private ProgressBar downloadProgress;
     private Label downloadFileLabel;
     private Label downloadStatsLabel;
@@ -1936,6 +1937,7 @@ public class HelloApplication extends Application {
             return;
         }
         long pid = gameProcess.pid();
+        gameStopRequested = true;
         gameProcess.descendants().forEach(ProcessHandle::destroyForcibly);
         gameProcess.destroyForcibly();
         gameRunning = false;
@@ -5844,7 +5846,7 @@ public class HelloApplication extends Application {
             menu.add(show);
             menu.addSeparator();
             menu.add(quit);
-            trayIcon = new java.awt.TrayIcon(image, "Neko Craft Launcher", menu);
+            trayIcon = new java.awt.TrayIcon(image, "Neko Craft Launcher 猫娘启动器", menu);
             trayIcon.setImageAutoSize(true);
             trayIcon.addActionListener(e -> Platform.runLater(this::restoreFromTray));
             java.awt.SystemTray.getSystemTray().add(trayIcon);
@@ -5875,6 +5877,11 @@ public class HelloApplication extends Application {
     private void quitLauncher() {
         if (quitting) return;
         quitting = true;
+        if (gameProcess != null && gameProcess.isAlive()) {
+            gameStopRequested = true;
+            gameProcess.descendants().forEach(ProcessHandle::destroyForcibly);
+            gameProcess.destroyForcibly();
+        }
         if (trayIcon != null) {
             try {
                 java.awt.SystemTray.getSystemTray().remove(trayIcon);
@@ -6102,11 +6109,17 @@ public class HelloApplication extends Application {
         }
 
         process.onExit().thenAccept(exited -> Platform.runLater(() -> {
+            boolean forcedStop = gameStopRequested;
+            gameStopRequested = false;
             gameRunning = false;
             setGameStatus(false);
             if (stageRef != null && !stageRef.isShowing() && trayIcon != null) {
-                trayIcon.displayMessage("Neko Craft Launcher", "游戏进程已退出。",
-                        java.awt.TrayIcon.MessageType.INFO);
+                String trayMessage = forcedStop ? "游戏已由启动器结束。"
+                        : exited.exitValue() == 0 ? "游戏已正常退出。" : "游戏异常退出，请查看崩溃报告。";
+                trayIcon.displayMessage("Neko Craft Launcher", trayMessage,
+                        forcedStop || exited.exitValue() == 0
+                                ? java.awt.TrayIcon.MessageType.INFO
+                                : java.awt.TrayIcon.MessageType.WARNING);
             }
             if (minimizedForGame && stageRef != null) {
                 minimizedForGame = false;
@@ -6130,17 +6143,18 @@ public class HelloApplication extends Application {
                         + "（累计 " + Playtime.format(Playtime.seconds(base, gameInstanceId)) + "）\n");
                 gameStartAt = 0;
             }
-            boolean crashLike = exited.exitValue() != 0
+            boolean crashLike = !forcedStop && (exited.exitValue() != 0
                     || recent.contains("Exception") || recent.contains("Caused by:")
-                    || recent.contains("Mixin") || recent.contains("FATAL");
+                    || recent.contains("Mixin") || recent.contains("FATAL"));
             LaunchHistory.record(new File(config.getGameDir()), new LaunchHistory.Entry(
                     System.currentTimeMillis(), gameInstanceId, lastLaunchPrepMs,
                     sessionSeconds, exited.exitValue(), crashLike));
             lastLaunchPrepMs = 0;
             refreshLaunchInsight();
-            logArea.appendText(crashLike
+            logArea.appendText(forcedStop ? "🛑 游戏已被启动器主动结束。\n"
+                    : crashLike
                     ? "⚠ 游戏异常退出（日志里检测到异常，退出码 " + exited.exitValue() + "）\n"
-                    : "🏁 游戏已退出（退出码 " + exited.exitValue() + "）\n");
+                    : "🏁 游戏已正常退出（退出码 " + exited.exitValue() + "）\n");
             launchBtn.setDisable(false);
             if (launchMainLabel != null) launchMainLabel.setText("启动游戏");
             if (crashLike) {
