@@ -775,14 +775,36 @@ public final class SettingsPanel extends VBox {
             }
         }).thenAccept(v -> Platform.runLater(() -> {
             button.setDisable(false);
-            status.setText("下载完成，正在启动安装程序：" + target.getFileName());
+            status.setText("下载完成，正在自动安装 " + info.version() + "…");
             status.setStyle("-fx-text-fill: #4CAF50; -fx-font-size: 11px;");
-            Toast.ok("更新已下载，安装程序即将启动");
+            Toast.ok("更新已下载，正在自动安装");
             try {
-                java.awt.Desktop.getDesktop().open(target.toFile());
+                ProcessBuilder installer = new ProcessBuilder(target.toString(),
+                        "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART",
+                        "/CLOSEAPPLICATIONS", "/RESTARTAPPLICATIONS");
+                installer.directory(target.getParent().toFile());
+                installer.start();
+                // 给安装程序一点时间接管，然后退出启动器以便覆盖 exe
+                Thread shutdown = new Thread(() -> {
+                    try {
+                        Thread.sleep(1200);
+                    } catch (InterruptedException ignored) {
+                    }
+                    Platform.runLater(() -> {
+                        Platform.exit();
+                        System.exit(0);
+                    });
+                }, "neko-update-shutdown");
+                shutdown.setDaemon(true);
+                shutdown.start();
             } catch (Exception ex) {
-                status.setText("安装包已下载到 " + target + "，请手动运行。");
-                status.setStyle("-fx-text-fill: #f87171; -fx-font-size: 11px;");
+                try {
+                    java.awt.Desktop.getDesktop().open(target.toFile());
+                    status.setText("安装程序已打开，请按提示完成安装。");
+                } catch (Exception openError) {
+                    status.setText("安装包已下载到 " + target + "，请手动运行。");
+                    status.setStyle("-fx-text-fill: #f87171; -fx-font-size: 11px;");
+                }
             }
         })).exceptionally(ex -> {
             Throwable cause = ex;
