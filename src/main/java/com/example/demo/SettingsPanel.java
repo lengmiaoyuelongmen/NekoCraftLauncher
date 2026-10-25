@@ -72,6 +72,7 @@ public final class SettingsPanel extends VBox {
     private final CheckBox isolationBox;
     private final CheckBox autoDepsBox;
     private final CheckBox autoRepairBox;
+    private volatile boolean updateBusy;
     private final RadioButton autoMemoryRadio;
     private final RadioButton customMemoryRadio;
     private final Slider memorySlider;
@@ -751,6 +752,10 @@ public final class SettingsPanel extends VBox {
     }
 
     private void downloadAndInstall(UpdateChecker.Info info, Label status, Button button) {
+        if (updateBusy) {
+            status.setText("更新正在下载或安装中，请稍候…");
+            return;
+        }
         String url = info.url() == null ? "" : info.url().trim();
         if (!url.startsWith("https://") || !url.toLowerCase(java.util.Locale.ROOT).contains(".exe")) {
             openLink(url);
@@ -759,6 +764,7 @@ public final class SettingsPanel extends VBox {
         String safeVersion = info.version().replaceAll("[^0-9A-Za-z._-]", "_");
         java.nio.file.Path target = java.nio.file.Paths.get(System.getProperty("java.io.tmpdir"),
                 "NekoCraftLauncher-Setup-" + safeVersion + ".exe");
+        updateBusy = true;
         button.setDisable(true);
         status.setText("正在下载更新 " + info.version() + "…");
         status.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
@@ -774,7 +780,7 @@ public final class SettingsPanel extends VBox {
                 throw new java.util.concurrent.CompletionException(ex);
             }
         }).thenAccept(v -> Platform.runLater(() -> {
-            button.setDisable(false);
+            // 保持按钮禁用，避免下载完成到安装启动之间被再次点击
             status.setText("下载完成，正在自动安装 " + info.version() + "…");
             status.setStyle("-fx-text-fill: #4CAF50; -fx-font-size: 11px;");
             Toast.ok("更新已下载，正在自动安装");
@@ -798,6 +804,8 @@ public final class SettingsPanel extends VBox {
                 shutdown.setDaemon(true);
                 shutdown.start();
             } catch (Exception ex) {
+                updateBusy = false;
+                button.setDisable(false);
                 try {
                     java.awt.Desktop.getDesktop().open(target.toFile());
                     status.setText("安装程序已打开，请按提示完成安装。");
@@ -811,6 +819,7 @@ public final class SettingsPanel extends VBox {
             while (cause.getCause() != null) cause = cause.getCause();
             final Throwable root = cause;
             Platform.runLater(() -> {
+                updateBusy = false;
                 button.setDisable(false);
                 status.setText("下载失败：" + (root.getMessage() == null
                         ? root.getClass().getSimpleName() : root.getMessage()));
