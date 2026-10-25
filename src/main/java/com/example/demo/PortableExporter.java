@@ -56,7 +56,6 @@ public final class PortableExporter {
             Files.writeString(new File(targetDir, "启动.bat").toPath(),
                     "@echo off\r\ncd /d \"%~dp0\"\r\nstart javaw -jar \"%~dp0NekoCraftLauncher.jar\"\r\n",
                     java.nio.charset.StandardCharsets.UTF_8);
-        report(progress, 1.0);
         }
 
         report(progress, 0.42);
@@ -80,6 +79,7 @@ public final class PortableExporter {
                         + "双击 NekoCraftLauncher.exe 启动。\n"
                         + "如果使用 jar 版，请双击 启动.bat，需要本机安装 Java 21。\n",
                 java.nio.charset.StandardCharsets.UTF_8);
+        report(progress, 1.0);
     }
 
     /** 优先复制本机已安装的完整启动器。 */
