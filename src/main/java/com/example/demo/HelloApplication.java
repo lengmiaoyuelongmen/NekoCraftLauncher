@@ -4590,39 +4590,65 @@ public class HelloApplication extends Application {
 
     private void exportInstance(Instance instance) {
         if (instance == null) return;
-        javafx.stage.FileChooser chooser = new javafx.stage.FileChooser();
-        chooser.setTitle("导出整合包");
-        chooser.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter(
-                "Modrinth 整合包 (*.mrpack)", "*.mrpack"));
-        chooser.setInitialFileName(instance.id.replaceAll("[^0-9A-Za-z._-]", "_") + ".mrpack");
-        File target = chooser.showSaveDialog(stageRef);
-        if (target == null) return;
-        if (!target.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".mrpack")) {
-            target = new File(target.getParentFile(), target.getName() + ".mrpack");
-        }
+
         javafx.scene.control.CheckBox includeSaves = new javafx.scene.control.CheckBox("同时包含存档");
+        javafx.scene.control.CheckBox includeLauncher =
+                new javafx.scene.control.CheckBox("带启动器（导出为便携文件夹，启动器和 .minecraft 放在同一目录）");
         javafx.scene.control.Dialog<javafx.scene.control.ButtonType> dialog = new javafx.scene.control.Dialog<>();
         dialog.initOwner(stageRef);
         dialog.setTitle("导出整合包");
         dialog.setHeaderText("导出 " + instance.id);
         dialog.getDialogPane().setContent(new VBox(10,
-                new Label("会导出 mods、config、资源包、光影包和 options.txt。"),
-                includeSaves));
+                new Label("默认导出 .mrpack，可直接拖入 PCL 安装。"),
+                new Label("勾选「带启动器」后会导出文件夹：启动器 + .minecraft + 启动脚本。"),
+                includeSaves, includeLauncher));
         dialog.getDialogPane().getButtonTypes().addAll(
                 javafx.scene.control.ButtonType.OK, javafx.scene.control.ButtonType.CANCEL);
         if (dialog.showAndWait().orElse(javafx.scene.control.ButtonType.CANCEL)
                 != javafx.scene.control.ButtonType.OK) return;
-        final File out = target;
-        logMessage("正在导出整合包: " + out.getName());
+
+        boolean withLauncher = includeLauncher.isSelected();
+        boolean withSaves = includeSaves.isSelected();
+        String safeName = instance.id.replaceAll("[^0-9A-Za-z._-]", "_");
+        File out;
+        if (withLauncher) {
+            javafx.stage.DirectoryChooser dirChooser = new javafx.stage.DirectoryChooser();
+            dirChooser.setTitle("选择导出位置");
+            File parent = dirChooser.showDialog(stageRef);
+            if (parent == null) return;
+            out = new File(parent, safeName + "-portable");
+            int suffix = 2;
+            while (out.exists()) out = new File(parent, safeName + "-portable-" + suffix++);
+        } else {
+            javafx.stage.FileChooser chooser = new javafx.stage.FileChooser();
+            chooser.setTitle("导出整合包");
+            chooser.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter(
+                    "Modrinth 整合包 (*.mrpack)", "*.mrpack"));
+            chooser.setInitialFileName(safeName + ".mrpack");
+            out = chooser.showSaveDialog(stageRef);
+            if (out == null) return;
+            if (!out.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".mrpack")) {
+                out = new File(out.getParentFile(), out.getName() + ".mrpack");
+            }
+        }
+
+        final File target = out;
+        logMessage(withLauncher ? "正在导出便携整合包: " + target.getName()
+                : "正在导出整合包: " + target.getName());
         CompletableFuture.runAsync(() -> {
             try {
-                ModpackExporter.export(new File(config.getGameDir()), instance, out, includeSaves.isSelected());
+                if (withLauncher) {
+                    PortableExporter.export(new File(config.getGameDir()), instance, target, withSaves);
+                } else {
+                    ModpackExporter.export(new File(config.getGameDir()), instance, target, withSaves);
+                }
             } catch (Exception ex) {
                 throw new java.util.concurrent.CompletionException(ex);
             }
         }).thenAccept(v -> Platform.runLater(() -> {
-            Toast.ok("整合包已导出，可直接拖入 PCL 安装");
-            logMessage("✅ 整合包导出完成: " + out.getAbsolutePath());
+            Toast.ok(withLauncher ? "便携整合包已导出，启动器和游戏在同一文件夹"
+                    : "整合包已导出，可直接拖入 PCL 安装");
+            logMessage("✅ 导出完成: " + target.getAbsolutePath());
         })).exceptionally(ex -> {
             Throwable cause = ex;
             while (cause.getCause() != null) cause = cause.getCause();
