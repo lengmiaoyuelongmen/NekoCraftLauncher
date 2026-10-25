@@ -4585,7 +4585,8 @@ public class HelloApplication extends Application {
 
                     downloadFileAsync(downloadUrl, saveFile, logArea, saved -> {
                         if (saved.getName().toLowerCase().endsWith(".mrpack")) {
-                            installMrpack(saved);
+                            // 下载完成直接走正式导入流程：安装版本/加载器、创建独立实例，无需二次拖入。
+                            importModpack(saved);
                         } else if ("模组".equals(projectType) || "资源包".equals(projectType)
                                 || "光影包".equals(projectType) || "数据包".equals(projectType)) {
                             logArea.appendText("✅ 已放入 " + installDirFor(projectType) + "/，启动游戏即可生效\n");
