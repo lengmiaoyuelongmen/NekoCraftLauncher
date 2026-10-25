@@ -1036,6 +1036,7 @@ public class HelloApplication extends Application {
         HBox.setHgrow(passwordField, Priority.ALWAYS);
         usernameField.setMaxWidth(Double.MAX_VALUE);
         passwordField.setMaxWidth(Double.MAX_VALUE);
+        installLoginCardDrop(loginCard, loginTypeCombo, serverField, usernameField, passwordField, loginBtn);
         loginCard.getChildren().addAll(loginTypeCombo, serverField, credentialsRow, msHint, loginBtn);
 
         logoutButton = new Button("退出登录");
@@ -4951,6 +4952,117 @@ public class HelloApplication extends Application {
         } catch (Exception ex) {
             Toast.error("头像图片读取失败");
         }
+    }
+
+    private void installLoginCardDrop(javafx.scene.layout.VBox card,
+                                      ComboBox<String> typeCombo,
+                                      ComboBox<String> serverField,
+                                      TextField usernameField,
+                                      PasswordField passwordField,
+                                      Button loginButton) {
+        card.setOnDragOver(event -> {
+            if (event.getDragboard().hasFiles()) {
+                event.acceptTransferModes(javafx.scene.input.TransferMode.COPY);
+                card.setStyle("-fx-background-color: rgba(20,184,166,0.12); -fx-background-radius: 12;"
+                        + " -fx-border-color: #14b8a6; -fx-border-radius: 12;");
+            }
+            event.consume();
+        });
+        card.setOnDragExited(event -> {
+            card.setStyle("-fx-background-color: rgba(255,255,255,0.035); -fx-background-radius: 12;"
+                    + " -fx-border-color: rgba(255,255,255,0.05); -fx-border-radius: 12;");
+            event.consume();
+        });
+        card.setOnDragDropped(event -> {
+            boolean ok = false;
+            if (event.getDragboard().hasFiles()) {
+                for (File file : event.getDragboard().getFiles()) {
+                    try {
+                        String text = java.nio.file.Files.readString(file.toPath(), java.nio.charset.StandardCharsets.UTF_8);
+                        LoginCardData data = parseLoginCard(text);
+                        if (data == null || data.username().isBlank()) continue;
+                        typeCombo.setValue(typeCombo.getItems().get(1));
+                        String server = normalizeLittleSkinServer(data.server());
+                        if (!server.isBlank()) {
+                            serverField.setValue(server);
+                            serverField.getEditor().setText(server);
+                        }
+                        usernameField.setText(data.username());
+                        passwordField.setText(data.password());
+                        ok = true;
+                        Toast.ok("已读取登录卡片，正在登录…");
+                        handleLogin(typeCombo, serverField, usernameField, passwordField, loginButton);
+                        break;
+                    } catch (Exception ignored) {
+                    }
+                }
+            }
+            card.setStyle("-fx-background-color: rgba(255,255,255,0.035); -fx-background-radius: 12;"
+                    + " -fx-border-color: rgba(255,255,255,0.05); -fx-border-radius: 12;");
+            event.setDropCompleted(ok);
+            event.consume();
+        });
+    }
+
+    private record LoginCardData(String server, String username, String password) {
+    }
+
+    private LoginCardData parseLoginCard(String text) {
+        if (text == null || text.isBlank()) return null;
+        String server = "";
+        String username = "";
+        String password = "";
+        try {
+            JsonObject json = com.google.gson.JsonParser.parseString(text).getAsJsonObject();
+            server = firstJsonString(json, "server", "apiRoot", "api_root", "authlibInjector",
+                    "authlib_injector", "yggdrasil", "url", "host");
+            username = firstJsonString(json, "username", "email", "account", "name");
+            password = firstJsonString(json, "password", "passwd", "pwd");
+            if (json.has("auth") && json.get("auth").isJsonObject()) {
+                JsonObject auth = json.getAsJsonObject("auth");
+                if (server.isBlank()) server = firstJsonString(auth, "server", "apiRoot", "url");
+                if (username.isBlank()) username = firstJsonString(auth, "username", "email");
+                if (password.isBlank()) password = firstJsonString(auth, "password", "passwd");
+            }
+        } catch (Exception ignored) {
+        }
+        if (server.isBlank()) {
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile(
+                    "(?im)^\\s*(?:服务器|地址|server|apiRoot|api_root|url)\\s*[:=]\\s*(\\S+)").matcher(text);
+            if (m.find()) server = m.group(1).trim();
+        }
+        if (username.isBlank()) {
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile(
+                    "(?im)^\\s*(?:邮箱|账号|用户名|username|email|account)\\s*[:=]\\s*(\\S+)").matcher(text);
+            if (m.find()) username = m.group(1).trim();
+        }
+        if (password.isBlank()) {
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile(
+                    "(?im)^\\s*(?:密码|password|passwd|pwd)\\s*[:=]\\s*(\\S+)").matcher(text);
+            if (m.find()) password = m.group(1).trim();
+        }
+        if (username.isBlank() && password.isBlank()) return null;
+        return new LoginCardData(server, username, password);
+    }
+
+    private String firstJsonString(JsonObject object, String... keys) {
+        for (String key : keys) {
+            if (object.has(key) && !object.get(key).isJsonNull() && object.get(key).isJsonPrimitive()) {
+                return object.get(key).getAsString();
+            }
+        }
+        return "";
+    }
+
+    private String normalizeLittleSkinServer(String server) {
+        if (server == null || server.isBlank()) return "";
+        String value = server.trim();
+        if (!value.startsWith("http://") && !value.startsWith("https://")) value = "https://" + value;
+        value = value.replaceAll("/+$", "");
+        if (value.contains("littleskin.cn") && !value.contains("/api/yggdrasil")) {
+            value += "/api/yggdrasil";
+        }
+        return value;
     }
 
     private void logout() {
