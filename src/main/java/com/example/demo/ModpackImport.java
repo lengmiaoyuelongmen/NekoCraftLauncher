@@ -80,16 +80,22 @@ public final class ModpackImport {
                 String loaderVersion = "";
                 if (json.has("minecraft") && json.getAsJsonObject("minecraft").has("modLoaders")) {
                     JsonArray loaders = json.getAsJsonObject("minecraft").getAsJsonArray("modLoaders");
+                    String firstId = "";
                     for (JsonElement element : loaders) {
                         JsonObject obj = element.getAsJsonObject();
-                        if (obj.has("primary") && obj.get("primary").getAsBoolean() && obj.has("id")) {
-                            String id = obj.get("id").getAsString();
-                            int dash = id.indexOf('-');
-                            if (dash > 0) {
-                                loader = id.substring(0, dash).toLowerCase(Locale.ROOT);
-                                loaderVersion = id.substring(dash + 1);
-                            }
+                        if (!obj.has("id")) continue;
+                        String id = obj.get("id").getAsString();
+                        if (obj.has("primary") && obj.get("primary").getAsBoolean()) {
+                            firstId = id;
                             break;
+                        }
+                        if (firstId.isBlank()) firstId = id;
+                    }
+                    if (!firstId.isBlank()) {
+                        int dash = firstId.indexOf('-');
+                        if (dash > 0) {
+                            loader = firstId.substring(0, dash).toLowerCase(Locale.ROOT);
+                            loaderVersion = firstId.substring(dash + 1);
                         }
                     }
                 }

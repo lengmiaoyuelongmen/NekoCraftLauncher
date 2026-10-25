@@ -100,6 +100,7 @@ public class LauncherConfig {
     /** 启动页背景图片路径（空 = 无） */
     private String backgroundImage = "";
     private String avatarImage = "";
+    private String lastImportDir = "";
 
     /** 界面字体缩放（1.0 = 标准） */
     private double uiFontScale = 1.0;
@@ -224,6 +225,7 @@ public class LauncherConfig {
         if (javaPath == null) javaPath = "";
         if (jvmArgs == null) jvmArgs = "";
         if (avatarImage == null) avatarImage = "";
+        if (lastImportDir == null) lastImportDir = "";
         if (gameDir == null || gameDir.isBlank()) gameDir = ".minecraft";
         if (gameDirs == null) gameDirs = new java.util.ArrayList<>();
         gameDirs.removeIf(dir -> dir == null || dir.isBlank());
@@ -474,6 +476,14 @@ public class LauncherConfig {
 
     public void setAccentColor(String accentColor) {
         this.accentColor = accentColor;
+    }
+
+    public String getLastImportDir() {
+        return lastImportDir == null ? "" : lastImportDir;
+    }
+
+    public void setLastImportDir(String lastImportDir) {
+        this.lastImportDir = lastImportDir;
     }
 
     public String getAvatarImage() {

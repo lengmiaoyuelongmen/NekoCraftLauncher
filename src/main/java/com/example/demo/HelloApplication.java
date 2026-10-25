@@ -4775,11 +4775,20 @@ public class HelloApplication extends Application {
     private void importModpackDialog() {
         FileChooser chooser = new FileChooser();
         chooser.setTitle("导入整合包");
+        String lastDir = config.getLastImportDir();
+        if (lastDir != null && !lastDir.isBlank()) {
+            File dir = new File(lastDir);
+            if (dir.isDirectory()) chooser.setInitialDirectory(dir);
+        }
         chooser.getExtensionFilters().addAll(
                 new FileChooser.ExtensionFilter("整合包", "*.zip", "*.mrpack"),
                 new FileChooser.ExtensionFilter("所有文件", "*.*"));
         File file = chooser.showOpenDialog(stageRef);
-        if (file != null) importModpack(file);
+        if (file != null) {
+            config.setLastImportDir(file.getParentFile() == null ? "" : file.getParentFile().getAbsolutePath());
+            config.save();
+            importModpack(file);
+        }
     }
 
     /** 导入 PCL-CE / Modrinth / CurseForge / HMCL 整合包：装好游戏与加载器后解包到实例目录。 */
@@ -4818,9 +4827,12 @@ public class HelloApplication extends Application {
                         }
                     }
                 }
+                if (instanceId == null) {
+                    throw new RuntimeException("未能识别或安装整合包对应的游戏版本/加载器，请先在下载页安装 "
+                            + (pack.gameVersion().isBlank() ? "对应版本" : pack.gameVersion()) + " 后重试");
+                }
                 // 导入整合包必须放入独立实例目录，避免写进公共 .minecraft 或覆盖其他实例
-                File target = instanceId == null
-                        ? gameDir : InstanceDirs.root(gameDir, instanceId, true);
+                File target = InstanceDirs.root(gameDir, instanceId, true);
                 if (!target.isDirectory() && !target.mkdirs()) {
                     throw new RuntimeException("无法创建实例目录: " + target.getAbsolutePath());
                 }
@@ -4839,8 +4851,10 @@ public class HelloApplication extends Application {
                     refreshInstalledVersions();
                     Toast.ok("已导入整合包: " + pack.name());
                     switchPage("instances");
-                    if (importedId != null && instancesPanel != null) {
-                        instancesPanel.setSelectedId(importedId);
+                    if (importedId != null) {
+                        config.setLastInstance(importedId);
+                        config.save();
+                        if (instancesPanel != null) instancesPanel.setSelectedId(importedId);
                     }
                 });
             } catch (Exception e) {
