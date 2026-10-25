@@ -4675,6 +4675,14 @@ public class HelloApplication extends Application {
             }
         }).thenAccept(v -> Platform.runLater(() -> {
             exportDone.set(true);
+            progressDialog.setOnCloseRequest(null);
+            try {
+                if (progressDialog.getDialogPane().getScene() != null
+                        && progressDialog.getDialogPane().getScene().getWindow() != null) {
+                    progressDialog.getDialogPane().getScene().getWindow().hide();
+                }
+            } catch (Exception ignored) {
+            }
             progressDialog.close();
             javafx.scene.control.Alert done = new javafx.scene.control.Alert(
                     javafx.scene.control.Alert.AlertType.INFORMATION);
@@ -4691,6 +4699,14 @@ public class HelloApplication extends Application {
             Throwable root = cause;
             Platform.runLater(() -> {
                 exportDone.set(true);
+                progressDialog.setOnCloseRequest(null);
+                try {
+                    if (progressDialog.getDialogPane().getScene() != null
+                            && progressDialog.getDialogPane().getScene().getWindow() != null) {
+                        progressDialog.getDialogPane().getScene().getWindow().hide();
+                    }
+                } catch (Exception ignored) {
+                }
                 progressDialog.close();
                 Toast.error("导出失败: " + (root.getMessage() == null ? "未知错误" : root.getMessage()));
                 logMessage("❌ 导出失败: " + root.getMessage());
