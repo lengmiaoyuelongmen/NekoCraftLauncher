@@ -121,6 +121,7 @@ public class HelloApplication extends Application {
     private javafx.scene.shape.Circle gameStatusDot;
     private Label gameStatusLabel;
     private javafx.animation.FadeTransition gameStatusPulse;
+    private Button stopGameButton;
     private VBox playerInfoBox;
     private Label playerInfoType;
     private Label playerInfoUuid;
@@ -559,7 +560,15 @@ public class HelloApplication extends Application {
         statusChip.setPadding(new Insets(3, 9, 3, 9));
         statusChip.setStyle("-fx-background-color: rgba(255,255,255,0.045); -fx-background-radius: 10;"
                 + " -fx-border-color: rgba(255,255,255,0.06); -fx-border-radius: 10;");
-        HBox brand = new HBox(8, mark, appTitle, Icons.node("star", 13, "#ffcf6a"), badge, liveClock, statusChip);
+        stopGameButton = new Button("结束游戏");
+        stopGameButton.setStyle("-fx-background-color: rgba(248,113,113,0.16); -fx-text-fill: #fecaca;"
+                + " -fx-border-color: rgba(248,113,113,0.55); -fx-border-radius: 8; -fx-background-radius: 8;"
+                + " -fx-font-size: 10.5px; -fx-padding: 3 10; -fx-cursor: hand;");
+        stopGameButton.setVisible(false);
+        stopGameButton.setManaged(false);
+        stopGameButton.setOnAction(e -> killGameProcess());
+        HBox brand = new HBox(8, mark, appTitle, Icons.node("star", 13, "#ffcf6a"), badge, liveClock, statusChip,
+                stopGameButton);
         brand.setAlignment(Pos.CENTER_LEFT);
 
         Region spacer = new Region();
@@ -1923,7 +1932,10 @@ public class HelloApplication extends Application {
             return;
         }
         long pid = gameProcess.pid();
+        gameProcess.descendants().forEach(ProcessHandle::destroyForcibly);
         gameProcess.destroyForcibly();
+        gameRunning = false;
+        setGameStatus(false);
         logArea.appendText("🛑 已结束游戏进程 (pid " + pid + ")\n");
     }
 
@@ -4899,6 +4911,10 @@ public class HelloApplication extends Application {
     }
 
     private void setGameStatus(boolean running) {
+        if (stopGameButton != null) {
+            stopGameButton.setVisible(running);
+            stopGameButton.setManaged(running);
+        }
         if (gameStatusDot == null) return;
         gameStatusDot.setFill(Color.web(running ? "#4CAF50" : "#6b7280"));
         gameStatusDot.setOpacity(1);
