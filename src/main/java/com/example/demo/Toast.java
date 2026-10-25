@@ -26,6 +26,8 @@ public final class Toast {
 
     private static VBox stack;
     private static StackPane host;
+    private static String lastMessage = "";
+    private static long lastMessageAt;
 
     private Toast() {
     }
@@ -64,6 +66,11 @@ public final class Toast {
             return;
         }
         if (stack == null || host == null) return;
+        // 连续点击同一目录时避免重复堆叠同一条提示
+        long now = System.currentTimeMillis();
+        if (message.equals(lastMessage) && now - lastMessageAt < 1800) return;
+        lastMessage = message;
+        lastMessageAt = now;
         if (stack.getChildren().size() >= 4) {
             stack.getChildren().remove(0);
         }

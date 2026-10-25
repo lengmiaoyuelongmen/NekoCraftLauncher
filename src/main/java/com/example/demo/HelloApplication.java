@@ -6313,6 +6313,8 @@ public class HelloApplication extends Application {
             logMessage("❌ 导入失败：未在 " + dir.getAbsolutePath() + " 找到 versions");
             return;
         }
+        File currentDir = new File(config.getGameDir()).getAbsoluteFile();
+        if (root.getAbsoluteFile().equals(currentDir)) return;
         config.setGameDir(root.getAbsolutePath());
         config.addGameDir(root.getAbsolutePath());
         config.save();
