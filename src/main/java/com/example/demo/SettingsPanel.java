@@ -787,7 +787,7 @@ public final class SettingsPanel extends VBox {
             try {
                 ProcessBuilder installer = new ProcessBuilder(target.toString(),
                         "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART",
-                        "/CLOSEAPPLICATIONS", "/RESTARTAPPLICATIONS");
+                        "/CLOSEAPPLICATIONS");
                 installer.directory(target.getParent().toFile());
                 installer.start();
                 // 给安装程序一点时间接管，然后退出启动器以便覆盖 exe
