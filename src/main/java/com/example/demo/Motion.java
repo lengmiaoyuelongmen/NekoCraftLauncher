@@ -199,6 +199,33 @@ public final class Motion {
     }
 
     /** 悬停微放大（卡片 / 主按钮用）。 */
+    /** PCL-CE 风格卡片悬停：轻微上浮 + 阴影扩散，不做整行 CSS 重算。 */
+    public static void hoverCard(javafx.scene.Node node) {
+        if (!enabled) return;
+        if (node.getProperties().put("mc.hover-card", Boolean.TRUE) != null) return;
+        javafx.scene.effect.DropShadow shadow = new javafx.scene.effect.DropShadow(
+                0, javafx.scene.paint.Color.web("#14b8a6", 0.20));
+        shadow.setOffsetY(2.5);
+        node.setEffect(shadow);
+        node.addEventHandler(MouseEvent.MOUSE_ENTERED, e -> animateCard(node, 1.006, -2.0, shadow, 10));
+        node.addEventHandler(MouseEvent.MOUSE_EXITED, e -> animateCard(node, 1.0, 0.0, shadow, 0));
+    }
+
+    private static void animateCard(javafx.scene.Node node, double scale, double translateY,
+                                     javafx.scene.effect.DropShadow shadow, double radius) {
+        ScaleTransition scaleTransition = new ScaleTransition(scaled(Duration.millis(135)), node);
+        scaleTransition.setToX(scale);
+        scaleTransition.setToY(scale);
+        scaleTransition.setInterpolator(scale > 1 ? OUT : IN_OUT);
+        TranslateTransition lift = new TranslateTransition(scaled(Duration.millis(135)), node);
+        lift.setToY(translateY);
+        lift.setInterpolator(scale > 1 ? OUT : IN_OUT);
+        javafx.animation.Timeline glow = new javafx.animation.Timeline(
+                new javafx.animation.KeyFrame(scaled(Duration.millis(135)),
+                        new javafx.animation.KeyValue(shadow.radiusProperty(), radius, OUT)));
+        new ParallelTransition(scaleTransition, lift, glow).play();
+    }
+
     public static void hoverScale(Node node, double scale) {
         if (!enabled) return;
         node.addEventHandler(MouseEvent.MOUSE_ENTERED, e -> scaleTo(node, scale, NORMAL, SPRING));

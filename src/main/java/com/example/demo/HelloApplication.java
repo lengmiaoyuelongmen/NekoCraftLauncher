@@ -194,8 +194,10 @@ public class HelloApplication extends Application {
     private final java.util.Map<String, java.util.List<ModpackProject>> prewarmedCommunity =
             new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.Set<String> prewarmStarted = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final java.util.concurrent.CompletableFuture<Void> communityPrewarmDone =
+            new java.util.concurrent.CompletableFuture<>();
     private static final java.util.concurrent.Semaphore ICON_SLOTS =
-            new java.util.concurrent.Semaphore(3);
+            new java.util.concurrent.Semaphore(12);
     private final java.util.Map<String, Image> iconMemoryCache =
             new java.util.LinkedHashMap<>(128, 0.75f, true) {
                 @Override
@@ -215,6 +217,15 @@ public class HelloApplication extends Application {
     private boolean loadingMoreResults;
     private boolean suppressFilterSearch;
     private Label loadMoreHint;
+    private javafx.animation.PauseTransition loadMoreDebounce;
+    private javafx.animation.PauseTransition searchWatchdog;
+    private final java.util.Map<String, java.util.List<ModpackProject>> searchPageCache =
+            java.util.Collections.synchronizedMap(new java.util.LinkedHashMap<>(64, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(java.util.Map.Entry<String, java.util.List<ModpackProject>> eldest) {
+                    return size() > 80;
+                }
+            });
 
     private ObservableList<MinecraftVersion> allMinecraftVersions = FXCollections.observableArrayList();
     private VBox minecraftCategoriesContainer;
@@ -418,18 +429,19 @@ public class HelloApplication extends Application {
         Toast.install(rootWrap);
 
         javafx.application.Platform.setImplicitExit(false);
+        prewarmCommunityResources();
         stage.setOpacity(Math.max(0.7, Math.min(1.0, config.getUiOpacity())));
         stage.setTitle("Neko Craft Launcher");
         stage.iconifiedProperty().addListener((obs, was, iconified) -> {
             if (iconified) ambient.stop();
             else if (!gameRunning || !config.isPauseVisualsInGame()) ambient.start();
         });
-        BootScreen boot = new BootScreen(() -> Platform.runLater(this::maybeOfferPerformanceOptimization));
+        BootScreen boot = new BootScreen(() -> Platform.runLater(this::maybeOfferPerformanceOptimization),
+                () -> communityPrewarmDone.isDone());
         rootWrap.getChildren().add(boot);
         stage.setScene(scene);
         stage.show();
         stage.centerOnScreen();
-        prewarmCommunityResources();
 
         switchPage("launch");
         Bootstrap.ensureGameDir(new File(config.getGameDir()),
@@ -895,8 +907,11 @@ public class HelloApplication extends Application {
         avatarPane.setPrefSize(112, 112);
         avatarPane.setMinSize(112, 112);
         avatarPane.setMaxSize(112, 112);
-        javafx.scene.control.Tooltip skinTip = new javafx.scene.control.Tooltip("把皮肤 PNG 拖到这里预览");
+        javafx.scene.control.Tooltip skinTip = new javafx.scene.control.Tooltip("点击选择头像，或把 PNG/JPG 拖到这里");
         javafx.scene.control.Tooltip.install(avatarPane, skinTip);
+        avatarPane.setCursor(javafx.scene.Cursor.HAND);
+        avatarPane.setOnMouseClicked(e -> chooseAvatar());
+        applyAvatarOverride();
         avatarPane.setOnDragOver(event -> {
             if (event.getDragboard().hasFiles() || event.getDragboard().hasUrl()
                     || event.getDragboard().hasString()) {
@@ -1929,7 +1944,7 @@ public class HelloApplication extends Application {
     // ================== 下载面板 ==================
     private HBox createDownloadPanel() {
         HBox panel = new HBox(0);
-        panel.setStyle("-fx-background-color: transparent;");
+        panel.setStyle("-fx-background-color: -app-bg;");
 
         VBox sidebar = new VBox(0);
         sidebar.setPrefWidth(230);
@@ -2277,6 +2292,8 @@ public class HelloApplication extends Application {
         modpackListView.setFixedCellSize(88);
         modpackListView.setCache(true);
         modpackListView.setCacheHint(javafx.scene.CacheHint.SPEED);
+        loadMoreDebounce = new javafx.animation.PauseTransition(javafx.util.Duration.millis(260));
+        loadMoreDebounce.setOnFinished(e -> loadSearchPage(false));
         modpackListView.setStyle("-fx-background-color: transparent; -fx-control-inner-background: transparent; -fx-border-color: transparent;");
         modpackListView.setCellFactory(param -> new ModpackCell());
         modpackListView.setMaxHeight(Double.MAX_VALUE);
@@ -2292,7 +2309,7 @@ public class HelloApplication extends Application {
         statusBox.setVisible(false);
 
         StackPane overlay = new StackPane(statusBox);
-        overlay.setStyle("-fx-background-color: " + (Theme.isLight() ? "rgba(255,255,255,0.88)" : "rgba(18,18,18,0.72)")
+        overlay.setStyle("-fx-background-color: " + (Theme.isLight() ? "rgba(234,244,255,0.34)" : "rgba(7,18,18,0.34)")
                 + "; -fx-background-radius: 16;");
         overlay.setVisible(false);
         statusBox.visibleProperty().addListener((obs, old, isVisible) -> overlay.setVisible(isVisible));
@@ -2324,7 +2341,9 @@ public class HelloApplication extends Application {
         if (modpackListView.lookup(".scroll-bar:vertical") instanceof javafx.scene.control.ScrollBar scrollBar) {
             if (scrollBar.getProperties().put("mc.hooked", Boolean.TRUE) != null) return;
             scrollBar.valueProperty().addListener((obs, old, value) -> {
-                if (value.doubleValue() > 0.9) loadSearchPage(false);
+                if (value.doubleValue() > 0.94 && loadMoreDebounce != null) {
+                    loadMoreDebounce.playFromStart();
+                }
             });
         }
     }
@@ -3537,11 +3556,7 @@ public class HelloApplication extends Application {
             card.prefWidthProperty().bind(modpackListView.widthProperty().subtract(30));
             card.setMaxWidth(Double.MAX_VALUE);
 
-            Motion.hoverScale(card, 1.004);
-            card.setOnMouseEntered(e -> card.setStyle("-fx-background-color: -app-hover-2;"
-                    + " -fx-background-radius: 14; -fx-border-color: -app-border-3; -fx-border-radius: 14;"));
-            card.setOnMouseExited(e -> card.setStyle("-fx-background-color: linear-gradient(to bottom, -app-card-top, -app-card-alt2);"
-                    + " -fx-background-radius: 14; -fx-border-color: -app-border-soft; -fx-border-radius: 14;"));
+            Motion.hoverCard(card);
 
             iconPane = new StackPane();
             iconPane.setPrefSize(58, 58);
@@ -3608,6 +3623,12 @@ public class HelloApplication extends Application {
             return iconView;
         }
 
+        private void showIconFallback(ModpackProject project) {
+            Label fallback = new Label(project.getTitle().substring(0, 1).toUpperCase());
+            fallback.setStyle("-fx-text-fill: -app-text-muted-2; -fx-font-size: 26px; -fx-font-weight: bold;");
+            iconPane.getChildren().setAll(fallback);
+        }
+
         @Override
         protected void updateItem(ModpackProject project, boolean empty) {
             super.updateItem(project, empty);
@@ -3630,10 +3651,15 @@ public class HelloApplication extends Application {
             if (cachedIcon != null) {
                 iconPane.getChildren().setAll(iconView(cachedIcon));
             } else {
-                Label placeholder = new Label(project.getTitle().substring(0, 1).toUpperCase());
-                placeholder.setStyle("-fx-text-fill: -app-text-muted-2; -fx-font-size: 28px; -fx-font-weight: bold;");
-                iconPane.getChildren().add(placeholder);
-                if (iconKey != null && !iconKey.isEmpty()) {
+                javafx.scene.control.ProgressIndicator iconLoading = new javafx.scene.control.ProgressIndicator();
+                iconLoading.setPrefSize(22, 22);
+                iconLoading.setMinSize(22, 22);
+                iconLoading.setMaxSize(22, 22);
+                iconLoading.setStyle("-fx-accent: #14b8a6;");
+                iconPane.getChildren().add(iconLoading);
+                if (iconKey == null || iconKey.isEmpty()) {
+                    showIconFallback(project);
+                } else {
                     String urlStr = iconKey.startsWith("http") ? iconKey : "https://" + iconKey;
                     CompletableFuture.runAsync(() -> {
                         try {
@@ -3643,15 +3669,24 @@ public class HelloApplication extends Application {
                             HttpResponse<InputStream> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofInputStream());
                             if (resp.statusCode() == 200) {
                                 byte[] bytes = resp.body().readAllBytes();
-                                Image img = decodeIcon(bytes);
-                                if (img != null && !img.isError()) {
-                                    Platform.runLater(() -> {
+                                Platform.runLater(() -> {
+                                    Image img = decodeIcon(bytes);
+                                    if (img != null && !img.isError()) {
                                         iconMemoryCache.put(iconKey, img);
                                         if (getItem() == project) iconPane.getChildren().setAll(iconView(img));
-                                    });
-                                }
+                                    } else if (getItem() == project) {
+                                        showIconFallback(project);
+                                    }
+                                });
+                            } else {
+                                Platform.runLater(() -> {
+                                    if (getItem() == project) showIconFallback(project);
+                                });
                             }
                         } catch (Exception ignored) {
+                            Platform.runLater(() -> {
+                                if (getItem() == project) showIconFallback(project);
+                            });
                         }
                     });
                 }
@@ -3686,42 +3721,61 @@ public class HelloApplication extends Application {
     // ================== 图标解码 ==================
 
     /** 先按 JavaFX 原生解码；失败（Modrinth 的 .webp）再用 ImageIO + webp 插件兜底。 */
-    /** 预加载界面期间先拉取模组/整合包首页，打开下载页时直接显示。 */
+    /** 预加载界面期间拉取模组/整合包各 40 个，并预渲染全部图标后再进入主界面。 */
     private void prewarmCommunityResources() {
-        for (String type : new String[]{"mod", "modpack"}) {
-            if (!prewarmStarted.add(type)) continue;
+        communityPrewarmDone.completeOnTimeout(null, 45, java.util.concurrent.TimeUnit.SECONDS);
+        String[] preloadTypes = {"mod", "modpack", "datapack", "resourcepack", "shader"};
+        java.util.concurrent.atomic.AtomicInteger pending =
+                new java.util.concurrent.atomic.AtomicInteger(preloadTypes.length);
+        for (String type : preloadTypes) {
+            if (!prewarmStarted.add(type)) {
+                if (pending.decrementAndGet() == 0) communityPrewarmDone.complete(null);
+                continue;
+            }
             String facets = "[\"project_type:" + type + "\"]";
             String url = "https://api.modrinth.com/v2/search?query=&facets="
                     + URLEncoder.encode("[" + facets + "]", StandardCharsets.UTF_8)
                     + "&index=relevance&limit=40&offset=0";
-            HttpRequest req = HttpRequest.newBuilder(URI.create(url))
-                    .header("User-Agent", "PCL-CE-Launcher/1.0")
-                    .GET().timeout(java.time.Duration.ofSeconds(15)).build();
-            CompletableFuture.runAsync(() -> {
+            String mirrorUrl = url.replace("https://api.modrinth.com/v2",
+                    "https://mod.mcimirror.top/modrinth/v2");
+            boolean prepareIcons = true;
+            String sourceUrl = prepareIcons ? mirrorUrl : url;
+            alternateSearchBodies(url, sourceUrl, type.equals("modpack") ? 40 : 0).thenAccept(body -> {
+                java.util.List<ModpackProject> projects = new java.util.ArrayList<>();
                 try {
-                    HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
-                    if (resp.statusCode() != 200 || !resp.body().startsWith("{")) return;
-                    JsonObject json = new Gson().fromJson(resp.body(), JsonObject.class);
-                    JsonArray hits = json.getAsJsonArray("hits");
-                    if (hits == null) return;
-                    java.util.List<ModpackProject> projects = new java.util.ArrayList<>();
-                    for (int i = 0; i < hits.size(); i++) {
-                        JsonObject hit = hits.get(i).getAsJsonObject();
-                        String icon = hit.has("icon_url") && !hit.get("icon_url").isJsonNull()
-                                ? hit.get("icon_url").getAsString() : null;
-                        String updated = hit.has("date_modified")
-                                ? hit.get("date_modified").getAsString().substring(0, 10) : "";
-                        projects.add(new ModpackProject(hit.get("project_id").getAsString(),
-                                hit.get("title").getAsString(), hit.get("description").getAsString(),
-                                hit.get("author").getAsString(), icon,
-                                hit.get("downloads").getAsLong(), updated, "Modrinth", type));
+                    if (body != null && body.startsWith("{")) {
+                        JsonObject json = new Gson().fromJson(body, JsonObject.class);
+                        JsonArray hits = json.getAsJsonArray("hits");
+                        if (hits != null) {
+                            for (int i = 0; i < hits.size(); i++) {
+                                JsonObject hit = hits.get(i).getAsJsonObject();
+                                String icon = hit.has("icon_url") && !hit.get("icon_url").isJsonNull()
+                                        ? hit.get("icon_url").getAsString() : null;
+                                String updated = hit.has("date_modified")
+                                        ? hit.get("date_modified").getAsString().substring(0, 10) : "";
+                                projects.add(new ModpackProject(hit.get("project_id").getAsString(),
+                                        hit.get("title").getAsString(), hit.get("description").getAsString(),
+                                        hit.get("author").getAsString(), icon,
+                                        hit.get("downloads").getAsLong(), updated, "Modrinth", type));
+                            }
+                        }
                     }
-                    Platform.runLater(() -> {
-                        prewarmedCommunity.put(type, projects);
-                        prefetchIcons(projects);
-                    });
                 } catch (Exception ignored) {
                 }
+                java.util.List<ModpackProject> prepared = projects;
+                Platform.runLater(() -> {
+                    if (!prepared.isEmpty()) prewarmedCommunity.put(type, prepared);
+                    if (prepareIcons) {
+                        prepareIconsAndRun(prepared, () -> {
+                            if (pending.decrementAndGet() == 0) communityPrewarmDone.complete(null);
+                        });
+                    } else if (pending.decrementAndGet() == 0) {
+                        communityPrewarmDone.complete(null);
+                    }
+                });
+            }).exceptionally(ex -> {
+                if (pending.decrementAndGet() == 0) communityPrewarmDone.complete(null);
+                return null;
             });
         }
     }
@@ -3746,10 +3800,10 @@ public class HelloApplication extends Application {
                     HttpResponse<InputStream> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofInputStream());
                     if (resp.statusCode() == 200) {
                         byte[] bytes = resp.body().readAllBytes();
-                        Image img = decodeIcon(bytes);
-                        if (img != null && !img.isError()) {
-                            Platform.runLater(() -> iconMemoryCache.put(key, img));
-                        }
+                        Platform.runLater(() -> {
+                            Image img = decodeIcon(bytes);
+                            if (img != null && !img.isError()) iconMemoryCache.put(key, img);
+                        });
                     }
                 } catch (Exception ignored) {
                 } finally {
@@ -3800,12 +3854,15 @@ public class HelloApplication extends Application {
 
     private void performSearch() {
         String warmedType = apiProjectType();
+        String loaderFilter = loaderCombo.getValue();
+        boolean loaderDefault = "任意".equals(loaderFilter)
+                || ("datapack".equals(warmedType) && "DataPack".equals(loaderFilter));
         boolean defaultFilters = (searchField.getText() == null || searchField.getText().trim().isEmpty())
                 && "任意".equals(gameVersionCombo.getValue())
-                && "任意".equals(loaderCombo.getValue())
+                && loaderDefault
                 && "默认".equals(sortCombo.getValue());
-        java.util.List<ModpackProject> ready = defaultFilters ? prewarmedCommunity.remove(warmedType) : null;
-        if (ready != null) {
+        java.util.List<ModpackProject> ready = defaultFilters ? prewarmedCommunity.get(warmedType) : null;
+        if (ready != null && !ready.isEmpty()) {
             modpackData.setAll(ready);
             searchOffset = ready.size();
             searchTotal = -1;
@@ -3831,10 +3888,127 @@ public class HelloApplication extends Application {
      * 拉一页社区资源（Modrinth 搜索）。
      * 滚动到底 / 点「加载更多」时接着拉，列表不再只有固定 20 个。
      */
+    private CompletableFuture<String> fetchSearchBody(String url) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                HttpRequest req = HttpRequest.newBuilder(URI.create(url))
+                        .header("User-Agent", "PCL-CE-Launcher/1.0")
+                        .GET().timeout(java.time.Duration.ofSeconds(8)).build();
+                HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+                return resp.statusCode() == 200 ? resp.body() : null;
+            } catch (Exception e) {
+                return null;
+            }
+        });
+    }
+
+    /** 官方与 MCIM 镜像隔页轮换，避免同时抢带宽导致卡顿；失败时自动切另一个源。 */
+    private CompletableFuture<String> alternateSearchBodies(String officialUrl, String mirrorUrl, int offset) {
+        boolean evenPage = Math.max(0, offset) / 40 % 2 == 0;
+        String primary = evenPage ? officialUrl : mirrorUrl;
+        String backup = evenPage ? mirrorUrl : officialUrl;
+        return fetchSearchBody(primary).thenCompose(body -> {
+            if (body != null && body.startsWith("{")) return CompletableFuture.completedFuture(body);
+            return fetchSearchBody(backup);
+        });
+    }
+
+    /** 官方与 MCIM 镜像同时请求，谁先返回有效 JSON 就用谁。 */
+    private CompletableFuture<String> raceSearchBodies(String officialUrl, String mirrorUrl) {
+        CompletableFuture<String> official = fetchSearchBody(officialUrl);
+        if (officialUrl == null || officialUrl.equals(mirrorUrl)) return official;
+        CompletableFuture<String> mirror = fetchSearchBody(mirrorUrl);
+        return official.applyToEither(mirror, body -> body).thenCompose(first -> {
+            if (first != null && first.startsWith("{")) return CompletableFuture.completedFuture(first);
+            return official.thenCombine(mirror, (a, b) ->
+                    a != null && a.startsWith("{") ? a : (b != null && b.startsWith("{") ? b : null));
+        });
+    }
+
+    /** 先取完并解码本页图标，再放行列表，避免滚动时逐张解码掉帧。 */
+    private void prepareIconsAndRun(java.util.List<ModpackProject> projects, Runnable onReady) {
+        java.util.List<ModpackProject> missing = new java.util.ArrayList<>();
+        for (ModpackProject project : projects) {
+            String key = project.getIconUrl();
+            if (key != null && !key.isBlank() && !iconMemoryCache.containsKey(key)) missing.add(project);
+        }
+        if (missing.isEmpty()) {
+            onReady.run();
+            return;
+        }
+        java.util.concurrent.atomic.AtomicBoolean done = new java.util.concurrent.atomic.AtomicBoolean();
+        java.util.concurrent.atomic.AtomicInteger remaining =
+                new java.util.concurrent.atomic.AtomicInteger(missing.size());
+        int total = missing.size();
+        javafx.animation.PauseTransition timeout = new javafx.animation.PauseTransition(javafx.util.Duration.seconds(8));
+        Runnable finish = () -> {
+            timeout.stop();
+            if (done.compareAndSet(false, true)) onReady.run();
+        };
+        timeout.setOnFinished(e -> finish.run());
+        timeout.play();
+        for (ModpackProject project : missing) {
+            String key = project.getIconUrl();
+            String urlStr = key.startsWith("http") ? key : "https://" + key;
+            CompletableFuture.runAsync(() -> {
+                try {
+                    ICON_SLOTS.acquire();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    Platform.runLater(() -> {
+                        if (remaining.decrementAndGet() <= 0) finish.run();
+                    });
+                    return;
+                }
+                try {
+                    HttpRequest req = HttpRequest.newBuilder(URI.create(IconProxy.resolve(urlStr)))
+                            .timeout(java.time.Duration.ofSeconds(8)).GET().build();
+                    HttpResponse<InputStream> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofInputStream());
+                    if (resp.statusCode() == 200) {
+                        byte[] bytes = resp.body().readAllBytes();
+                        Platform.runLater(() -> {
+                            Image img = decodeIcon(bytes);
+                            if (img != null && !img.isError()) iconMemoryCache.put(key, img);
+                            int left = remaining.decrementAndGet();
+                            statusLabel.setText("正在预渲染图标 " + (total - left) + "/" + total + "…");
+                            if (left <= 0) finish.run();
+                        });
+                    } else {
+                        Platform.runLater(() -> {
+                            if (remaining.decrementAndGet() <= 0) finish.run();
+                        });
+                    }
+                } catch (Exception ignored) {
+                    Platform.runLater(() -> {
+                        if (remaining.decrementAndGet() <= 0) finish.run();
+                    });
+                } finally {
+                    ICON_SLOTS.release();
+                }
+            });
+        }
+    }
+
     private void loadSearchPage(boolean first) {
         if (loadingMoreResults) return;
         if (searchTotal >= 0 && searchOffset >= searchTotal) return;
         loadingMoreResults = true;
+        if (searchWatchdog == null) {
+            searchWatchdog = new javafx.animation.PauseTransition(javafx.util.Duration.seconds(12));
+            searchWatchdog.setOnFinished(e -> {
+                if (!loadingMoreResults) return;
+                loadingMoreResults = false;
+                statusBox.setVisible(true);
+                statusBox.getChildren().setAll(statusLabel);
+                statusLabel.setText("获取超时，请检查网络后点击重试");
+                statusBox.setOnMouseClicked(ev -> {
+                    statusLabel.setText("正在重新加载...");
+                    loadSearchPage(true);
+                });
+                updateLoadMoreButton();
+            });
+        }
+        searchWatchdog.playFromStart();
         final int offset = searchOffset;
 
         String query = searchField.getText() == null ? "" : searchField.getText().trim();
@@ -3848,6 +4022,29 @@ public class HelloApplication extends Application {
         else if (currentProjectType.equals("光影包")) pType = "shader";
         else if (currentProjectType.equals("数据包")) pType = "datapack";
         else pType = "modpack";
+
+        String pageKey = pType + "|" + query + "|" + gameVer + "|" + loader + "|" + sort + "|" + offset;
+        java.util.List<ModpackProject> cachedPage = searchPageCache.get(pageKey);
+        if (cachedPage != null && cachedPage.isEmpty()) {
+            searchPageCache.remove(pageKey);
+            cachedPage = null;
+        }
+        if (cachedPage != null) {
+            loadingMoreResults = false;
+            statusBox.setVisible(false);
+            java.util.List<ModpackProject> addedCache = new java.util.ArrayList<>();
+            for (ModpackProject project : cachedPage) {
+                boolean exists = modpackData.stream().anyMatch(p -> project.getId().equals(p.getId()));
+                if (!exists) {
+                    modpackData.add(project);
+                    addedCache.add(project);
+                }
+            }
+            searchOffset = offset + cachedPage.size();
+            updateLoadMoreButton();
+            prefetchIcons(addedCache);
+            return;
+        }
 
         JsonArray facets = new JsonArray();
         JsonArray typeArr = new JsonArray();
@@ -3875,20 +4072,13 @@ public class HelloApplication extends Application {
                     + "&facets=" + encodedFacets + "&index=" + index
                     + "&limit=40&offset=" + offset;
 
-            HttpRequest req = HttpRequest.newBuilder(URI.create(urlStr))
-                    .header("User-Agent", "PCL-CE-Launcher/1.0")
-                    .GET()
-                    .timeout(java.time.Duration.ofSeconds(15))
-                    .build();
-
-            CompletableFuture.supplyAsync(() -> {
-                try {
-                    HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
-                    return resp.body();
-                } catch (Exception e) {
-                    return null;
-                }
-            }).thenAccept(body -> Platform.runLater(() -> {
+            String mirrorUrl = urlStr.replace("https://api.modrinth.com/v2",
+                    "https://mod.mcimirror.top/modrinth/v2");
+            String effectiveMirror = ("mod".equals(pType) || "modpack".equals(pType)) ? mirrorUrl : urlStr;
+            alternateSearchBodies(urlStr, effectiveMirror, offset)
+                    .orTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                    .thenAccept(body -> Platform.runLater(() -> {
+                if (searchWatchdog != null) searchWatchdog.stop();
                 loadingMoreResults = false;
                 if (body == null || !body.startsWith("{")) {
                     statusBox.setVisible(true);
@@ -3901,18 +4091,34 @@ public class HelloApplication extends Application {
                     updateLoadMoreButton();
                     return;
                 }
-                statusBox.setVisible(false);
-                JsonObject json = new Gson().fromJson(body, JsonObject.class);
+                statusBox.setVisible(true);
+                statusLabel.setText("正在准备社区资源…");
+                JsonObject json;
+                try {
+                    json = new Gson().fromJson(body, JsonObject.class);
+                } catch (Exception parseError) {
+                    loadingMoreResults = false;
+                    statusBox.setVisible(true);
+                    statusBox.getChildren().setAll(statusLabel);
+                    statusLabel.setText("资源数据解析失败，点击重试");
+                    statusBox.setOnMouseClicked(e -> loadSearchPage(true));
+                    return;
+                }
                 JsonArray hits = json.getAsJsonArray("hits");
                 if (json.has("total_hits") && !json.get("total_hits").isJsonNull()) {
                     searchTotal = json.get("total_hits").getAsInt();
                 }
                 if (hits == null || hits.size() == 0) {
-                    if (first) statusLabel.setText("未找到匹配的项目。");
+                    loadingMoreResults = false;
+                    if (searchWatchdog != null) searchWatchdog.stop();
+                    statusBox.setVisible(true);
+                    statusBox.getChildren().setAll(statusLabel);
+                    statusLabel.setText(first ? "未找到匹配的项目，请调整筛选条件" : "没有更多结果");
                     updateLoadMoreButton();
                     return;
                 }
 
+                java.util.List<ModpackProject> pageProjects = new java.util.ArrayList<>();
                 for (int i = 0; i < hits.size(); i++) {
                     JsonObject hit = hits.get(i).getAsJsonObject();
                     String id = hit.get("project_id").getAsString();
@@ -3925,21 +4131,33 @@ public class HelloApplication extends Application {
                             ? hit.get("icon_url").getAsString() : null;
                     long downloads = hit.get("downloads").getAsLong();
                     String updated = hit.get("date_modified").getAsString().substring(0, 10);
-                    modpackData.add(new ModpackProject(id, title, desc, author, iconUrl, downloads, updated,
-                            "Modrinth", pType));
+                    ModpackProject project = new ModpackProject(id, title, desc, author, iconUrl, downloads, updated,
+                            "Modrinth", pType);
+                    pageProjects.add(project);
                 }
-                int addedStart = Math.max(0, modpackData.size() - hits.size());
-                prefetchIcons(modpackData.subList(addedStart, modpackData.size()));
+                for (ModpackProject project : pageProjects) {
+                    boolean duplicate = modpackData.stream().anyMatch(p -> project.getId().equals(p.getId()));
+                    if (!duplicate) modpackData.add(project);
+                }
+                searchPageCache.put(pageKey, pageProjects);
                 searchOffset = offset + hits.size();
                 if (searchTotal < 0 && hits.size() < 40) searchTotal = searchOffset;
+                statusBox.setVisible(false);
+                if (searchWatchdog != null) searchWatchdog.stop();
+                loadingMoreResults = false;
                 updateLoadMoreButton();
+                prefetchIcons(pageProjects);
             })).exceptionally(ex -> {
                 Platform.runLater(() -> {
+                    if (searchWatchdog != null) searchWatchdog.stop();
                     loadingMoreResults = false;
                     statusBox.setVisible(true);
                     statusBox.getChildren().setAll(statusLabel);
                     statusLabel.setText("请求失败：" + ex.getMessage() + "（点击重试）");
+                    statusBox.setVisible(true);
+                    statusBox.getChildren().setAll(statusLabel);
                     statusBox.setOnMouseClicked(ev -> {
+                        loadingMoreResults = false;
                         statusLabel.setText("正在重新加载...");
                         loadSearchPage(true);
                     });
@@ -4650,13 +4868,50 @@ public class HelloApplication extends Application {
         }
     }
 
+    private boolean applyAvatarOverride() {
+        String path = config == null ? "" : config.getAvatarImage();
+        if (path == null || path.isBlank()) return false;
+        File file = new File(path);
+        if (!file.isFile()) return false;
+        try {
+            Image image = new Image(file.toURI().toString(), 160, 160, true, true);
+            if (image.isError()) return false;
+            avatarImageView.setImage(image);
+            return true;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private void chooseAvatar() {
+        javafx.stage.FileChooser chooser = new javafx.stage.FileChooser();
+        chooser.setTitle("选择头像图片");
+        chooser.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter(
+                "图片 (*.png, *.jpg, *.jpeg)", "*.png", "*.jpg", "*.jpeg"));
+        File file = chooser.showOpenDialog(stageRef);
+        if (file == null) return;
+        try {
+            Image image = new Image(file.toURI().toString(), 160, 160, true, true);
+            if (image.isError()) {
+                Toast.error("头像图片读取失败");
+                return;
+            }
+            avatarImageView.setImage(image);
+            config.setAvatarImage(file.getAbsolutePath());
+            config.save();
+            Toast.ok("头像已更新");
+        } catch (Exception ex) {
+            Toast.error("头像图片读取失败");
+        }
+    }
+
     private void logout() {
         currentSession = null;
         SessionStore.clear();
         usernameLabel.setText("未登录");
         userTypeLabel.setText("请在下方登录");
         uuidLabel.setText("");
-        avatarImageView.setImage(null);
+        if (!applyAvatarOverride()) avatarImageView.setImage(null);
         passwordField.clear();
         loginBtn.setDisable(false);
         loginBtnLabel.setText("登录");
@@ -4785,7 +5040,7 @@ public class HelloApplication extends Application {
                             writer.setColor(x, y, reader.getColor((x * 8 * scale) / targetSize, (y * 8 * scale) / targetSize));
                         }
                     }
-                    avatarImageView.setImage(clearFace);
+                    if (!applyAvatarOverride()) avatarImageView.setImage(clearFace);
                     logArea.appendText("🎨 高清头部贴图加载成功\n");
                 } catch (Exception ex) {
                     logArea.appendText("❌ 头像裁剪失败: " + ex.getMessage() + "\n");

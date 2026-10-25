@@ -39,6 +39,7 @@ public final class BootScreen extends StackPane {
     private final Label statusLabel = new Label("正在建立连接…");
     private final Label[] stepLabels = new Label[STEPS.length];
     private final Runnable onFinished;
+    private final java.util.function.BooleanSupplier extraReady;
     private final long startedAt = System.nanoTime();
     private final AnimationTimer timer;
     private boolean finishing;
@@ -47,7 +48,12 @@ public final class BootScreen extends StackPane {
     private Label alertLabel;
 
     public BootScreen(Runnable onFinished) {
+        this(onFinished, () -> true);
+    }
+
+    public BootScreen(Runnable onFinished, java.util.function.BooleanSupplier extraReady) {
         this.onFinished = onFinished;
+        this.extraReady = extraReady;
         setStyle("-fx-background-color: #071212;");
         setPickOnBounds(true);
         setFocusTraversable(true);
@@ -188,8 +194,14 @@ public final class BootScreen extends StackPane {
                 time += 0.016;
                 double elapsed = (System.nanoTime() - startedAt) / 1_000_000.0;
                 double progress = Math.min(1.0, elapsed / DURATION_MS);
-                progressBar.setProgress(Math.min(1.0, progress * 1.03));
-                percentLabel.setText((int) (progress * 100) + "%");
+                boolean ready = extraReady == null || extraReady.getAsBoolean();
+                double display = progress;
+                if (progress >= 1 && !ready) {
+                    display = 0.99;
+                    statusLabel.setText("正在预渲染社区资源…");
+                }
+                progressBar.setProgress(Math.min(1.0, display * 1.03));
+                percentLabel.setText((int) (display * 100) + "%");
                 int activeStep = Math.min(STEPS.length - 1, (int) (progress * STEPS.length));
                 for (int i = 0; i < stepLabels.length; i++) {
                     if (i < activeStep) {
@@ -204,12 +216,14 @@ public final class BootScreen extends StackPane {
                         stepLabels[i].setOpacity(1);
                     }
                 }
-                statusLabel.setText(progress < 0.32 ? "猫爪准备中…" : progress < 0.62 ? "伸个懒腰，校验依赖…" : progress < 0.9 ? "同步猫猫资源…" : "欢迎回来，主人~");
+                if (!(progress >= 1 && !ready)) {
+                    statusLabel.setText(progress < 0.32 ? "猫爪准备中…" : progress < 0.62 ? "伸个懒腰，校验依赖…" : progress < 0.9 ? "同步猫猫资源…" : "欢迎回来，主人~");
+                }
                 if (alertLabel != null) {
                     alertLabel.setOpacity(0.55 + 0.35 * (0.5 + 0.5 * Math.sin(time * 3.2)));
                 }
-                draw(time, progress);
-                if (progress >= 1) finish();
+                draw(time, display);
+                if (progress >= 1 && ready) finish();
             }
         };
         timer.start();
