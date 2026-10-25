@@ -4818,8 +4818,9 @@ public class HelloApplication extends Application {
                         }
                     }
                 }
+                // 导入整合包必须放入独立实例目录，避免写进公共 .minecraft 或覆盖其他实例
                 File target = instanceId == null
-                        ? gameDir : InstanceDirs.root(gameDir, instanceId, config.isIsolation());
+                        ? gameDir : InstanceDirs.root(gameDir, instanceId, true);
                 if (!target.isDirectory() && !target.mkdirs()) {
                     throw new RuntimeException("无法创建实例目录: " + target.getAbsolutePath());
                 }
@@ -4833,10 +4834,14 @@ public class HelloApplication extends Application {
                 }
                 logLine("✅ 导入完成: " + pack.name() + " → " + target.getAbsolutePath()
                         + "（" + count + " 个文件）");
+                final String importedId = instanceId;
                 Platform.runLater(() -> {
                     refreshInstalledVersions();
                     Toast.ok("已导入整合包: " + pack.name());
                     switchPage("instances");
+                    if (importedId != null && instancesPanel != null) {
+                        instancesPanel.setSelectedId(importedId);
+                    }
                 });
             } catch (Exception e) {
                 logLine("❌ 导入失败: " + e.getMessage());

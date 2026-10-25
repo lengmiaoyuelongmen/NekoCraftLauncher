@@ -46,11 +46,19 @@ public final class ModpackImport {
                 if (json.has("dependencies") && json.get("dependencies").isJsonObject()) {
                     JsonObject deps = json.getAsJsonObject("dependencies");
                     if (deps.has("minecraft")) game = deps.get("minecraft").getAsString();
-                    for (String key : new String[]{"forge", "neoforge", "fabric", "quilt"}) {
-                        if (deps.has(key)) {
-                            loader = key;
-                            loaderVersion = deps.get(key).getAsString();
-                            break;
+                    if (deps.has("fabric-loader")) {
+                        loader = "fabric";
+                        loaderVersion = deps.get("fabric-loader").getAsString();
+                    } else if (deps.has("quilt-loader")) {
+                        loader = "quilt";
+                        loaderVersion = deps.get("quilt-loader").getAsString();
+                    } else {
+                        for (String key : new String[]{"forge", "neoforge", "fabric", "quilt"}) {
+                            if (deps.has(key)) {
+                                loader = key;
+                                loaderVersion = deps.get(key).getAsString();
+                                break;
+                            }
                         }
                     }
                 }
