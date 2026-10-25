@@ -42,6 +42,7 @@ public final class InstancesPanel extends HBox {
     private final Consumer<Instance> onCheck;
     private final Consumer<Instance> onSettings;
     private final Runnable onImport;
+    private final java.util.function.Consumer<Instance> onExport;
     private final Runnable onBack;
     private final VBox side = new VBox(0);
 
@@ -57,7 +58,7 @@ public final class InstancesPanel extends HBox {
                           Consumer<Instance> onDelete,
                           java.util.function.BiConsumer<Instance, Boolean> onClone,
                           Consumer<Instance> onCheck, Consumer<Instance> onSettings,
-                          Runnable onImport, Runnable onBack) {
+                          Runnable onImport, java.util.function.Consumer<Instance> onExport, Runnable onBack) {
         this.gameDir = gameDir;
         this.selectedId = selectedId;
         this.onSelect = onSelect;
@@ -69,6 +70,7 @@ public final class InstancesPanel extends HBox {
         this.onCheck = onCheck;
         this.onSettings = onSettings;
         this.onImport = onImport;
+        this.onExport = onExport;
         this.onBack = onBack;
 
         setSpacing(0);
@@ -175,6 +177,15 @@ public final class InstancesPanel extends HBox {
         side.getChildren().add(sideItem("导入整合包", "⇩", false, () -> {
             if (onImport != null) onImport.run();
         }));
+        side.getChildren().add(sideItem("导出整合包", "⇧", false, this::exportSelected));
+    }
+
+    private void exportSelected() {
+        if (selectedId == null || selectedId.isBlank()) {
+            Toast.info("先选择一个实例，再导出整合包");
+            return;
+        }
+        if (onExport != null) onExport.accept(Instance.of(gameDir, selectedId));
     }
 
     /** 目录右键菜单：重命名 / 移除。 */
