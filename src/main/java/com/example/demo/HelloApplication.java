@@ -4637,27 +4637,56 @@ public class HelloApplication extends Application {
         }
 
         final File target = out;
+        javafx.scene.control.ProgressBar exportProgress = new javafx.scene.control.ProgressBar(0);
+        exportProgress.setMaxWidth(Double.MAX_VALUE);
+        javafx.scene.control.Label exportStatus = new javafx.scene.control.Label("正在准备导出…");
+        exportStatus.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 12px;");
+        javafx.scene.control.Dialog<Void> progressDialog = new javafx.scene.control.Dialog<>();
+        progressDialog.initOwner(stageRef);
+        progressDialog.initModality(javafx.stage.Modality.APPLICATION_MODAL);
+        progressDialog.setTitle("正在导出");
+        progressDialog.setHeaderText(withLauncher ? "正在导出便携整合包" : "正在导出 Modrinth 整合包");
+        progressDialog.getDialogPane().setContent(new VBox(12, exportStatus, exportProgress));
+        progressDialog.getDialogPane().setPrefWidth(440);
+        progressDialog.setOnCloseRequest(javafx.event.Event::consume);
+        progressDialog.getDialogPane().addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, ev -> {
+            if (ev.getCode() == javafx.scene.input.KeyCode.ESCAPE) ev.consume();
+        });
+        progressDialog.show();
+
+        java.util.function.DoubleConsumer onProgress = p -> Platform.runLater(() -> {
+            exportProgress.setProgress(Math.max(0, Math.min(1, p)));
+            exportStatus.setText("正在导出… " + (int) Math.round(p * 100) + "%");
+        });
         logMessage(withLauncher ? "正在导出便携整合包: " + target.getName()
                 : "正在导出整合包: " + target.getName());
         CompletableFuture.runAsync(() -> {
             try {
                 if (withLauncher) {
-                    PortableExporter.export(new File(config.getGameDir()), instance, target, withSaves);
+                    PortableExporter.export(new File(config.getGameDir()), instance, target, withSaves, onProgress);
                 } else {
-                    ModpackExporter.export(new File(config.getGameDir()), instance, target, withSaves);
+                    ModpackExporter.export(new File(config.getGameDir()), instance, target, withSaves, onProgress);
                 }
             } catch (Exception ex) {
                 throw new java.util.concurrent.CompletionException(ex);
             }
         }).thenAccept(v -> Platform.runLater(() -> {
-            Toast.ok(withLauncher ? "便携整合包已导出，启动器和游戏在同一文件夹"
-                    : "整合包已导出，可直接拖入 PCL 安装");
+            progressDialog.close();
+            javafx.scene.control.Alert done = new javafx.scene.control.Alert(
+                    javafx.scene.control.Alert.AlertType.INFORMATION);
+            done.initOwner(stageRef);
+            done.setTitle("导出完成");
+            done.setHeaderText("整合包导出完成");
+            done.setContentText((withLauncher ? "便携整合包已生成：\n" : "Modrinth 整合包已生成：\n")
+                    + target.getAbsolutePath());
+            done.showAndWait();
             logMessage("✅ 导出完成: " + target.getAbsolutePath());
         })).exceptionally(ex -> {
             Throwable cause = ex;
             while (cause.getCause() != null) cause = cause.getCause();
             Throwable root = cause;
             Platform.runLater(() -> {
+                progressDialog.close();
                 Toast.error("导出失败: " + (root.getMessage() == null ? "未知错误" : root.getMessage()));
                 logMessage("❌ 导出失败: " + root.getMessage());
             });

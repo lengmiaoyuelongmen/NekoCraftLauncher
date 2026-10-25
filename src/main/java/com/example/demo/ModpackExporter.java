@@ -21,6 +21,11 @@ public final class ModpackExporter {
     }
 
     public static void export(File gameDir, Instance instance, File output, boolean includeSaves) throws IOException {
+        export(gameDir, instance, output, includeSaves, null);
+    }
+
+    public static void export(File gameDir, Instance instance, File output, boolean includeSaves,
+                              java.util.function.DoubleConsumer progress) throws IOException {
         JsonObject index = new JsonObject();
         index.addProperty("formatVersion", 1);
         index.addProperty("game", "minecraft");
@@ -51,7 +56,11 @@ public final class ModpackExporter {
                     new File(source, "defaultconfigs"), new File(source, "resourcepacks"),
                     new File(source, "shaderpacks"), new File(source, "options.txt")};
 
+        long totalFiles = 0;
+        for (File root : roots) if (root != null && root.exists()) totalFiles += countFiles(root);
+        long[] done = {0};
         try (ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(output))) {
+            if (progress != null) progress.accept(0.03);
             zip.putNextEntry(new ZipEntry("modrinth.index.json"));
             zip.write(new GsonBuilder().setPrettyPrinting().create().toJson(index)
                     .getBytes(StandardCharsets.UTF_8));
@@ -59,29 +68,46 @@ public final class ModpackExporter {
             for (File root : roots) {
                 if (root == null || !root.exists()) continue;
                 if (root.isFile()) {
-                    addFile(zip, root, "overrides/" + root.getName());
+                    addFile(zip, root, "overrides/" + root.getName(), totalFiles, done, progress);
                 } else {
-                    addTree(zip, root, "overrides/" + root.getName());
+                    addTree(zip, root, "overrides/" + root.getName(), totalFiles, done, progress);
                 }
             }
+            if (progress != null) progress.accept(1.0);
         }
     }
 
-    private static void addTree(ZipOutputStream zip, File dir, String prefix) throws IOException {
+    private static long countFiles(File file) {
+        if (file == null) return 0;
+        if (file.isFile()) return 1;
+        File[] files = file.listFiles();
+        if (files == null) return 0;
+        long count = 0;
+        for (File child : files) count += countFiles(child);
+        return count;
+    }
+
+    private static void addTree(ZipOutputStream zip, File dir, String prefix,
+                                long total, long[] done, java.util.function.DoubleConsumer progress)
+            throws IOException {
         File[] files = dir.listFiles();
         if (files == null) return;
         for (File file : files) {
             String name = prefix + "/" + file.getName();
-            if (file.isDirectory()) addTree(zip, file, name);
-            else addFile(zip, file, name);
+            if (file.isDirectory()) addTree(zip, file, name, total, done, progress);
+            else addFile(zip, file, name, total, done, progress);
         }
     }
 
-    private static void addFile(ZipOutputStream zip, File file, String name) throws IOException {
+    private static void addFile(ZipOutputStream zip, File file, String name,
+                                long total, long[] done, java.util.function.DoubleConsumer progress)
+            throws IOException {
         zip.putNextEntry(new ZipEntry(name.replace('\\', '/')));
         try (InputStream in = new FileInputStream(file)) {
             in.transferTo(zip);
         }
         zip.closeEntry();
+        done[0]++;
+        if (progress != null) progress.accept(total > 0 ? 0.05 + 0.90 * done[0] / total : 0.5);
     }
 }

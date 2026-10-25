@@ -22,6 +22,12 @@ public final class PortableExporter {
     }
 
     public static void export(File gameDir, Instance instance, File targetDir, boolean includeSaves) throws IOException {
+        export(gameDir, instance, targetDir, includeSaves, null);
+    }
+
+    public static void export(File gameDir, Instance instance, File targetDir, boolean includeSaves,
+                              java.util.function.DoubleConsumer progress) throws IOException {
+        report(progress, 0.02);
         Files.createDirectories(targetDir.toPath());
         File base = AppPaths.baseDir();
 
@@ -39,6 +45,7 @@ public final class PortableExporter {
         }
         // 便携模式：不读取本机账户注册表，避免把导出者的登录状态带进去。
         Files.writeString(new File(targetDir, ".portable").toPath(), "portable", java.nio.charset.StandardCharsets.UTF_8);
+        report(progress, 0.38);
         File launcherExe = new File(targetDir, "NekoCraftLauncher.exe");
         if (launcherExe.isFile()) {
             Files.writeString(new File(targetDir, "启动 Neko Craft Launcher.bat").toPath(),
@@ -51,6 +58,7 @@ public final class PortableExporter {
                     java.nio.charset.StandardCharsets.UTF_8);
         }
 
+        report(progress, 0.42);
         File minecraft = new File(targetDir, ".minecraft");
         File targetVersion = new File(new File(minecraft, "versions"), instance.id);
         File source = InstanceDirs.root(gameDir, instance.id, true);
@@ -62,6 +70,7 @@ public final class PortableExporter {
             copyTree(new File(versionsRoot, instance.id), targetVersion, null);
         }
 
+        report(progress, 0.92);
         Files.writeString(new File(targetDir, "导出说明.txt").toPath(),
                 "Neko Craft Launcher 便携整合包\n"
                         + "实例: " + instance.id + "\n"
@@ -73,6 +82,10 @@ public final class PortableExporter {
     }
 
     /** 优先复制本机已安装的完整启动器。 */
+    private static void report(java.util.function.DoubleConsumer progress, double value) {
+        if (progress != null) progress.accept(value);
+    }
+
     private static boolean copyLocalLauncher(File targetDir, File base) throws IOException {
         java.util.List<File> candidates = new java.util.ArrayList<>();
         candidates.add(new File(base, "NekoCraftLauncher.exe"));
