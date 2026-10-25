@@ -473,7 +473,7 @@
 /* 顶部标题栏：始终深色（含浅色模式），所以单独写死 */
 .app-topbar {
     -fx-background-color: #0e2f26;
-    -fx-background-radius: 12 12 0 0;
+    -fx-background-radius: 16 16 0 0;
     -fx-border-color: transparent transparent #1f5a46 transparent;
 }
 /* 对话框：跟随主题，避免深色界面里出现白色按钮区 */
@@ -521,3 +521,26 @@
 
 .text-field, .text-area, .combo-box { -fx-text-fill: -app-text; -fx-prompt-text-fill: -app-text-muted; }
 
+
+
+/* 版本分组：PCL 风格紧凑折叠列表 */
+.titled-pane {
+    -fx-text-fill: -app-text-2;
+}
+.titled-pane > .title {
+    -fx-background-color: -app-row2;
+    -fx-background-radius: 8;
+    -fx-border-color: -app-border-soft;
+    -fx-border-radius: 8;
+    -fx-padding: 7 11;
+}
+.titled-pane > .title > .text {
+    -fx-font-size: 12px;
+    -fx-fill: -app-text-2;
+}
+.titled-pane > .content {
+    -fx-background-color: transparent;
+    -fx-border-color: -app-border-soft;
+    -fx-border-radius: 0 0 8 8;
+    -fx-padding: 4;
+}

@@ -51,9 +51,9 @@ public final class AmbientBackground extends Canvas {
                     return;
                 }
                 // 24fps 足够表现缓动背景，显著降低空闲 CPU / GPU 占用
-                if (now - lastFrame < 120_000_000L) return;
+                if (now - lastFrame < 500_000_000L) return;
                 lastFrame = now;
-                time += 0.120;
+                time += 0.500;
                 draw();
             }
         };

@@ -238,6 +238,14 @@ public final class InstancesPanel extends HBox {
         if (alias != null && !alias.isBlank()) return alias;
         String name = dir.getName();
         if (name == null || name.isBlank()) return dir.getAbsolutePath();
+        // .minecraft / game 这类目录用上一级文件夹名，避免列表里出现一堆同名目录
+        if (name.equalsIgnoreCase(".minecraft") || name.equalsIgnoreCase("minecraft")
+                || name.equalsIgnoreCase("game")) {
+            File parent = dir.getParentFile();
+            if (parent != null && parent.getName() != null && !parent.getName().isBlank()) {
+                return parent.getName();
+            }
+        }
         return name;
     }
 

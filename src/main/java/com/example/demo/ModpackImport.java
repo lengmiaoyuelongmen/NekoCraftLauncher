@@ -175,6 +175,46 @@ public final class ModpackImport {
         return count;
     }
 
+    /** 按 Modrinth 索引里的 files 列表补齐实际模组文件。overrides 只包含配置，不含大部分模组。 */
+    public static int installIndexedFiles(File archive, File targetDir, Consumer<String> log) throws Exception {
+        java.util.List<DownloadManager.Task> tasks = new java.util.ArrayList<>();
+        try (ZipFile zip = new ZipFile(archive)) {
+            ZipEntry index = zip.getEntry("modrinth.index.json");
+            if (index == null) return 0;
+            JsonObject json = JsonParser.parseString(new String(
+                    zip.getInputStream(index).readAllBytes(), StandardCharsets.UTF_8)).getAsJsonObject();
+            if (!json.has("files") || !json.get("files").isJsonArray()) return 0;
+            for (JsonElement element : json.getAsJsonArray("files")) {
+                if (!element.isJsonObject()) continue;
+                JsonObject file = element.getAsJsonObject();
+                String path = file.has("path") ? file.get("path").getAsString() : "";
+                if (path.isBlank()) continue;
+                File out = new File(targetDir, path);
+                if (!out.toPath().normalize().startsWith(targetDir.toPath())) continue;
+                String url = "";
+                if (file.has("downloads") && file.get("downloads").isJsonArray()
+                        && !file.getAsJsonArray("downloads").isEmpty()) {
+                    url = file.getAsJsonArray("downloads").get(0).getAsString();
+                }
+                if (url.isBlank()) continue;
+                String sha1 = null;
+                if (file.has("hashes") && file.get("hashes").isJsonObject()) {
+                    JsonObject hashes = file.getAsJsonObject("hashes");
+                    if (hashes.has("sha1")) sha1 = hashes.get("sha1").getAsString();
+                }
+                long size = file.has("fileSize") ? file.get("fileSize").getAsLong() : -1;
+                tasks.add(new DownloadManager.Task(url, out, sha1, size));
+            }
+        }
+        if (tasks.isEmpty()) return 0;
+        if (log != null) log.accept("正在补齐索引中的 " + tasks.size() + " 个模组文件…");
+        DownloadManager.Stats stats = DownloadManager.downloadAll(tasks, 8, null, "auto", 0);
+        int installed = tasks.size() - stats.failed;
+        if (log != null) log.accept("索引文件完成: " + installed + "/" + tasks.size()
+                + (stats.failed > 0 ? "，失败 " + stats.failed : ""));
+        return installed;
+    }
+
     private static String mapPath(String raw) {
         if (raw.equals("modrinth.index.json") || raw.equals("manifest.json")
                 || raw.equals("modlist.html") || raw.equals("PCL/Setup.ini")

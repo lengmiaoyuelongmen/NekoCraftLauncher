@@ -122,6 +122,8 @@ public class HelloApplication extends Application {
     private Label gameStatusLabel;
     private javafx.animation.FadeTransition gameStatusPulse;
     private Button stopGameButton;
+    private File lastDownloadedFile;
+    private StackPane dropOverlay;
     private VBox playerInfoBox;
     private Label playerInfoType;
     private Label playerInfoUuid;
@@ -326,7 +328,8 @@ public class HelloApplication extends Application {
         VBox.setVgrow(contentStack, Priority.ALWAYS);
         contentStack.setMinHeight(0);
         root.setStyle("-fx-background-color: linear-gradient(to bottom, -app-root-1 0%, -app-root-2 32%, -app-root-3 100%);"
-                + " -fx-background-radius: 12;");
+                + " -fx-background-radius: 16; -fx-border-color: rgba(148,163,184,0.18);"
+                + " -fx-border-radius: 16; -fx-border-width: 1;");
         root.setMinSize(0, 0);
         root.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 
@@ -334,8 +337,30 @@ public class HelloApplication extends Application {
         resizeGrip.setArcWidth(6);
         resizeGrip.setArcHeight(6);
         resizeGrip.setCursor(Cursor.SE_RESIZE);
+        javafx.scene.shape.Rectangle windowClip = new javafx.scene.shape.Rectangle();
+        windowClip.setArcWidth(32);
+        windowClip.setArcHeight(32);
+        windowClip.widthProperty().bind(root.widthProperty());
+        windowClip.heightProperty().bind(root.heightProperty());
+        root.setClip(windowClip);
         StackPane rootWrap = new StackPane(root, resizeGrip);
         rootWrap.setAlignment(Pos.TOP_LEFT);
+
+        dropOverlay = new StackPane();
+        dropOverlay.setVisible(false);
+        dropOverlay.setManaged(false);
+        dropOverlay.setMouseTransparent(true);
+        dropOverlay.setStyle("-fx-background-color: rgba(5,20,18,0.72);");
+        Label dropTitle = new Label("松开鼠标导入整合包");
+        dropTitle.setStyle("-fx-text-fill: #ccfbf1; -fx-font-size: 24px; -fx-font-weight: bold;");
+        Label dropHint = new Label("支持 .zip / .mrpack，直接拖入窗口即可安装");
+        dropHint.setStyle("-fx-text-fill: rgba(204,251,241,0.78); -fx-font-size: 12px;");
+        VBox dropBox = new VBox(10, Icons.node("download", 42, "#5eead4"), dropTitle, dropHint);
+        dropBox.setAlignment(Pos.CENTER);
+        dropBox.setStyle("-fx-background-color: rgba(14,47,38,0.92); -fx-background-radius: 20;"
+                + " -fx-border-color: rgba(94,234,212,0.65); -fx-border-radius: 20; -fx-padding: 34 44;");
+        dropOverlay.getChildren().add(dropBox);
+        rootWrap.getChildren().add(dropOverlay);
         StackPane.setAlignment(resizeGrip, Pos.BOTTOM_RIGHT);
         StackPane.setMargin(resizeGrip, new Insets(0, 6, 6, 0));
         final double[] gripStart = new double[4];
@@ -382,6 +407,24 @@ public class HelloApplication extends Application {
 
         Scene scene = new Scene(rootWrap, 1060, 760);
         scene.setFill(Color.TRANSPARENT);
+        scene.addEventFilter(javafx.scene.input.DragEvent.DRAG_OVER, event -> {
+            File archive = firstImportArchive(event.getDragboard());
+            if (archive == null) return;
+            event.acceptTransferModes(javafx.scene.input.TransferMode.COPY);
+            if (dropOverlay != null) dropOverlay.setVisible(true);
+            event.consume();
+        });
+        scene.addEventFilter(javafx.scene.input.DragEvent.DRAG_EXITED, event -> {
+            if (dropOverlay != null) dropOverlay.setVisible(false);
+        });
+        scene.addEventFilter(javafx.scene.input.DragEvent.DRAG_DROPPED, event -> {
+            if (dropOverlay != null) dropOverlay.setVisible(false);
+            File archive = firstImportArchive(event.getDragboard());
+            if (archive == null) return;
+            event.setDropCompleted(true);
+            event.consume();
+            importModpack(archive);
+        });
         stage.initStyle(javafx.stage.StageStyle.TRANSPARENT);
         stage.setMinWidth(1060);
         stage.setMinHeight(740);
@@ -1203,7 +1246,8 @@ public class HelloApplication extends Application {
         logArea.setEditable(false);
         logArea.setWrapText(true);
         logArea.setStyle("-fx-control-inner-background: -app-bg-2; -fx-text-fill: -app-text-dim;"
-                + " -fx-font-family: 'Cascadia Mono', 'Consolas', monospace; -fx-background-radius: 11;"
+                + " -fx-font-family: 'Microsoft YaHei UI', 'Segoe UI Variable Text', 'Segoe UI';"
+                + " -fx-background-radius: 11;"
                 + " -fx-border-color: rgba(255,255,255,0.05); -fx-border-radius: 11; -fx-font-size: 12.5px;");
         VBox.setVgrow(logArea, Priority.ALWAYS);
 
@@ -2296,6 +2340,8 @@ public class HelloApplication extends Application {
         Button taskBtn = new Button();
         taskBtn.setGraphic(Icons.node("download", 15, "#9ca3af"));
         taskBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: #aaa; -fx-font-size: 16px; -fx-cursor: hand;");
+        taskBtn.setTooltip(new javafx.scene.control.Tooltip("下载任务与最近下载位置"));
+        taskBtn.setOnAction(e -> showDownloadTasks());
 
         sourceCombo.setPrefWidth(125); sourceCombo.setMinWidth(110);
         tagCombo.setPrefWidth(125); tagCombo.setMinWidth(110);
@@ -4717,6 +4763,15 @@ public class HelloApplication extends Application {
         });
     }
 
+    private File firstImportArchive(javafx.scene.input.Dragboard board) {
+        if (board == null || !board.hasFiles()) return null;
+        for (File file : board.getFiles()) {
+            String name = file.getName().toLowerCase(java.util.Locale.ROOT);
+            if (name.endsWith(".zip") || name.endsWith(".mrpack") || name.endsWith(".mcpack")) return file;
+        }
+        return null;
+    }
+
     private void importModpackDialog() {
         FileChooser chooser = new FileChooser();
         chooser.setTitle("导入整合包");
@@ -4769,6 +4824,7 @@ public class HelloApplication extends Application {
                     throw new RuntimeException("无法创建实例目录: " + target.getAbsolutePath());
                 }
                 int count = ModpackImport.extract(archive, target, this::logLine);
+                count += ModpackImport.installIndexedFiles(archive, target, this::logLine);
                 Files.writeString(new File(target, "modpack-source.txt").toPath(),
                         "name=" + pack.name() + "\nformat=" + pack.format()
                                 + "\narchive=" + archive.getAbsolutePath() + "\n", StandardCharsets.UTF_8);
@@ -4904,7 +4960,9 @@ public class HelloApplication extends Application {
                         logArea.appendText("❌ 下载失败: " + targetFile.getName() + "\n");
                         return;
                     }
+                    lastDownloadedFile = targetFile;
                     logArea.appendText("✅ 下载完成: " + targetFile.getAbsolutePath() + "\n");
+                    Toast.ok("下载完成：" + targetFile.getName() + "，点右上角下载按钮查看位置");
                     if (onDone != null) onDone.accept(targetFile);
                 });
             } catch (Exception e) {
@@ -5317,6 +5375,37 @@ public class HelloApplication extends Application {
         } catch (Exception e) {
             logMessage("❌ 打开浏览器失败: " + e.getMessage());
         }
+    }
+
+    private void showDownloadTasks() {
+        DownloadManager.Status status = DownloadManager.status();
+        javafx.scene.control.Dialog<javafx.scene.control.ButtonType> dialog =
+                new javafx.scene.control.Dialog<>();
+        dialog.initOwner(stageRef);
+        dialog.setTitle("下载任务");
+        dialog.setHeaderText(status.total() > 0 && status.done() < status.total()
+                ? "正在下载" : "下载任务与最近文件");
+        Label current = new Label(status.total() > 0 && status.done() < status.total()
+                ? (status.file() == null || status.file().isBlank() ? "正在准备下载…" : status.file())
+                : "当前没有进行中的下载任务。");
+        current.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 12px;");
+        Label last = new Label(lastDownloadedFile == null
+                ? "还没有已完成的下载。"
+                : "最近完成：\n" + lastDownloadedFile.getAbsolutePath());
+        last.setWrapText(true);
+        last.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
+        Button open = new Button("打开所在文件夹");
+        open.setStyle("-fx-background-color: -app-btn-2; -fx-text-fill: -app-text-2;"
+                + " -fx-background-radius: 8; -fx-padding: 7 14; -fx-cursor: hand;");
+        open.setDisable(lastDownloadedFile == null);
+        open.setOnAction(e -> {
+            if (lastDownloadedFile != null && lastDownloadedFile.getParentFile() != null) {
+                openDir(lastDownloadedFile.getParentFile());
+            }
+        });
+        dialog.getDialogPane().setContent(new VBox(10, current, last, open));
+        dialog.getDialogPane().getButtonTypes().add(javafx.scene.control.ButtonType.CLOSE);
+        dialog.showAndWait();
     }
 
     private void openDir(File dir) {
