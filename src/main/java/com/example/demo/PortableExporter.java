@@ -56,6 +56,7 @@ public final class PortableExporter {
             Files.writeString(new File(targetDir, "启动.bat").toPath(),
                     "@echo off\r\ncd /d \"%~dp0\"\r\nstart javaw -jar \"%~dp0NekoCraftLauncher.jar\"\r\n",
                     java.nio.charset.StandardCharsets.UTF_8);
+        report(progress, 1.0);
         }
 
         report(progress, 0.42);

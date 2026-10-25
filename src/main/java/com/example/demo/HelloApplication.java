@@ -4648,9 +4648,12 @@ public class HelloApplication extends Application {
         progressDialog.setHeaderText(withLauncher ? "正在导出便携整合包" : "正在导出 Modrinth 整合包");
         progressDialog.getDialogPane().setContent(new VBox(12, exportStatus, exportProgress));
         progressDialog.getDialogPane().setPrefWidth(440);
-        progressDialog.setOnCloseRequest(javafx.event.Event::consume);
+        java.util.concurrent.atomic.AtomicBoolean exportDone = new java.util.concurrent.atomic.AtomicBoolean(false);
+        progressDialog.setOnCloseRequest(ev -> {
+            if (!exportDone.get()) ev.consume();
+        });
         progressDialog.getDialogPane().addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, ev -> {
-            if (ev.getCode() == javafx.scene.input.KeyCode.ESCAPE) ev.consume();
+            if (ev.getCode() == javafx.scene.input.KeyCode.ESCAPE && !exportDone.get()) ev.consume();
         });
         progressDialog.show();
 
@@ -4671,6 +4674,7 @@ public class HelloApplication extends Application {
                 throw new java.util.concurrent.CompletionException(ex);
             }
         }).thenAccept(v -> Platform.runLater(() -> {
+            exportDone.set(true);
             progressDialog.close();
             javafx.scene.control.Alert done = new javafx.scene.control.Alert(
                     javafx.scene.control.Alert.AlertType.INFORMATION);
@@ -4686,6 +4690,7 @@ public class HelloApplication extends Application {
             while (cause.getCause() != null) cause = cause.getCause();
             Throwable root = cause;
             Platform.runLater(() -> {
+                exportDone.set(true);
                 progressDialog.close();
                 Toast.error("导出失败: " + (root.getMessage() == null ? "未知错误" : root.getMessage()));
                 logMessage("❌ 导出失败: " + root.getMessage());
