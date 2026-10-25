@@ -448,7 +448,11 @@ public class HelloApplication extends Application {
         Bootstrap.ensureGameDir(new File(config.getGameDir()),
                 message -> Platform.runLater(() -> logArea.appendText(message + "\n")));
         LauncherLog.attach(new File(config.getGameDir()), logArea);
-        restoreSessionFromRegistry();
+        if (new File(AppPaths.baseDir(), ".portable").isFile()) {
+            logArea.appendText("便携模式：不读取本机账户注册表，请重新登录\n");
+        } else {
+            restoreSessionFromRegistry();
+        }
         File detectGameDir = new File(config.getGameDir());
         CompletableFuture.runAsync(() -> {
             HardwareInfo.Detect hardware = HardwareInfo.detect(detectGameDir);

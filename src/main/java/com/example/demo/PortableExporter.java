@@ -25,15 +25,7 @@ public final class PortableExporter {
         Files.createDirectories(targetDir.toPath());
         File base = AppPaths.baseDir();
 
-        File exe = new File(base, "NekoCraftLauncher.exe");
-        boolean copiedLauncher = false;
-        if (exe.isFile()) {
-            Files.copy(exe.toPath(), new File(targetDir, exe.getName()).toPath(),
-                    StandardCopyOption.REPLACE_EXISTING);
-            copyTree(new File(base, "app"), new File(targetDir, "app"), null);
-            copyTree(new File(base, "runtime"), new File(targetDir, "runtime"), null);
-            copiedLauncher = true;
-        }
+        boolean copiedLauncher = copyLocalLauncher(targetDir, base);
         if (!copiedLauncher) {
             copiedLauncher = downloadLauncher(targetDir);
         }
@@ -45,6 +37,8 @@ public final class PortableExporter {
                 copiedLauncher = true;
             }
         }
+        // 便携模式：不读取本机账户注册表，避免把导出者的登录状态带进去。
+        Files.writeString(new File(targetDir, ".portable").toPath(), "portable", java.nio.charset.StandardCharsets.UTF_8);
         File launcherExe = new File(targetDir, "NekoCraftLauncher.exe");
         if (launcherExe.isFile()) {
             Files.writeString(new File(targetDir, "启动 Neko Craft Launcher.bat").toPath(),
@@ -58,9 +52,15 @@ public final class PortableExporter {
         }
 
         File minecraft = new File(targetDir, ".minecraft");
-        File source = InstanceDirs.root(gameDir, instance.id, true);
         File targetVersion = new File(new File(minecraft, "versions"), instance.id);
-        copyTree(source, targetVersion, includeSaves ? null : "saves");
+        File source = InstanceDirs.root(gameDir, instance.id, true);
+        File versionsRoot = new File(gameDir, "versions");
+        if (source.getAbsoluteFile().toPath().startsWith(versionsRoot.getAbsoluteFile().toPath())) {
+            copyTree(source, targetVersion, includeSaves ? null : "saves");
+        } else {
+            // 非隔离实例：只复制当前版本目录，绝不把其他版本 / 其他游戏存档一起带走。
+            copyTree(new File(versionsRoot, instance.id), targetVersion, null);
+        }
 
         Files.writeString(new File(targetDir, "导出说明.txt").toPath(),
                 "Neko Craft Launcher 便携整合包\n"
@@ -70,6 +70,28 @@ public final class PortableExporter {
                         + "双击 NekoCraftLauncher.exe 启动。\n"
                         + "如果使用 jar 版，请双击 启动.bat，需要本机安装 Java 21。\n",
                 java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    /** 优先复制本机已安装的完整启动器。 */
+    private static boolean copyLocalLauncher(File targetDir, File base) throws IOException {
+        java.util.List<File> candidates = new java.util.ArrayList<>();
+        candidates.add(new File(base, "NekoCraftLauncher.exe"));
+        String localAppData = System.getenv("LOCALAPPDATA");
+        if (localAppData != null) candidates.add(new File(localAppData, "NekoCraftLauncher/NekoCraftLauncher.exe"));
+        String programFiles = System.getenv("ProgramFiles");
+        if (programFiles != null) candidates.add(new File(programFiles, "NekoCraftLauncher/NekoCraftLauncher.exe"));
+        candidates.add(new File(System.getProperty("user.dir"), "release/exe/NekoCraftLauncher/NekoCraftLauncher.exe"));
+        candidates.add(new File(System.getProperty("user.dir"), "release/NekoCraftLauncher/NekoCraftLauncher.exe"));
+        for (File exe : candidates) {
+            if (exe == null || !exe.isFile()) continue;
+            File root = exe.getParentFile();
+            Files.copy(exe.toPath(), new File(targetDir, exe.getName()).toPath(),
+                    StandardCopyOption.REPLACE_EXISTING);
+            copyTree(new File(root, "app"), new File(targetDir, "app"), null);
+            copyTree(new File(root, "runtime"), new File(targetDir, "runtime"), null);
+            return true;
+        }
+        return false;
     }
 
     /** 没有本地启动器时，从 GitHub 下载最新便携版并解压到导出目录。 */
@@ -131,10 +153,14 @@ public final class PortableExporter {
         try {
             File location = new File(PortableExporter.class.getProtectionDomain()
                     .getCodeSource().getLocation().toURI());
-            return location.isFile() && location.getName().endsWith(".jar") ? location : null;
-        } catch (Exception e) {
-            return null;
+            if (location.isFile() && location.getName().endsWith(".jar")) return location;
+        } catch (Exception ignored) {
         }
+        for (String candidate : new String[]{"target/mc-launcher.jar", "release/mc-launcher.jar"}) {
+            File jar = new File(System.getProperty("user.dir"), candidate);
+            if (jar.isFile()) return jar;
+        }
+        return null;
     }
 
     private static void copyTree(File source, File target, String skipName) throws IOException {
