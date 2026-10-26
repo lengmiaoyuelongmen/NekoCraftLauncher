@@ -4620,6 +4620,69 @@ public class HelloApplication extends Application {
     }
 
     /** 不同资源类型装到游戏目录里对应的文件夹，而不是全塞进 downloads。 */
+    /** 下载 Modrinth 中标记为 required 的前置模组，避免装完主模组后缺依赖。 */
+    private void installRequiredDependencies(JsonObject version) {
+        if (version == null || !version.has("dependencies")
+                || !version.get("dependencies").isJsonArray()) return;
+        java.util.List<String> ids = new java.util.ArrayList<>();
+        for (var element : version.getAsJsonArray("dependencies")) {
+            if (!element.isJsonObject()) continue;
+            JsonObject dep = element.getAsJsonObject();
+            String type = dep.has("dependency_type") ? dep.get("dependency_type").getAsString() : "";
+            if (!"required".equals(type)) continue;
+            if (dep.has("version_id") && !dep.get("version_id").isJsonNull()) {
+                ids.add(dep.get("version_id").getAsString());
+            }
+        }
+        if (ids.isEmpty()) return;
+        logLine("📦 正在补齐 " + ids.size() + " 个前置模组…");
+        CompletableFuture.runAsync(() -> {
+            File game = new File(config.getGameDir());
+            File mods = new File(InstanceDirs.root(game, currentInstanceId(), config.isIsolation()), "mods");
+            if (!mods.isDirectory()) mods.mkdirs();
+            for (String id : ids) {
+                try {
+                    HttpRequest req = HttpRequest.newBuilder(URI.create(
+                                    "https://api.modrinth.com/v2/version/" + id))
+                            .header("User-Agent", "PCL-CE-Launcher/1.0")
+                            .timeout(java.time.Duration.ofSeconds(15)).GET().build();
+                    HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+                    if (resp.statusCode() != 200) continue;
+                    JsonObject depVersion = com.google.gson.JsonParser.parseString(resp.body()).getAsJsonObject();
+                    JsonObject file = null;
+                    if (depVersion.has("files") && depVersion.get("files").isJsonArray()) {
+                        for (var f : depVersion.getAsJsonArray("files")) {
+                            JsonObject candidate = f.getAsJsonObject();
+                            if (candidate.has("primary") && candidate.get("primary").getAsBoolean()) {
+                                file = candidate;
+                                break;
+                            }
+                            if (file == null) file = candidate;
+                        }
+                    }
+                    if (file == null) continue;
+                    String name = file.get("filename").getAsString();
+                    File target = new File(mods, name);
+                    if (target.isFile() && target.length() > 1024) {
+                        logLine("   前置已存在: " + name);
+                        continue;
+                    }
+                    String sha1 = null;
+                    if (file.has("hashes") && file.get("hashes").isJsonObject()
+                            && file.getAsJsonObject("hashes").has("sha1")) {
+                        sha1 = file.getAsJsonObject("hashes").get("sha1").getAsString();
+                    }
+                    DownloadManager.downloadAll(java.util.List.of(new DownloadManager.Task(
+                            file.get("url").getAsString(), target, sha1,
+                            file.has("size") ? file.get("size").getAsLong() : -1)), 1, null);
+                    logLine("   ✅ 前置: " + name);
+                } catch (Exception e) {
+                    logLine("   ⚠ 前置下载失败: " + e.getMessage());
+                }
+            }
+        });
+    }
+
     private String installDirFor(String projectType) {
         return switch (projectType) {
             case "模组" -> "mods";
@@ -5276,6 +5339,7 @@ public class HelloApplication extends Application {
         java.io.File[] reports = new File(game, "crash-reports")
                 .listFiles((d, n) -> n.endsWith(".txt"));
         boolean hasCrash = reports != null && reports.length > 0;
+        java.util.List<String> conflicts = ModConflictChecker.check(mods);
 
         javafx.scene.control.Dialog<Void> dialog = new javafx.scene.control.Dialog<>();
         dialog.initOwner(stageRef);
@@ -5288,7 +5352,11 @@ public class HelloApplication extends Application {
                 healthRow(modCount > 0 || versionOk ? "正常" : "提示",
                         modCount + " 个模组文件", versionOk),
                 healthRow(hasCrash ? "有记录" : "正常",
-                        hasCrash ? "发现 " + reports.length + " 条崩溃记录" : "未发现崩溃记录", !hasCrash));
+                        hasCrash ? "发现 " + reports.length + " 条崩溃记录" : "未发现崩溃记录", !hasCrash),
+                healthRow(conflicts.isEmpty() ? "正常" : "冲突",
+                        conflicts.isEmpty() ? "未发现重复 modId"
+                                : "发现 " + conflicts.size() + " 个模组冲突：" + conflicts.get(0),
+                        conflicts.isEmpty()));
         Button fullCheck = new Button("运行完整性检查");
         fullCheck.setDisable(id == null);
         fullCheck.setOnAction(e -> {
