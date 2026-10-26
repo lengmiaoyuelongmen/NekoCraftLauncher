@@ -20,7 +20,8 @@ import java.util.UUID;
 public final class AccountStore {
 
     public record Account(String username, String uuid, String accessToken, String loginType,
-                          String userType, String server, String skinUrl) {
+                          String userType, String server, String skinUrl,
+                          String skinPath, String capePath) {
     }
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -42,7 +43,8 @@ public final class AccountStore {
             for (JsonElement element : parsed.getAsJsonArray()) {
                 JsonObject o = element.getAsJsonObject();
                 result.add(new Account(get(o, "username"), get(o, "uuid"), get(o, "accessToken"),
-                        get(o, "loginType"), get(o, "userType"), get(o, "server"), get(o, "skinUrl")));
+                        get(o, "loginType"), get(o, "userType"), get(o, "server"), get(o, "skinUrl"),
+                        get(o, "skinPath"), get(o, "capePath")));
             }
             return result;
         } catch (Exception e) {
@@ -53,6 +55,8 @@ public final class AccountStore {
     public static void upsert(UserSession session, String loginType, String server) {
         if (session == null || session.getUsername() == null || session.getUsername().isBlank()) return;
         List<Account> accounts = list();
+        Account old = accounts.stream().filter(a -> a.username().equalsIgnoreCase(session.getUsername()))
+                .findFirst().orElse(null);
         accounts.removeIf(a -> a.username().equalsIgnoreCase(session.getUsername()));
         accounts.add(0, new Account(session.getUsername(),
                 session.getUuid() == null ? "" : session.getUuid().toString(),
@@ -60,7 +64,8 @@ public final class AccountStore {
                 loginType == null ? "" : loginType,
                 session.getUserType() == null ? "" : session.getUserType(),
                 server == null ? "" : server,
-                session.getSkinUrl() == null ? "" : session.getSkinUrl()));
+                session.getSkinUrl() == null ? "" : session.getSkinUrl(),
+                old == null ? "" : old.skinPath(), old == null ? "" : old.capePath()));
         save(accounts);
     }
 
@@ -81,6 +86,8 @@ public final class AccountStore {
             o.addProperty("userType", account.userType());
             o.addProperty("server", account.server());
             o.addProperty("skinUrl", account.skinUrl());
+            o.addProperty("skinPath", account.skinPath());
+            o.addProperty("capePath", account.capePath());
             array.add(o);
         }
         try (Writer writer = Files.newBufferedWriter(file().toPath(), StandardCharsets.UTF_8)) {
@@ -91,6 +98,19 @@ public final class AccountStore {
 
     private static String get(JsonObject object, String key) {
         return object.has(key) && !object.get(key).isJsonNull() ? object.get(key).getAsString() : "";
+    }
+
+    public static void setTexture(String username, String skinPath, String capePath) {
+        List<Account> accounts = list();
+        for (int i = 0; i < accounts.size(); i++) {
+            Account a = accounts.get(i);
+            if (!a.username().equalsIgnoreCase(username)) continue;
+            accounts.set(i, new Account(a.username(), a.uuid(), a.accessToken(), a.loginType(),
+                    a.userType(), a.server(), a.skinUrl(),
+                    skinPath == null ? "" : skinPath, capePath == null ? "" : capePath));
+            save(accounts);
+            return;
+        }
     }
 
     public static UserSession toSession(Account account) {

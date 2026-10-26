@@ -1234,8 +1234,14 @@ public class HelloApplication extends Application {
         skinPreviewBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: -app-text-muted;"
                 + " -fx-font-size: 10.5px; -fx-border-color: -app-border-soft; -fx-border-radius: 8;"
                 + " -fx-background-radius: 8; -fx-padding: 3 10; -fx-cursor: hand;");
-        skinPreviewBtn.setOnAction(e -> SkinPreviewDialog.show(stageRef, config,
-                currentSession == null ? null : currentSession.getSkinUrl()));
+        skinPreviewBtn.setOnAction(e -> {
+            SkinPreviewDialog.show(stageRef, config,
+                    currentSession == null ? null : currentSession.getSkinUrl());
+            if (currentSession != null && currentSession.getUsername() != null) {
+                AccountStore.setTexture(currentSession.getUsername(),
+                        config.getPreviewSkinPath(), config.getPreviewCapePath());
+            }
+        });
         Button accountManagerBtn = new Button("账户管理");
         accountManagerBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: -app-text-muted;"
                 + " -fx-font-size: 10.5px; -fx-border-color: -app-border-soft; -fx-border-radius: 8;"
@@ -5327,8 +5333,10 @@ public class HelloApplication extends Application {
         for (AccountStore.Account account : accounts) {
             Label name = new Label(account.username());
             name.setStyle("-fx-text-fill: -app-text; -fx-font-size: 13px; -fx-font-weight: bold;");
+            String texture = (account.skinPath().isBlank() ? "" : " · 有皮肤")
+                    + (account.capePath().isBlank() ? "" : " · 有披风");
             Label meta = new Label(account.loginType()
-                    + (account.server().isBlank() ? "" : " · " + account.server()));
+                    + (account.server().isBlank() ? "" : " · " + account.server()) + texture);
             meta.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 10px;");
             VBox info = new VBox(2, name, meta);
             HBox.setHgrow(info, Priority.ALWAYS);
@@ -5381,6 +5389,9 @@ public class HelloApplication extends Application {
         if (serverFieldRef != null && !account.server().isBlank()) {
             serverFieldRef.getEditor().setText(account.server());
         }
+        config.setPreviewSkinPath(account.skinPath());
+        config.setPreviewCapePath(account.capePath());
+        config.save();
         if (account.skinUrl() != null && !account.skinUrl().isBlank()) loadSkinHead(account.skinUrl());
         Toast.ok("已切换到账户：" + account.username());
         logMessage("👤 已切换账户: " + account.username());

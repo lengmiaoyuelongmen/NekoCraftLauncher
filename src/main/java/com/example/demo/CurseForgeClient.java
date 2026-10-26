@@ -199,6 +199,26 @@ public final class CurseForgeClient {
         return files;
     }
 
+    /** 按整合包 manifest 中的 projectID/fileID 精确取文件。 */
+    public static MirrorFile fileById(long modId, long fileId) {
+        JsonObject root = getJson(MIRROR + "/mods/" + modId + "/files/" + fileId);
+        if (root == null || !root.has("data") || !root.get("data").isJsonObject()) return null;
+        JsonObject obj = root.getAsJsonObject("data");
+        String fileName = obj.has("fileName") ? obj.get("fileName").getAsString() : "";
+        if (fileName.isBlank()) return null;
+        String downloadUrl = obj.has("downloadUrl") && !obj.get("downloadUrl").isJsonNull()
+                ? obj.get("downloadUrl").getAsString() : "";
+        if (downloadUrl.isBlank()) {
+            FileEntry fallback = new FileEntry(fileId, fileName, "", "");
+            downloadUrl = fallback.directUrl();
+        }
+        return new MirrorFile(fileId,
+                obj.has("displayName") ? obj.get("displayName").getAsString() : fileName,
+                fileName, downloadUrl,
+                obj.has("releaseType") ? obj.get("releaseType").getAsInt() : 0,
+                obj.has("fileLength") ? obj.get("fileLength").getAsLong() : -1);
+    }
+
     private static JsonObject getJson(String url) {
         try {
             HttpRequest request = HttpRequest.newBuilder(URI.create(url))

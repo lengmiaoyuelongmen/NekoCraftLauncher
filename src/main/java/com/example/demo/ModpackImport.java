@@ -194,34 +194,56 @@ public final class ModpackImport {
         java.util.List<DownloadManager.Task> tasks = new java.util.ArrayList<>();
         try (ZipFile zip = new ZipFile(archive)) {
             ZipEntry index = zip.getEntry("modrinth.index.json");
-            if (index == null) return 0;
-            JsonObject json = JsonParser.parseString(new String(
-                    zip.getInputStream(index).readAllBytes(), StandardCharsets.UTF_8)).getAsJsonObject();
-            if (!json.has("files") || !json.get("files").isJsonArray()) return 0;
-            for (JsonElement element : json.getAsJsonArray("files")) {
-                if (!element.isJsonObject()) continue;
-                JsonObject file = element.getAsJsonObject();
-                String path = file.has("path") ? file.get("path").getAsString() : "";
-                if (path.isBlank()) continue;
-                // Minecraft 只扫描 mods 根目录，索引里的 mods/子目录文件统一摊平
-                if (path.startsWith("mods/") && path.indexOf('/', 5) > 0) {
-                    path = "mods/" + new File(path).getName();
+            if (index != null) {
+                JsonObject json = JsonParser.parseString(new String(
+                        zip.getInputStream(index).readAllBytes(), StandardCharsets.UTF_8)).getAsJsonObject();
+                if (json.has("files") && json.get("files").isJsonArray()) {
+                    for (JsonElement element : json.getAsJsonArray("files")) {
+                        if (!element.isJsonObject()) continue;
+                        JsonObject file = element.getAsJsonObject();
+                        String path = file.has("path") ? file.get("path").getAsString() : "";
+                        if (path.isBlank()) continue;
+                        if (path.startsWith("mods/") && path.indexOf('/', 5) > 0) {
+                            path = "mods/" + new File(path).getName();
+                        }
+                        File out = new File(targetDir, path);
+                        if (!out.toPath().normalize().startsWith(targetDir.toPath())) continue;
+                        String url = "";
+                        if (file.has("downloads") && file.get("downloads").isJsonArray()
+                                && !file.getAsJsonArray("downloads").isEmpty()) {
+                            url = file.getAsJsonArray("downloads").get(0).getAsString();
+                        }
+                        if (url.isBlank()) continue;
+                        String sha1 = null;
+                        if (file.has("hashes") && file.get("hashes").isJsonObject()) {
+                            JsonObject hashes = file.getAsJsonObject("hashes");
+                            if (hashes.has("sha1")) sha1 = hashes.get("sha1").getAsString();
+                        }
+                        long size = file.has("fileSize") ? file.get("fileSize").getAsLong() : -1;
+                        tasks.add(new DownloadManager.Task(url, out, sha1, size));
+                    }
                 }
-                File out = new File(targetDir, path);
-                if (!out.toPath().normalize().startsWith(targetDir.toPath())) continue;
-                String url = "";
-                if (file.has("downloads") && file.get("downloads").isJsonArray()
-                        && !file.getAsJsonArray("downloads").isEmpty()) {
-                    url = file.getAsJsonArray("downloads").get(0).getAsString();
+            } else {
+                ZipEntry manifest = zip.getEntry("manifest.json");
+                if (manifest != null) {
+                    JsonObject json = JsonParser.parseString(new String(
+                            zip.getInputStream(manifest).readAllBytes(), StandardCharsets.UTF_8)).getAsJsonObject();
+                    if (json.has("files") && json.get("files").isJsonArray()) {
+                        if (log != null) log.accept("正在解析 CurseForge 整合包文件列表…");
+                        for (JsonElement element : json.getAsJsonArray("files")) {
+                            if (!element.isJsonObject()) continue;
+                            JsonObject file = element.getAsJsonObject();
+                            if (file.has("required") && !file.get("required").getAsBoolean()) continue;
+                            long projectId = file.has("projectID") ? file.get("projectID").getAsLong() : 0;
+                            long fileId = file.has("fileID") ? file.get("fileID").getAsLong() : 0;
+                            if (projectId == 0 || fileId == 0) continue;
+                            CurseForgeClient.MirrorFile mirror = CurseForgeClient.fileById(projectId, fileId);
+                            if (mirror == null || mirror.fileName().isBlank()) continue;
+                            File out = new File(targetDir, "mods/" + mirror.fileName());
+                            tasks.add(new DownloadManager.Task(mirror.downloadUrl(), out, null, mirror.size()));
+                        }
+                    }
                 }
-                if (url.isBlank()) continue;
-                String sha1 = null;
-                if (file.has("hashes") && file.get("hashes").isJsonObject()) {
-                    JsonObject hashes = file.getAsJsonObject("hashes");
-                    if (hashes.has("sha1")) sha1 = hashes.get("sha1").getAsString();
-                }
-                long size = file.has("fileSize") ? file.get("fileSize").getAsLong() : -1;
-                tasks.add(new DownloadManager.Task(url, out, sha1, size));
             }
         }
         if (tasks.isEmpty()) return 0;
