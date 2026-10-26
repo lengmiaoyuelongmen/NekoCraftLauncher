@@ -38,10 +38,20 @@ public final class UpdateChecker {
     private static final String FALLBACK_URL = LauncherConfig.DEFAULT_UPDATE_URL;
 
     public static Info fetch(String url) throws Exception {
+        return fetch(url, "");
+    }
+
+    /** 主更新源失败后依次尝试备用镜像和内置 GitHub 源。 */
+    public static Info fetch(String url, String mirrorUrl) throws Exception {
         try {
             return fetchOnce(url);
         } catch (Exception first) {
-            // 旧版配置可能仍指向已失效的旧仓库；自动回退到当前仓库。
+            if (mirrorUrl != null && !mirrorUrl.isBlank()) {
+                try {
+                    return fetchOnce(mirrorUrl);
+                } catch (Exception ignored) {
+                }
+            }
             if (url != null && url.contains("lengmiaoyuelongmen/NekoCraftLauncher")) throw first;
             try {
                 return fetchOnce(FALLBACK_URL);

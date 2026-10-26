@@ -103,6 +103,7 @@ public class LauncherConfig {
     private String lastImportDir = "";
     private String previewSkinPath = "";
     private String previewCapePath = "";
+    private String updateMirrorUrl = "";
 
     /** 界面字体缩放（1.0 = 标准） */
     private double uiFontScale = 1.0;
@@ -230,6 +231,7 @@ public class LauncherConfig {
         if (lastImportDir == null) lastImportDir = "";
         if (previewSkinPath == null) previewSkinPath = "";
         if (previewCapePath == null) previewCapePath = "";
+        if (updateMirrorUrl == null) updateMirrorUrl = "";
         if (gameDir == null || gameDir.isBlank()) gameDir = ".minecraft";
         if (gameDirs == null) gameDirs = new java.util.ArrayList<>();
         gameDirs.removeIf(dir -> dir == null || dir.isBlank());
@@ -480,6 +482,14 @@ public class LauncherConfig {
 
     public void setAccentColor(String accentColor) {
         this.accentColor = accentColor;
+    }
+
+    public String getUpdateMirrorUrl() {
+        return updateMirrorUrl == null ? "" : updateMirrorUrl;
+    }
+
+    public void setUpdateMirrorUrl(String updateMirrorUrl) {
+        this.updateMirrorUrl = updateMirrorUrl;
     }
 
     public String getPreviewSkinPath() {

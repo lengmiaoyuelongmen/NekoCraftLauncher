@@ -836,9 +836,14 @@ public final class SettingsPanel extends VBox {
         javafx.scene.control.TextField urlField = new javafx.scene.control.TextField(config.getUpdateUrl());
         urlField.setPromptText("https://api.github.com/repos/用户/NekoCraftLauncher/releases/latest");
         HBox.setHgrow(urlField, Priority.ALWAYS);
+        javafx.scene.control.TextField mirrorField =
+                new javafx.scene.control.TextField(config.getUpdateMirrorUrl());
+        mirrorField.setPromptText("备用更新源 / Gitee / 自建 manifest（可选）");
+        HBox.setHgrow(mirrorField, Priority.ALWAYS);
 
         Button saveUrl = smallButton("保存更新源", e -> {
             config.setUpdateUrl(urlField.getText().trim());
+            config.setUpdateMirrorUrl(mirrorField.getText().trim());
             config.save();
             Toast.ok("更新源已保存");
         });
@@ -852,7 +857,9 @@ public final class SettingsPanel extends VBox {
 
         Button check = smallButton("检查更新", e -> {
             String url = urlField.getText().trim();
+            String mirror = mirrorField.getText().trim();
             config.setUpdateUrl(url);
+            config.setUpdateMirrorUrl(mirror);
             config.save();
             if (url.isBlank()) {
                 Toast.info("请先填写更新源 JSON 地址");
@@ -863,7 +870,7 @@ public final class SettingsPanel extends VBox {
             status.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
             java.util.concurrent.CompletableFuture.supplyAsync(() -> {
                 try {
-                    return UpdateChecker.fetch(url);
+                    return UpdateChecker.fetch(url, mirror);
                 } catch (Exception ex) {
                     throw new java.util.concurrent.CompletionException(ex);
                 }
@@ -909,6 +916,7 @@ public final class SettingsPanel extends VBox {
                 hint("支持 GitHub Releases API、仓库地址，或静态 JSON：version / url / notes。"),
                 hint("GitHub 仓库地址会自动转换为 releases/latest；留空则不检查。"),
                 new HBox(10, urlField, saveUrl, check, download),
+                new HBox(10, mirrorField),
                 status);
         return scroll(card);
     }
