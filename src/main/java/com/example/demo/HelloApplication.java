@@ -4620,67 +4620,84 @@ public class HelloApplication extends Application {
     }
 
     /** 不同资源类型装到游戏目录里对应的文件夹，而不是全塞进 downloads。 */
-    /** 下载 Modrinth 中标记为 required 的前置模组，避免装完主模组后缺依赖。 */
+    /** 递归下载 Modrinth 中 required 的前置模组，直到没有新依赖。 */
     private void installRequiredDependencies(JsonObject version) {
+        java.util.Deque<String> queue = new java.util.ArrayDeque<>();
+        java.util.Set<String> visited = new java.util.HashSet<>();
+        collectRequiredVersions(version, queue, visited);
+        if (queue.isEmpty()) return;
+        int count = queue.size();
+        logLine("📦 正在补齐 " + count + " 个前置模组（含间接依赖）…");
+        CompletableFuture.runAsync(() -> {
+            File game = new File(config.getGameDir());
+            File mods = new File(InstanceDirs.root(game, currentInstanceId(), config.isIsolation()), "mods");
+            if (!mods.isDirectory()) mods.mkdirs();
+            int done = 0;
+            while (!queue.isEmpty()) {
+                String id = queue.poll();
+                try {
+                    JsonObject depVersion = fetchModrinthVersion(id);
+                    if (depVersion == null) continue;
+                    JsonObject file = primaryFile(depVersion);
+                    if (file == null) continue;
+                    String name = file.get("filename").getAsString();
+                    File target = new File(mods, name);
+                    if (!(target.isFile() && target.length() > 1024)) {
+                        String sha1 = null;
+                        if (file.has("hashes") && file.get("hashes").isJsonObject()
+                                && file.getAsJsonObject("hashes").has("sha1")) {
+                            sha1 = file.getAsJsonObject("hashes").get("sha1").getAsString();
+                        }
+                        DownloadManager.downloadAll(java.util.List.of(new DownloadManager.Task(
+                                file.get("url").getAsString(), target, sha1,
+                                file.has("size") ? file.get("size").getAsLong() : -1)), 1, null);
+                        done++;
+                        logLine("   ✅ 前置: " + name);
+                    }
+                    collectRequiredVersions(depVersion, queue, visited);
+                } catch (Exception e) {
+                    logLine("   ⚠ 前置下载失败: " + e.getMessage());
+                }
+            }
+            logLine("📦 前置处理完成，新增 " + done + " 个文件");
+        });
+    }
+
+    private void collectRequiredVersions(JsonObject version, java.util.Deque<String> queue,
+                                         java.util.Set<String> visited) {
         if (version == null || !version.has("dependencies")
                 || !version.get("dependencies").isJsonArray()) return;
-        java.util.List<String> ids = new java.util.ArrayList<>();
         for (var element : version.getAsJsonArray("dependencies")) {
             if (!element.isJsonObject()) continue;
             JsonObject dep = element.getAsJsonObject();
             String type = dep.has("dependency_type") ? dep.get("dependency_type").getAsString() : "";
             if (!"required".equals(type)) continue;
             if (dep.has("version_id") && !dep.get("version_id").isJsonNull()) {
-                ids.add(dep.get("version_id").getAsString());
+                String id = dep.get("version_id").getAsString();
+                if (visited.add(id)) queue.add(id);
             }
         }
-        if (ids.isEmpty()) return;
-        logLine("📦 正在补齐 " + ids.size() + " 个前置模组…");
-        CompletableFuture.runAsync(() -> {
-            File game = new File(config.getGameDir());
-            File mods = new File(InstanceDirs.root(game, currentInstanceId(), config.isIsolation()), "mods");
-            if (!mods.isDirectory()) mods.mkdirs();
-            for (String id : ids) {
-                try {
-                    HttpRequest req = HttpRequest.newBuilder(URI.create(
-                                    "https://api.modrinth.com/v2/version/" + id))
-                            .header("User-Agent", "PCL-CE-Launcher/1.0")
-                            .timeout(java.time.Duration.ofSeconds(15)).GET().build();
-                    HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
-                    if (resp.statusCode() != 200) continue;
-                    JsonObject depVersion = com.google.gson.JsonParser.parseString(resp.body()).getAsJsonObject();
-                    JsonObject file = null;
-                    if (depVersion.has("files") && depVersion.get("files").isJsonArray()) {
-                        for (var f : depVersion.getAsJsonArray("files")) {
-                            JsonObject candidate = f.getAsJsonObject();
-                            if (candidate.has("primary") && candidate.get("primary").getAsBoolean()) {
-                                file = candidate;
-                                break;
-                            }
-                            if (file == null) file = candidate;
-                        }
-                    }
-                    if (file == null) continue;
-                    String name = file.get("filename").getAsString();
-                    File target = new File(mods, name);
-                    if (target.isFile() && target.length() > 1024) {
-                        logLine("   前置已存在: " + name);
-                        continue;
-                    }
-                    String sha1 = null;
-                    if (file.has("hashes") && file.get("hashes").isJsonObject()
-                            && file.getAsJsonObject("hashes").has("sha1")) {
-                        sha1 = file.getAsJsonObject("hashes").get("sha1").getAsString();
-                    }
-                    DownloadManager.downloadAll(java.util.List.of(new DownloadManager.Task(
-                            file.get("url").getAsString(), target, sha1,
-                            file.has("size") ? file.get("size").getAsLong() : -1)), 1, null);
-                    logLine("   ✅ 前置: " + name);
-                } catch (Exception e) {
-                    logLine("   ⚠ 前置下载失败: " + e.getMessage());
-                }
-            }
-        });
+    }
+
+    private JsonObject fetchModrinthVersion(String id) throws Exception {
+        HttpRequest req = HttpRequest.newBuilder(URI.create(
+                        "https://api.modrinth.com/v2/version/" + id))
+                .header("User-Agent", "PCL-CE-Launcher/1.0")
+                .timeout(java.time.Duration.ofSeconds(15)).GET().build();
+        HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+        if (resp.statusCode() != 200) return null;
+        return com.google.gson.JsonParser.parseString(resp.body()).getAsJsonObject();
+    }
+
+    private JsonObject primaryFile(JsonObject version) {
+        if (version == null || !version.has("files") || !version.get("files").isJsonArray()) return null;
+        JsonObject fallback = null;
+        for (var element : version.getAsJsonArray("files")) {
+            JsonObject file = element.getAsJsonObject();
+            if (file.has("primary") && file.get("primary").getAsBoolean()) return file;
+            if (fallback == null) fallback = file;
+        }
+        return fallback;
     }
 
     private String installDirFor(String projectType) {

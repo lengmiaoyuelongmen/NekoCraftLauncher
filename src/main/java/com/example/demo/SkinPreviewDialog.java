@@ -75,6 +75,14 @@ public final class SkinPreviewDialog {
             });
         });
 
+        Button manage = new Button("打开 LittleSkin 材质管理");
+        manage.setOnAction(e -> {
+            try {
+                java.awt.Desktop.getDesktop().browse(java.net.URI.create("https://littleskin.cn/user/player"));
+            } catch (Exception ignored) {
+            }
+        });
+
         Button clear = new Button("清除");
         clear.setOnAction(e -> {
             skin[0] = null;
@@ -86,7 +94,7 @@ public final class SkinPreviewDialog {
             hint.setText("已清除预览");
         });
 
-        VBox controls = new VBox(10, new Label("模型预览"), chooseSkin, chooseCape, account, clear, hint);
+        VBox controls = new VBox(10, new Label("模型预览"), chooseSkin, chooseCape, account, manage, clear, hint);
         controls.setPrefWidth(230);
         HBox content = new HBox(18, canvas, controls);
         dialog.getDialogPane().setContent(content);
