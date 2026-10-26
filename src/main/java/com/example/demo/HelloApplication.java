@@ -116,6 +116,7 @@ public class HelloApplication extends Application {
     private TextField usernameField;
     private PasswordField passwordField;
     private Button loginBtn;
+    private HBox launchBottomRow;
     private Label loginBtnLabel;
     private Button logoutButton;
     private javafx.scene.shape.Circle gameStatusDot;
@@ -401,7 +402,7 @@ public class HelloApplication extends Application {
         crt.heightProperty().addListener((o, a, b) -> paintCrt.run());
         rootWrap.getChildren().add(1, crt);
 
-        Scene scene = new Scene(rootWrap, 1060, 760);
+        Scene scene = new Scene(rootWrap, 1060, 792);
         scene.setFill(Color.TRANSPARENT);
         scene.addEventFilter(javafx.scene.input.DragEvent.DRAG_OVER, event -> {
             File archive = firstImportArchive(event.getDragboard());
@@ -423,7 +424,7 @@ public class HelloApplication extends Application {
         });
         stage.initStyle(javafx.stage.StageStyle.TRANSPARENT);
         stage.setMinWidth(1060);
-        stage.setMinHeight(740);
+        stage.setMinHeight(772);
 
         scene.setOnKeyPressed(e -> {
             if (e.isControlDown() && e.getCode() == javafx.scene.input.KeyCode.K) {
@@ -938,11 +939,11 @@ public class HelloApplication extends Application {
         VBox panel = new VBox(20);
         panel.setPadding(new Insets(25));
 
-        VBox userArea = new VBox(12);
+        VBox userArea = new VBox(0);
         userArea.setPrefWidth(410);
-        userArea.setAlignment(Pos.TOP_CENTER);
+        userArea.setAlignment(Pos.CENTER);
         userArea.setStyle("-fx-background-color: -app-card;"
-                + " -fx-background-radius: 20; -fx-padding: 16;"
+                + " -fx-background-radius: 20; -fx-padding: 14 16 6 16;"
                 + " -fx-border-color: -app-border-2; -fx-border-width: 1; -fx-border-radius: 20;"
                 + " -fx-effect: dropshadow(gaussian, rgba(15,23,42,0.12), 24, 0.12, 0, 8);");
 
@@ -1001,7 +1002,11 @@ public class HelloApplication extends Application {
         });
 
         usernameLabel = new Label("未登录");
-        usernameLabel.setStyle("-fx-font-size: 27px; -fx-font-weight: bold; -fx-text-fill: -app-text;");
+        usernameLabel.setStyle("-fx-font-size: 25px; -fx-font-weight: bold; -fx-text-fill: -app-text;");
+        usernameLabel.setMaxWidth(Double.MAX_VALUE);
+        usernameLabel.setAlignment(Pos.CENTER);
+        usernameLabel.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
+        usernameLabel.setWrapText(false);
         userTypeLabel = new Label("请在下方登录");
         userTypeLabel.setStyle("-fx-font-size: 12.5px; -fx-text-fill: -app-text-dim-2;");
         uuidLabel = new Label("");
@@ -1042,20 +1047,29 @@ public class HelloApplication extends Application {
 
         loginBtn = new Button();
         loginBtnLabel = new Label("登录");
-        loginBtnLabel.setStyle("-fx-text-fill: #ffffff; -fx-font-weight: bold; -fx-font-size: 12.5px;");
-        loginBtn.setGraphic(loginBtnLabel);
+        loginBtnLabel.setTranslateY(3);
+        loginBtnLabel.setStyle("-fx-text-fill: #6fae65; -fx-font-weight: bold; -fx-font-size: 24px;"
+                + " -fx-font-family: 'Microsoft YaHei UI', 'Segoe UI';"
+                + " -fx-effect: dropshadow(gaussian, rgba(255,255,255,0.65), 3, 0.2, 0, 1);");
+        javafx.scene.image.ImageView loginBanner = new javafx.scene.image.ImageView();
+        try (java.io.InputStream in = HelloApplication.class.getResourceAsStream("/login-button.png")) {
+            if (in != null) loginBanner.setImage(new javafx.scene.image.Image(in));
+        } catch (Exception ignored) {
+        }
+        loginBanner.setFitWidth(336);
+        loginBanner.setPreserveRatio(true);
+        loginBanner.setSmooth(true);
+        StackPane loginGraphic = new StackPane(loginBanner, loginBtnLabel);
+        loginGraphic.setAlignment(Pos.CENTER);
+        loginBtn.setGraphic(loginGraphic);
+        loginBtn.setContentDisplay(javafx.scene.control.ContentDisplay.GRAPHIC_ONLY);
         loginBtn.setDefaultButton(true);
         loginBtn.setMaxWidth(Double.MAX_VALUE);
-        loginBtn.setStyle("-fx-background-color: linear-gradient(to bottom, #2dd4bf, #0f766e);"
-                + " -fx-text-fill: #ffffff; -fx-font-weight: bold; -fx-cursor: hand;"
-                + " -fx-background-radius: 9; -fx-padding: 8;");
+        loginBtn.setStyle("-fx-background-color: transparent; -fx-padding: 0; -fx-cursor: hand;");
+        VBox.setMargin(loginBtn, new Insets(22, 0, 0, 0));
         Motion.press(loginBtn);
-        loginBtn.setOnMouseEntered(e -> loginBtn.setStyle("-fx-background-color: linear-gradient(to bottom, #5eead4, #0d9488);"
-                + " -fx-text-fill: #ffffff; -fx-font-weight: bold; -fx-cursor: hand;"
-                + " -fx-background-radius: 9; -fx-padding: 8;"));
-        loginBtn.setOnMouseExited(e -> loginBtn.setStyle("-fx-background-color: linear-gradient(to bottom, #2dd4bf, #0f766e);"
-                + " -fx-text-fill: #ffffff; -fx-font-weight: bold; -fx-cursor: hand;"
-                + " -fx-background-radius: 9; -fx-padding: 8;"));
+        loginBtn.setOnMouseEntered(e -> loginBtn.setOpacity(0.88));
+        loginBtn.setOnMouseExited(e -> loginBtn.setOpacity(1));
 
         Label msHint = new Label("将打开浏览器并显示设备代码；需要已购买 Minecraft。");
         msHint.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 10.5px;");
@@ -1077,7 +1091,10 @@ public class HelloApplication extends Application {
             if (lockedHeight > 0) {
                 Platform.runLater(() -> {
                     if (stageRef != null && !stageRef.isMaximized()) {
-                        if (Math.abs(stageRef.getHeight() - lockedHeight) > 1) stageRef.setHeight(lockedHeight);
+                        double maxHeight = javafx.stage.Screen.getPrimary().getVisualBounds().getHeight() - 40;
+                        double target = is3rd ? Math.min(maxHeight, Math.max(lockedHeight, 830))
+                                : Math.min(maxHeight, Math.max(lockedHeight, 792));
+                        if (Math.abs(stageRef.getHeight() - target) > 1) stageRef.setHeight(target);
                         if (Math.abs(stageRef.getWidth() - lockedWidth) > 1) stageRef.setWidth(lockedWidth);
                     }
                 });
@@ -1188,6 +1205,7 @@ public class HelloApplication extends Application {
         launchBtn.setMaxWidth(Double.MAX_VALUE);
         launchBtn.setPrefHeight(146);
         launchBtn.setMinHeight(146);
+
         String launchNormal = "-fx-background-color: transparent; -fx-padding: 0; -fx-cursor: hand;";
         String launchHover = "-fx-background-color: transparent; -fx-padding: 0; -fx-cursor: hand;";
         launchBtn.setStyle(launchNormal);
@@ -1205,31 +1223,33 @@ public class HelloApplication extends Application {
         Button instSettings = new Button("实例设置");
         for (Button b : new Button[]{instSelect, instSettings}) {
             b.setMaxWidth(Double.MAX_VALUE);
-            b.setStyle("-fx-background-color: transparent; -fx-text-fill: -app-text-2; -fx-font-size: 13px;"
-                    + " -fx-border-color: #4b5563; -fx-border-radius: 4; -fx-background-radius: 4;"
-                    + " -fx-padding: 9; -fx-cursor: hand;");
+            String normalStyle = "-fx-background-color: transparent; -fx-text-fill: -app-text-2;"
+                    + " -fx-font-size: 13px; -fx-border-color: -app-border-soft;"
+                    + " -fx-border-radius: 8; -fx-background-radius: 8; -fx-padding: 7 9; -fx-cursor: hand;";
+            String hoverStyle = "-fx-background-color: -app-hover-2; -fx-text-fill: -app-text;"
+                    + " -fx-font-size: 13px; -fx-border-color: -app-accent;"
+                    + " -fx-border-radius: 8; -fx-background-radius: 8; -fx-padding: 7 9; -fx-cursor: hand;";
+            b.setStyle(normalStyle);
             HBox.setHgrow(b, Priority.ALWAYS);
             Motion.press(b);
-            b.setOnMouseEntered(e -> b.setStyle("-fx-background-color: rgba(255,255,255,0.05);"
-                    + " -fx-text-fill: white; -fx-font-size: 13px;"
-                    + " -fx-border-color: -app-text-muted; -fx-border-radius: 4; -fx-background-radius: 4;"
-                    + " -fx-padding: 9; -fx-cursor: hand;"));
-            b.setOnMouseExited(e -> b.setStyle("-fx-background-color: transparent;"
-                    + " -fx-text-fill: -app-text-2; -fx-font-size: 13px;"
-                    + " -fx-border-color: #4b5563; -fx-border-radius: 4; -fx-background-radius: 4;"
-                    + " -fx-padding: 9; -fx-cursor: hand;"));
+            b.setOnMouseEntered(e -> b.setStyle(hoverStyle));
+            b.setOnMouseExited(e -> b.setStyle(normalStyle));
         }
         instSelect.setOnAction(e -> switchPage("instances"));
         instSettings.setOnAction(e -> openInstanceSettings("overview"));
         HBox bottomRow = new HBox(10, instSelect, instSettings);
         bottomRow.setAlignment(Pos.CENTER);
+        launchBottomRow = bottomRow;
 
         // 版本选择交给「实例选择」页，启动页只显示当前版本（与 PCL 一致）
         versionComboBox.setVisible(false);
         versionComboBox.setManaged(false);
 
         Region profileSpacer = new Region();
-        VBox.setVgrow(profileSpacer, Priority.ALWAYS);
+        profileSpacer.setMinHeight(0);
+        profileSpacer.setPrefHeight(0);
+        profileSpacer.setMaxHeight(0);
+        VBox.setVgrow(profileSpacer, Priority.NEVER);
         Button skinPreviewBtn = new Button("皮肤 / 披风预览");
         skinPreviewBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: -app-text-muted;"
                 + " -fx-font-size: 10.5px; -fx-border-color: -app-border-soft; -fx-border-radius: 8;"
@@ -1256,6 +1276,13 @@ public class HelloApplication extends Application {
         accountTools.setAlignment(Pos.CENTER);
         userArea.getChildren().addAll(avatarPane, usernameLabel, userTypeLabel, uuidLabel, accountTools,
                 loginCard, logoutButton, playerInfoBox, profileSpacer, launchBtn, bottomRow);
+        // 黄金分割／斐波那契间距：8、13、21
+        VBox.setMargin(avatarPane, new Insets(6, 0, 0, 0));
+        VBox.setMargin(usernameLabel, new Insets(6, 0, 0, 0));
+        VBox.setMargin(accountTools, new Insets(10, 0, 0, 0));
+        VBox.setMargin(loginCard, new Insets(10, 0, 0, 0));
+        VBox.setMargin(launchBtn, new Insets(16, 0, 0, 0));
+        VBox.setMargin(bottomRow, new Insets(10, 0, 6, 0));
 
         VBox logContainer = new VBox(4);
         logContainer.setStyle("-fx-background-color: -app-card;"
@@ -5563,11 +5590,14 @@ public class HelloApplication extends Application {
         String password = passwordField.getText().trim();
 
         if (!type.equals("正版登录 (微软)") && username.isEmpty()) {
-            logArea.appendText("⚠️ 请输入账号/玩家名\n");
+            Toast.warn("请输入账号或玩家名");
+            usernameField.requestFocus();
             return;
         }
         if (type.equals("第三方外置登录") && (serverUrl.isEmpty() || password.isEmpty())) {
-            logArea.appendText("⚠️ 请填写完整的验证服务器地址和密码\n");
+            Toast.warn(serverUrl.isEmpty() ? "请填写验证服务器地址" : "请填写密码");
+            if (serverUrl.isEmpty()) serverField.requestFocus();
+            else passwordField.requestFocus();
             return;
         }
 
