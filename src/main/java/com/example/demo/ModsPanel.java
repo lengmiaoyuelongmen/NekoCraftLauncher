@@ -337,6 +337,10 @@ public final class ModsPanel extends VBox {
     }
 
     private void refreshLocal(boolean force) {
+        try {
+            ModpackImport.flattenMods(modsDir, msg -> status.setText(msg));
+        } catch (Exception ignored) {
+        }
         File[] files = modsDir.listFiles((d, n) -> {
             String lower = n.toLowerCase();
             return lower.endsWith(".jar") || lower.endsWith(".jar.disabled");

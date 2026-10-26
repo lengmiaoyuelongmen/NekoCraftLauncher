@@ -4835,6 +4835,7 @@ public class HelloApplication extends Application {
                 }
                 int count = ModpackImport.extract(archive, target, this::logLine);
                 count += ModpackImport.installIndexedFiles(archive, target, this::logLine);
+                ModpackImport.flattenMods(target, this::logLine);
                 Files.writeString(new File(target, "modpack-source.txt").toPath(),
                         "name=" + pack.name() + "\nformat=" + pack.format()
                                 + "\narchive=" + archive.getAbsolutePath() + "\n", StandardCharsets.UTF_8);

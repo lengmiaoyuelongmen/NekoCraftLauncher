@@ -203,6 +203,10 @@ public final class ModpackImport {
                 JsonObject file = element.getAsJsonObject();
                 String path = file.has("path") ? file.get("path").getAsString() : "";
                 if (path.isBlank()) continue;
+                // Minecraft 只扫描 mods 根目录，索引里的 mods/子目录文件统一摊平
+                if (path.startsWith("mods/") && path.indexOf('/', 5) > 0) {
+                    path = "mods/" + new File(path).getName();
+                }
                 File out = new File(targetDir, path);
                 if (!out.toPath().normalize().startsWith(targetDir.toPath())) continue;
                 String url = "";
@@ -227,6 +231,33 @@ public final class ModpackImport {
         if (log != null) log.accept("索引文件完成: " + installed + "/" + tasks.size()
                 + (stats.failed > 0 ? "，失败 " + stats.failed : ""));
         return installed;
+    }
+
+    /** 将 mods/** 子目录里的 jar 移到 mods 根目录，否则启动器/Minecraft 不会读取。 */
+    public static int flattenMods(File targetDir, Consumer<String> log) throws Exception {
+        File mods = new File(targetDir, "mods");
+        if (!mods.isDirectory()) return 0;
+        int moved = 0;
+        try (var stream = java.nio.file.Files.walk(mods.toPath())) {
+            for (java.nio.file.Path path : stream.toList()) {
+                if (!java.nio.file.Files.isRegularFile(path)) continue;
+                String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
+                if (!(name.endsWith(".jar") || name.endsWith(".jar.disabled"))) continue;
+                if (path.getParent().equals(mods.toPath())) continue;
+                File dest = new File(mods, path.getFileName().toString());
+                int suffix = 2;
+                while (dest.exists()) {
+                    String raw = path.getFileName().toString();
+                    int dot = raw.toLowerCase(Locale.ROOT).endsWith(".jar.disabled")
+                            ? raw.length() - ".jar.disabled".length() : raw.length() - 4;
+                    dest = new File(mods, raw.substring(0, dot) + "-" + suffix++ + raw.substring(dot));
+                }
+                java.nio.file.Files.move(path, dest.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                moved++;
+            }
+        }
+        if (moved > 0 && log != null) log.accept("已整理 " + moved + " 个嵌套模组到 mods 根目录");
+        return moved;
     }
 
     private static String mapPath(String raw) {
