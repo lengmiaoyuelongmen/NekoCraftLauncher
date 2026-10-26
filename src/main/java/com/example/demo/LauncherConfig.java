@@ -101,6 +101,8 @@ public class LauncherConfig {
     private String backgroundImage = "";
     private String avatarImage = "";
     private String lastImportDir = "";
+    private String previewSkinPath = "";
+    private String previewCapePath = "";
 
     /** 界面字体缩放（1.0 = 标准） */
     private double uiFontScale = 1.0;
@@ -226,6 +228,8 @@ public class LauncherConfig {
         if (jvmArgs == null) jvmArgs = "";
         if (avatarImage == null) avatarImage = "";
         if (lastImportDir == null) lastImportDir = "";
+        if (previewSkinPath == null) previewSkinPath = "";
+        if (previewCapePath == null) previewCapePath = "";
         if (gameDir == null || gameDir.isBlank()) gameDir = ".minecraft";
         if (gameDirs == null) gameDirs = new java.util.ArrayList<>();
         gameDirs.removeIf(dir -> dir == null || dir.isBlank());
@@ -476,6 +480,22 @@ public class LauncherConfig {
 
     public void setAccentColor(String accentColor) {
         this.accentColor = accentColor;
+    }
+
+    public String getPreviewSkinPath() {
+        return previewSkinPath == null ? "" : previewSkinPath;
+    }
+
+    public void setPreviewSkinPath(String path) {
+        this.previewSkinPath = path;
+    }
+
+    public String getPreviewCapePath() {
+        return previewCapePath == null ? "" : previewCapePath;
+    }
+
+    public void setPreviewCapePath(String path) {
+        this.previewCapePath = path;
     }
 
     public String getLastImportDir() {

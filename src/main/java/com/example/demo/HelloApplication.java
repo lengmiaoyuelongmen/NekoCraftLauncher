@@ -1230,7 +1230,13 @@ public class HelloApplication extends Application {
 
         Region profileSpacer = new Region();
         VBox.setVgrow(profileSpacer, Priority.ALWAYS);
-        userArea.getChildren().addAll(avatarPane, usernameLabel, userTypeLabel, uuidLabel,
+        Button skinPreviewBtn = new Button("皮肤 / 披风预览");
+        skinPreviewBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: -app-text-muted;"
+                + " -fx-font-size: 10.5px; -fx-border-color: -app-border-soft; -fx-border-radius: 8;"
+                + " -fx-background-radius: 8; -fx-padding: 3 10; -fx-cursor: hand;");
+        skinPreviewBtn.setOnAction(e -> SkinPreviewDialog.show(stageRef, config,
+                currentSession == null ? null : currentSession.getSkinUrl()));
+        userArea.getChildren().addAll(avatarPane, usernameLabel, userTypeLabel, uuidLabel, skinPreviewBtn,
                 loginCard, logoutButton, playerInfoBox, profileSpacer, launchBtn, bottomRow);
 
         VBox logContainer = new VBox(4);
