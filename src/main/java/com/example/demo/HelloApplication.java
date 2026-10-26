@@ -1236,7 +1236,19 @@ public class HelloApplication extends Application {
                 + " -fx-background-radius: 8; -fx-padding: 3 10; -fx-cursor: hand;");
         skinPreviewBtn.setOnAction(e -> SkinPreviewDialog.show(stageRef, config,
                 currentSession == null ? null : currentSession.getSkinUrl()));
-        userArea.getChildren().addAll(avatarPane, usernameLabel, userTypeLabel, uuidLabel, skinPreviewBtn,
+        Button accountManagerBtn = new Button("账户管理");
+        accountManagerBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: -app-text-muted;"
+                + " -fx-font-size: 10.5px; -fx-border-color: -app-border-soft; -fx-border-radius: 8;"
+                + " -fx-background-radius: 8; -fx-padding: 3 10; -fx-cursor: hand;");
+        accountManagerBtn.setOnAction(e -> showAccountManager());
+        Button healthBtn = new Button("一键体检");
+        healthBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: -app-text-muted;"
+                + " -fx-font-size: 10.5px; -fx-border-color: -app-border-soft; -fx-border-radius: 8;"
+                + " -fx-background-radius: 8; -fx-padding: 3 10; -fx-cursor: hand;");
+        healthBtn.setOnAction(e -> showHealthCheck());
+        HBox accountTools = new HBox(6, skinPreviewBtn, accountManagerBtn, healthBtn);
+        accountTools.setAlignment(Pos.CENTER);
+        userArea.getChildren().addAll(avatarPane, usernameLabel, userTypeLabel, uuidLabel, accountTools,
                 loginCard, logoutButton, playerInfoBox, profileSpacer, launchBtn, bottomRow);
 
         VBox logContainer = new VBox(4);
@@ -5244,6 +5256,136 @@ public class HelloApplication extends Application {
         return value;
     }
 
+    private void showHealthCheck() {
+        String id = currentInstanceId();
+        File game = new File(config.getGameDir());
+        boolean versionOk = id != null && VersionProfile.isInstalled(game, id);
+        File mods = InstanceDirs.mods(game, id, config.isIsolation());
+        int modCount = 0;
+        File[] jars = mods.listFiles((d, n) -> {
+            String lower = n.toLowerCase(java.util.Locale.ROOT);
+            return lower.endsWith(".jar") || lower.endsWith(".jar.disabled");
+        });
+        if (jars != null) modCount = jars.length;
+        java.io.File[] reports = new File(game, "crash-reports")
+                .listFiles((d, n) -> n.endsWith(".txt"));
+        boolean hasCrash = reports != null && reports.length > 0;
+
+        javafx.scene.control.Dialog<Void> dialog = new javafx.scene.control.Dialog<>();
+        dialog.initOwner(stageRef);
+        dialog.setTitle("一键体检");
+        dialog.setHeaderText(id == null ? "还没有选择实例" : "实例 " + id);
+        VBox rows = new VBox(8,
+                healthRow(versionOk ? "正常" : "缺失", versionOk
+                        ? "版本文件存在" : "版本 JSON / 客户端文件不完整", versionOk),
+                healthRow("正常", "Java 由启动器自动选择", true),
+                healthRow(modCount > 0 || versionOk ? "正常" : "提示",
+                        modCount + " 个模组文件", versionOk),
+                healthRow(hasCrash ? "有记录" : "正常",
+                        hasCrash ? "发现 " + reports.length + " 条崩溃记录" : "未发现崩溃记录", !hasCrash));
+        Button fullCheck = new Button("运行完整性检查");
+        fullCheck.setDisable(id == null);
+        fullCheck.setOnAction(e -> {
+            if (id != null) checkInstance(Instance.of(game, id));
+        });
+        Button openCrash = new Button("打开崩溃目录");
+        openCrash.setDisable(!hasCrash);
+        openCrash.setOnAction(e -> openDir(new File(game, "crash-reports")));
+        HBox actions = new HBox(8, fullCheck, openCrash);
+        dialog.getDialogPane().setContent(new VBox(12, rows, actions));
+        dialog.getDialogPane().getButtonTypes().add(javafx.scene.control.ButtonType.CLOSE);
+        dialog.showAndWait();
+    }
+
+    private HBox healthRow(String level, String message, boolean ok) {
+        Label dot = new Label(ok ? "●" : "●");
+        dot.setStyle("-fx-text-fill: " + (ok ? "#4CAF50" : "#FF9800") + "; -fx-font-size: 14px;");
+        Label levelLabel = new Label(level);
+        levelLabel.setMinWidth(48);
+        levelLabel.setStyle("-fx-text-fill: " + (ok ? "#4CAF50" : "#FF9800") + "; -fx-font-size: 11px; -fx-font-weight: bold;");
+        Label text = new Label(message);
+        text.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 12px;");
+        HBox row = new HBox(8, dot, levelLabel, text);
+        row.setAlignment(Pos.CENTER_LEFT);
+        row.setPadding(new Insets(7, 10, 7, 10));
+        row.setStyle("-fx-background-color: -app-row2; -fx-background-radius: 8;");
+        return row;
+    }
+
+    private void showAccountManager() {
+        javafx.scene.control.Dialog<Void> dialog = new javafx.scene.control.Dialog<>();
+        dialog.initOwner(stageRef);
+        dialog.setTitle("账户管理");
+        dialog.setHeaderText("已保存的账户");
+        VBox list = new VBox(8);
+        java.util.List<AccountStore.Account> accounts = AccountStore.list();
+        if (accounts.isEmpty()) {
+            Label empty = new Label("还没有保存的账户，登录后会自动保存。");
+            empty.setStyle("-fx-text-fill: -app-text-muted;");
+            list.getChildren().add(empty);
+        }
+        for (AccountStore.Account account : accounts) {
+            Label name = new Label(account.username());
+            name.setStyle("-fx-text-fill: -app-text; -fx-font-size: 13px; -fx-font-weight: bold;");
+            Label meta = new Label(account.loginType()
+                    + (account.server().isBlank() ? "" : " · " + account.server()));
+            meta.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 10px;");
+            VBox info = new VBox(2, name, meta);
+            HBox.setHgrow(info, Priority.ALWAYS);
+            Button use = new Button("切换");
+            use.setOnAction(e -> {
+                switchAccount(account);
+                dialog.close();
+            });
+            Button remove = new Button("删除");
+            remove.setStyle("-fx-background-color: transparent; -fx-text-fill: #f87171; -fx-cursor: hand;");
+            remove.setOnAction(e -> {
+                AccountStore.remove(account.username());
+                dialog.close();
+                showAccountManager();
+            });
+            HBox row = new HBox(10, info, use, remove);
+            row.setAlignment(Pos.CENTER_LEFT);
+            row.setPadding(new Insets(8, 10, 8, 10));
+            row.setStyle("-fx-background-color: -app-row2; -fx-background-radius: 9;");
+            list.getChildren().add(row);
+        }
+        Button add = new Button("添加账户");
+        add.setOnAction(e -> {
+            dialog.close();
+            logout();
+        });
+        dialog.getDialogPane().setContent(new VBox(12, list, add));
+        dialog.getDialogPane().getButtonTypes().add(javafx.scene.control.ButtonType.CLOSE);
+        dialog.showAndWait();
+    }
+
+    private void switchAccount(AccountStore.Account account) {
+        UserSession session = AccountStore.toSession(account);
+        currentSession = session;
+        SessionStore.save(session, account.loginType(), account.server());
+        usernameLabel.setText(account.username());
+        applySessionUi(true);
+        userTypeLabel.setText(account.userType().isBlank() ? account.loginType() : account.userType());
+        userTypeLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: #4CAF50;");
+        updatePlayerInfo(userTypeLabel.getText(), account.server(), session);
+        if (session.getUuid() != null) {
+            uuidLabel.setText("UUID: " + session.getUuid().toString().substring(0, 13) + "...");
+        } else {
+            uuidLabel.setText("");
+        }
+        if (loginTypeComboRef != null) {
+            loginTypeComboRef.setValue(loginTypeComboRef.getItems().contains(account.loginType())
+                    ? account.loginType() : account.loginType());
+        }
+        if (serverFieldRef != null && !account.server().isBlank()) {
+            serverFieldRef.getEditor().setText(account.server());
+        }
+        if (account.skinUrl() != null && !account.skinUrl().isBlank()) loadSkinHead(account.skinUrl());
+        Toast.ok("已切换到账户：" + account.username());
+        logMessage("👤 已切换账户: " + account.username());
+    }
+
     private void logout() {
         currentSession = null;
         SessionStore.clear();
@@ -5339,6 +5481,7 @@ public class HelloApplication extends Application {
                     uuidLabel.setText("UUID: " + session.getUuid().toString().substring(0, 13) + "...");
                     currentSession = session;
                     SessionStore.save(session, type, serverUrl);
+                    AccountStore.upsert(session, type, serverUrl);
 
                     if (versionComboBox.getItems() != null && !versionComboBox.getItems().isEmpty()) {
                         if (versionComboBox.getValue() == null) {
