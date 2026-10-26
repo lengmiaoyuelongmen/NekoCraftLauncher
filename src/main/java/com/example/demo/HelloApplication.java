@@ -2645,6 +2645,16 @@ public class HelloApplication extends Application {
         listView.setPrefHeight(300);
         listView.setStyle("-fx-background-color: transparent; -fx-control-inner-background: transparent; -fx-border-color: transparent;");
         listView.setCellFactory(param -> new McVersionCell());
+        // 版本列表内滚动时不要冒泡到外层页面，否则鼠标在列表上滚轮会把整页往上带走
+        listView.addEventFilter(javafx.scene.input.ScrollEvent.SCROLL, event -> {
+            event.consume();
+            if (listView.lookup(".scroll-bar:vertical") instanceof javafx.scene.control.ScrollBar bar
+                    && bar.getMax() > bar.getMin() && bar.isVisible()) {
+                double range = bar.getMax() - bar.getMin();
+                double next = bar.getValue() - event.getDeltaY() / 1000.0 * range;
+                bar.setValue(Math.max(bar.getMin(), Math.min(bar.getMax(), next)));
+            }
+        });
 
         content.getChildren().add(listView);
 

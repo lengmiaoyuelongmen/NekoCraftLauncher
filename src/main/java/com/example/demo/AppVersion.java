@@ -1,9 +1,9 @@
 package com.example.demo;
 
-/** 鐗堟湰鍙烽泦涓畾涔夛紝瀹夎鍖?/ 鍏充簬椤?/ 鏇存柊妫€鏌ュ叡鐢ㄣ€?*/
+/** 版本号集中定义，安装包 / 关于页 / 更新检查共用。 */
 public final class AppVersion {
 
-    public static final String CURRENT = "2.4.0";
+    public static final String CURRENT = "2.4.1";
 
     private AppVersion() {
     }

@@ -45,6 +45,8 @@ import java.util.function.Consumer;
  */
 public final class SettingsPanel extends VBox {
 
+    private javafx.scene.layout.HBox windowRatioRow;
+
     private final LauncherConfig config;
     private final Consumer<String> log;
 
@@ -145,6 +147,40 @@ public final class SettingsPanel extends VBox {
         memorySpinner = spinner(512, 16384, config.getMemoryMb(), 512, 130);
         widthSpinner = spinner(320, 3840, config.getWindowWidth(), 10, 100);
         heightSpinner = spinner(240, 2160, config.getWindowHeight(), 10, 100);
+
+        javafx.scene.control.ToggleGroup ratioGroup = new javafx.scene.control.ToggleGroup();
+        javafx.scene.layout.HBox ratioRow = new javafx.scene.layout.HBox(6);
+        String[][] ratios = {{"16:9", "16", "9"}, {"16:10", "16", "10"},
+                {"4:3", "4", "3"}, {"21:9", "21", "9"}};
+        double currentRatio = config.getWindowHeight() <= 0 ? 0
+                : (double) config.getWindowWidth() / config.getWindowHeight();
+        for (String[] ratio : ratios) {
+            double value = Double.parseDouble(ratio[1]) / Double.parseDouble(ratio[2]);
+            javafx.scene.control.ToggleButton chip = new javafx.scene.control.ToggleButton(ratio[0]);
+            chip.setToggleGroup(ratioGroup);
+            chip.setUserData(value);
+            chip.setStyle("-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 4 11;"
+                    + " -fx-background-color: -app-row2; -fx-text-fill: -app-text-muted; -fx-cursor: hand;");
+            chip.setOnAction(e -> {
+                if (!chip.isSelected()) {
+                    chip.setSelected(true);
+                    return;
+                }
+                int width = widthSpinner.getValue();
+                int height = (int) Math.round(width / value);
+                height = Math.max(240, Math.min(2160, height));
+                heightSpinner.getValueFactory().setValue(height);
+            });
+            ratioGroup.selectedToggleProperty().addListener((obs, old, selected) -> {
+                boolean on = selected == chip;
+                chip.setStyle("-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 4 11;"
+                        + " -fx-cursor: hand; -fx-background-color: " + (on ? "-app-accent" : "-app-row2") + ";"
+                        + " -fx-text-fill: " + (on ? "#06251f" : "-app-text-muted") + ";");
+            });
+            if (Math.abs(currentRatio - value) < 0.02) chip.setSelected(true);
+            ratioRow.getChildren().add(chip);
+        }
+        windowRatioRow = ratioRow;
 
         ToggleGroup memoryGroup = new ToggleGroup();
         autoMemoryRadio = new RadioButton("自动配置");
@@ -401,6 +437,7 @@ public final class SettingsPanel extends VBox {
                 new HBox(8, memorySpinner, hint("MB")));
         VBox card = card(
                 section("启动设置"),
+                labeled("窗口比例", windowRatioRow),
                 labeled("窗口尺寸", new HBox(8, widthSpinner, new Label("×"), heightSpinner, hint("像素"))),
                 section("游戏内存"),
                 new HBox(18, autoMemoryRadio, customMemoryRadio),
