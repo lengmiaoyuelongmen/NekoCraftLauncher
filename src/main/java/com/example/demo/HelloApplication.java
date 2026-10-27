@@ -1485,15 +1485,16 @@ public class HelloApplication extends Application {
         TextField field = commandField;
         field.setPromptText("命令：help 查看启动器命令；/give @s diamond 64 发送到游戏");
         field.setPrefHeight(32);
-        field.setStyle("-fx-background-color: -app-input; -fx-text-fill: -app-text;"
+        field.setStyle("-fx-background-color: transparent; -fx-text-fill: -app-text;"
                 + " -fx-prompt-text-fill: -app-text-muted; -fx-background-radius: 8;"
-                + " -fx-border-color: -app-border-3; -fx-border-radius: 8;"
-                + " -fx-padding: 6 10; -fx-font-size: 12px; -fx-font-family: 'Cascadia Mono', 'Consolas', monospace;");
+                + " -fx-border-color: transparent; -fx-border-radius: 8;"
+                + " -fx-padding: 6 10; -fx-font-size: 12px;"
+                + " -fx-font-family: 'Microsoft YaHei UI', 'Segoe UI';");
         HBox.setHgrow(field, Priority.ALWAYS);
 
         Button send = new Button("发送");
-        send.setStyle("-fx-background-color: -app-row3; -fx-text-fill: -app-text-2; -fx-background-radius: 8;"
-                + " -fx-padding: 5 14; -fx-font-size: 12px; -fx-cursor: hand;");
+        send.setStyle("-fx-background-color: -app-accent; -fx-text-fill: #06251f; -fx-font-weight: bold;"
+                + " -fx-background-radius: 8; -fx-padding: 5 16; -fx-font-size: 12px; -fx-cursor: hand;");
         Motion.press(send);
 
         Runnable submit = () -> {
@@ -1632,6 +1633,9 @@ public class HelloApplication extends Application {
 
         HBox bar = new HBox(8, commandAiToggle, prefix, field, send);
         bar.setAlignment(Pos.CENTER_LEFT);
+        bar.setPadding(new Insets(4));
+        bar.setStyle("-fx-background-color: -app-row2; -fx-background-radius: 12;"
+                + " -fx-border-color: -app-border-3; -fx-border-radius: 12;");
         applyAiMode();
         return bar;
     }
@@ -1646,7 +1650,7 @@ public class HelloApplication extends Application {
         commandAiToggle.setContentDisplay(javafx.scene.control.ContentDisplay.LEFT);
         commandAiToggle.setGraphicTextGap(5);
         commandAiToggle.setStyle(on
-                ? "-fx-background-color: #9ca3af; -fx-text-fill: #111827; -fx-font-weight: bold;"
+                ? "-fx-background-color: -app-accent; -fx-text-fill: #06251f; -fx-font-weight: bold;"
                 + " -fx-background-radius: 8; -fx-padding: 5 10; -fx-font-size: 11px; -fx-cursor: hand;"
                 : "-fx-background-color: transparent; -fx-text-fill: -app-text-2;"
                 + " -fx-border-color: -app-border-3; -fx-border-radius: 8; -fx-background-radius: 8;"
@@ -6340,6 +6344,26 @@ public class HelloApplication extends Application {
         }
     }
 
+    /** 把实例 options.txt 的语言固定为简体中文，避免首次启动变英文。 */
+    private void ensureChineseLanguage(File instanceDir) {
+        try {
+            if (!instanceDir.isDirectory()) instanceDir.mkdirs();
+            File options = new File(instanceDir, "options.txt");
+            if (!options.isFile()) {
+                java.nio.file.Files.writeString(options.toPath(), "lang:zh_cn\n", java.nio.charset.StandardCharsets.UTF_8);
+                return;
+            }
+            String text = java.nio.file.Files.readString(options.toPath(), java.nio.charset.StandardCharsets.UTF_8);
+            if (text.contains("lang:")) {
+                text = text.replaceAll("(?m)^lang:.*$", "lang:zh_cn");
+            } else {
+                text = text + (text.endsWith("\n") ? "" : "\n") + "lang:zh_cn\n";
+            }
+            java.nio.file.Files.writeString(options.toPath(), text, java.nio.charset.StandardCharsets.UTF_8);
+        } catch (Exception ignored) {
+        }
+    }
+
     private void startGame(VersionProfile profile) {
         launchPrepareStart = System.currentTimeMillis();
         File gameDir = new File(config.getGameDir());
@@ -6395,11 +6419,13 @@ public class HelloApplication extends Application {
                                     launchConfig.getJvmArgs(), plan.jvmArgs()));
                             logArea.appendText("⚡ 智能性能：" + plan.summary() + "\n");
                         }
+                        File instanceDir = InstanceDirs.root(gameDir, profile.getId(), config.isIsolation());
+                        ensureChineseLanguage(instanceDir);
                         List<String> command = LaunchCommand.build(profile, currentSession, launchConfig, gameDir,
-                                javaPath, nativesDir, (File) res[0]);
+                                instanceDir, javaPath, nativesDir, (File) res[0]);
                         gameInstanceId = profile.getId();
                         gameStartAt = System.currentTimeMillis();
-                        startProcess(command, gameDir);
+                        startProcess(command, instanceDir);
                     } catch (Exception e) {
                         logArea.appendText("❌ 启动失败: " + e.getMessage() + "\n");
                         showLaunchFailureHint("启动失败: " + e.getMessage());

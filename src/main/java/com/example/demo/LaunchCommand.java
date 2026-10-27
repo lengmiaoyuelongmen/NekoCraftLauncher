@@ -111,6 +111,8 @@ public final class LaunchCommand {
         command.add(javaPath);
         command.add("-Xmx" + config.getMemoryMb() + "M");
         command.add("-Dfile.encoding=UTF-8");
+        command.add("-Duser.language=zh");
+        command.add("-Duser.country=CN");
         command.add("-Dminecraft.launcher.brand=MCLauncher");
 
         String extra = config.getJvmArgs() == null ? "" : config.getJvmArgs().trim();
@@ -148,6 +150,10 @@ public final class LaunchCommand {
         }
 
         System.out.println("[launch] " + profile.getId() + " 类路径库数量=" + libCount);
+        if (!command.contains("--lang")) {
+            command.add("--lang");
+            command.add("zh_CN");
+        }
         return command;
     }
 
