@@ -100,6 +100,7 @@ public class LauncherConfig {
     /** 启动页背景图片路径（空 = 无） */
     private String backgroundImage = "";
     private String avatarImage = "";
+    private boolean avatarUseSkin = false;
     private String lastImportDir = "";
     private String previewSkinPath = "";
     private String previewCapePath = "";
@@ -514,6 +515,14 @@ public class LauncherConfig {
 
     public void setLastImportDir(String lastImportDir) {
         this.lastImportDir = lastImportDir;
+    }
+
+    public boolean isAvatarUseSkin() {
+        return avatarUseSkin;
+    }
+
+    public void setAvatarUseSkin(boolean avatarUseSkin) {
+        this.avatarUseSkin = avatarUseSkin;
     }
 
     public String getAvatarImage() {

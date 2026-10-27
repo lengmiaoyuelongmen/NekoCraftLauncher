@@ -140,6 +140,7 @@ public class HelloApplication extends Application {
     private Button commandAiToggle;
     private boolean aiBusy;
     private final java.util.List<DeepSeekClient.Message> aiHistory = new java.util.ArrayList<>();
+    private TextArea aiChatArea;
     private Process gameProcess;
     private volatile boolean gameStopRequested;
     private ProgressBar downloadProgress;
@@ -322,6 +323,13 @@ public class HelloApplication extends Application {
         primaryStage.maximizedProperty().addListener((obs, oldMax, max) -> {
             if (maximizeWindowButton != null) {
                 maximizeWindowButton.setGraphic(windowIcon(max ? WindowIcon.RESTORE : WindowIcon.MAXIMIZE));
+            }
+            if (!max && primaryStage != null) {
+                Platform.runLater(() -> {
+                    primaryStage.setWidth(1060);
+                    primaryStage.setHeight(792);
+                    primaryStage.centerOnScreen();
+                });
             }
         });
         VBox root = new VBox(topBar, contentStack);
@@ -965,7 +973,35 @@ public class HelloApplication extends Application {
         javafx.scene.control.Tooltip skinTip = new javafx.scene.control.Tooltip("点击选择头像，或把 PNG/JPG 拖到这里");
         javafx.scene.control.Tooltip.install(avatarPane, skinTip);
         avatarPane.setCursor(javafx.scene.Cursor.HAND);
-        avatarPane.setOnMouseClicked(e -> chooseAvatar());
+        avatarPane.setOnMouseClicked(e -> {
+            if (e.getButton() == javafx.scene.input.MouseButton.SECONDARY) {
+                javafx.scene.control.ContextMenu menu = new javafx.scene.control.ContextMenu();
+                javafx.scene.control.MenuItem choose = new javafx.scene.control.MenuItem("选择自定义头像");
+                choose.setOnAction(ev -> chooseAvatar());
+                javafx.scene.control.MenuItem toggle = new javafx.scene.control.MenuItem(
+                        config.isAvatarUseSkin() ? "切换为自定义头像" : "切换为皮肤头像");
+                toggle.setOnAction(ev -> toggleAvatarMode());
+                javafx.scene.control.MenuItem reset = new javafx.scene.control.MenuItem("恢复默认头像");
+                reset.setOnAction(ev -> {
+                    config.setAvatarImage("");
+                    config.setAvatarUseSkin(false);
+                    config.save();
+                    avatarImageView.setImage(null);
+                    Toast.ok("已恢复默认头像");
+                });
+                menu.getItems().addAll(choose, toggle, reset);
+                menu.show(avatarPane, e.getScreenX(), e.getScreenY());
+                e.consume();
+                return;
+            }
+            if (currentSession != null && currentSession.getSkinUrl() != null
+                    && !currentSession.getSkinUrl().isBlank()
+                    && config.getAvatarImage() != null && !config.getAvatarImage().isBlank()) {
+                toggleAvatarMode();
+            } else {
+                chooseAvatar();
+            }
+        });
         applyAvatarOverride();
         avatarPane.setOnDragOver(event -> {
             if (event.getDragboard().hasFiles() || event.getDragboard().hasUrl()
@@ -1291,12 +1327,23 @@ public class HelloApplication extends Application {
                 + " -fx-effect: dropshadow(gaussian, rgba(15,23,42,0.12), 24, 0.12, 0, 8);");
         logArea = new TextArea();
         logArea.setEditable(false);
-        logArea.setWrapText(true);
+        logArea.setWrapText(false);
         logArea.setStyle("-fx-control-inner-background: -app-bg-2; -fx-text-fill: -app-text-dim;"
                 + " -fx-font-family: 'Microsoft YaHei UI', 'Segoe UI Variable Text', 'Segoe UI';"
                 + " -fx-background-radius: 11;"
-                + " -fx-border-color: rgba(255,255,255,0.05); -fx-border-radius: 11; -fx-font-size: 12.5px;");
+                + " -fx-border-color: rgba(255,255,255,0.05); -fx-border-radius: 11; -fx-font-size: 11.5px;");
         VBox.setVgrow(logArea, Priority.ALWAYS);
+        aiChatArea = new TextArea();
+        aiChatArea.setEditable(false);
+        aiChatArea.setWrapText(true);
+        aiChatArea.setPrefHeight(120);
+        aiChatArea.setMinHeight(100);
+        aiChatArea.setMaxHeight(160);
+        aiChatArea.setStyle("-fx-control-inner-background: -app-card-alt; -fx-text-fill: -app-text;"
+                + " -fx-font-size: 11.5px; -fx-background-radius: 10;"
+                + " -fx-border-color: -app-border-soft; -fx-border-radius: 10;");
+        aiChatArea.setVisible(false);
+        aiChatArea.setManaged(false);
 
         Label downloadTitle = new Label("下载任务");
         downloadTitle.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
@@ -1381,7 +1428,7 @@ public class HelloApplication extends Application {
         }
         HBox commandBar = createCommandBar();
         HBox insightBar = buildLaunchInsightBar();
-        logContainer.getChildren().addAll(insightBar, logPane, commandBar, logActions, downloadBar);
+        logContainer.getChildren().addAll(insightBar, aiChatArea, logPane, commandBar, logActions, downloadBar);
         HBox.setHgrow(logContainer, Priority.ALWAYS);
 
         HBox mainContent = new HBox(25, userArea, logContainer);
@@ -1660,11 +1707,26 @@ public class HelloApplication extends Application {
             commandPrefix.getChildren().setAll(Icons.node(on ? "sparkles" : "terminal", 14,
                     on ? "#d1d5db" : "#9ca3af"));
         }
+        if (aiChatArea != null) {
+            aiChatArea.setVisible(on);
+            aiChatArea.setManaged(on);
+        }
         commandField.setPromptText(on
                 ? (config.getAiApiKey().isBlank()
                     ? "本地免费助手：问启动器 / MC 问题；设置 → AI 可填 Key"
                     : "问 DeepSeek：例如「这个报错怎么解决？」")
                 : "命令：help 查看启动器命令；/give @s diamond 64 发送到游戏");
+    }
+
+    private void appendAiChat(String text) {
+        if (aiChatArea == null) return;
+        aiChatArea.setVisible(true);
+        aiChatArea.setManaged(true);
+        String existing = aiChatArea.getText();
+        String next = (existing == null || existing.isBlank() ? "" : existing + "\n\n") + text;
+        if (next.length() > 24000) next = next.substring(next.length() - 24000);
+        aiChatArea.setText(next);
+        aiChatArea.setScrollTop(Double.MAX_VALUE);
     }
 
     private void sendAiMessage(String text) {
@@ -1679,8 +1741,7 @@ public class HelloApplication extends Application {
             String reply = LocalAiAssistant.answer(text, new File(config.getGameDir()));
             aiHistory.add(new DeepSeekClient.Message("assistant", reply));
             trimAiHistory();
-            logArea.appendText("🆓 本地免费助手（未配置 Key）：\n" + reply + "\n");
-            logArea.setScrollTop(Double.MAX_VALUE);
+            appendAiChat("你：" + text + "\n\n猫娘助手：" + reply);
             return;
         }
 
@@ -1709,8 +1770,7 @@ public class HelloApplication extends Application {
                     aiBusy = false;
                     aiHistory.add(new DeepSeekClient.Message("assistant", reply));
                     trimAiHistory();
-                    logArea.appendText("🤖 DeepSeek：\n" + reply + "\n");
-                    logArea.setScrollTop(Double.MAX_VALUE);
+                    appendAiChat("你：" + text + "\n\nDeepSeek：" + reply);
                 }))
                 .exceptionally(ex -> {
                     Platform.runLater(() -> {
@@ -5237,6 +5297,7 @@ public class HelloApplication extends Application {
     }
 
     private boolean applyAvatarOverride() {
+        if (config != null && config.isAvatarUseSkin()) return false;
         String path = config == null ? "" : config.getAvatarImage();
         if (path == null || path.isBlank()) return false;
         File file = new File(path);
@@ -5248,6 +5309,25 @@ public class HelloApplication extends Application {
             return true;
         } catch (Exception ignored) {
             return false;
+        }
+    }
+
+    private void toggleAvatarMode() {
+        if (currentSession == null || currentSession.getSkinUrl() == null
+                || currentSession.getSkinUrl().isBlank()) {
+            chooseAvatar();
+            return;
+        }
+        config.setAvatarUseSkin(!config.isAvatarUseSkin());
+        config.save();
+        if (config.isAvatarUseSkin()) {
+            loadSkinHead(currentSession.getSkinUrl());
+            Toast.ok("已切换为皮肤头像");
+        } else if (!applyAvatarOverride()) {
+            avatarImageView.setImage(null);
+            Toast.ok("暂无自定义头像");
+        } else {
+            Toast.ok("已切换为自定义头像");
         }
     }
 
@@ -6561,9 +6641,8 @@ public class HelloApplication extends Application {
                         + "（累计 " + Playtime.format(Playtime.seconds(base, gameInstanceId)) + "）\n");
                 gameStartAt = 0;
             }
-            boolean crashLike = !forcedStop && (exited.exitValue() != 0
-                    || recent.contains("Exception") || recent.contains("Caused by:")
-                    || recent.contains("Mixin") || recent.contains("FATAL"));
+            // 退出码 0 就是正常关闭，日志里出现过的旧异常不能反过来判成崩溃
+            boolean crashLike = !forcedStop && exited.exitValue() != 0;
             LaunchHistory.record(new File(config.getGameDir()), new LaunchHistory.Entry(
                     System.currentTimeMillis(), gameInstanceId, lastLaunchPrepMs,
                     sessionSeconds, exited.exitValue(), crashLike));
