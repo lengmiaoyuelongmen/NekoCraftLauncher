@@ -139,14 +139,20 @@ public final class DownloadManager {
         AtomicInteger done = new AtomicInteger();
         AtomicLong bytes = new AtomicLong();
         AtomicLong lastReport = new AtomicLong(0);
-        ExecutorService pool = Executors.newFixedThreadPool(Math.max(1, threads));
+        int adaptiveThreads = total >= 32 ? Math.max(threads, 16) : Math.max(1, threads);
+        ExecutorService pool = Executors.newFixedThreadPool(adaptiveThreads);
         List<CompletableFuture<Void>> futures = new ArrayList<>();
 
         for (Task task : pending) {
             futures.add(CompletableFuture.runAsync(() -> {
                 currentFile = task.target.getName();
                 publishStatus(done.get(), total, transferredBytes.get(), currentFile, 0);
-                boolean ok = downloadWithRetry(task);
+                boolean ok;
+                if (task.size >= 4L * 1024 * 1024 && threads > 1 && total <= 8) {
+                    ok = downloadRanged(task, 4, null).downloaded > 0;
+                } else {
+                    ok = downloadWithRetry(task);
+                }
                 synchronized (stats) {
                     if (ok) {
                         stats.downloaded++;
@@ -315,6 +321,7 @@ public final class DownloadManager {
         java.util.concurrent.atomic.AtomicInteger failed = new java.util.concurrent.atomic.AtomicInteger();
         List<File> partFiles = new ArrayList<>();
         List<CompletableFuture<Void>> futures = new ArrayList<>();
+        List<String> segmentUrls = candidates(task.url);
         long started = System.currentTimeMillis();
         for (int i = 0; i < parts; i++) {
             long start = i * chunk;
@@ -324,31 +331,35 @@ public final class DownloadManager {
             partFiles.add(part);
             final int index = i;
             futures.add(CompletableFuture.runAsync(() -> {
-                try {
-                    HttpRequest req = HttpRequest.newBuilder(URI.create(task.url))
-                            .timeout(REQUEST_TIMEOUT)
-                            .header("Range", "bytes=" + start + "-" + end)
-                            .GET().build();
-                    HttpResponse<InputStream> resp = CLIENT.send(req, HttpResponse.BodyHandlers.ofInputStream());
-                    if (resp.statusCode() != 206) throw new RuntimeException("HTTP " + resp.statusCode());
-                    try (InputStream in = resp.body(); OutputStream out = Files.newOutputStream(part.toPath())) {
-                        byte[] buffer = new byte[65536];
-                        int read;
-                        while ((read = in.read(buffer)) != -1) {
-                            out.write(buffer, 0, read);
-                            long nowDone = done.addAndGet(read);
-                            long elapsed = Math.max(1, System.currentTimeMillis() - started);
-                            publishStatus(currentDone, currentTotal, nowDone, task.target.getName(),
-                                    nowDone * 1000 / elapsed);
-                            if (progress != null && (nowDone & 0x3FFFF) < 4096) {
-                                progress.onProgress((int) Math.min(100, nowDone * 100 / total), 100, nowDone);
+                for (int attempt = 0; attempt < 2; attempt++) {
+                    String segmentUrl = segmentUrls.get((index + attempt) % segmentUrls.size());
+                    try {
+                        HttpRequest req = HttpRequest.newBuilder(URI.create(segmentUrl))
+                                .timeout(REQUEST_TIMEOUT)
+                                .header("Range", "bytes=" + start + "-" + end)
+                                .GET().build();
+                        HttpResponse<InputStream> resp = CLIENT.send(req, HttpResponse.BodyHandlers.ofInputStream());
+                        if (resp.statusCode() != 206) throw new RuntimeException("HTTP " + resp.statusCode());
+                        try (InputStream in = resp.body(); OutputStream out = Files.newOutputStream(part.toPath())) {
+                            byte[] buffer = new byte[65536];
+                            int read;
+                            while ((read = in.read(buffer)) != -1) {
+                                out.write(buffer, 0, read);
+                                long nowDone = done.addAndGet(read);
+                                long elapsed = Math.max(1, System.currentTimeMillis() - started);
+                                publishStatus(currentDone, currentTotal, nowDone, task.target.getName(),
+                                        nowDone * 1000 / elapsed);
+                                if (progress != null && (nowDone & 0x3FFFF) < 4096) {
+                                    progress.onProgress((int) Math.min(100, nowDone * 100 / total), 100, nowDone);
+                                }
                             }
                         }
+                        return;
+                    } catch (Exception ignored) {
+                        part.delete();
                     }
-                } catch (Exception e) {
-                    failed.incrementAndGet();
-                    part.delete();
                 }
+                failed.incrementAndGet();
             }, pool));
         }
         try {

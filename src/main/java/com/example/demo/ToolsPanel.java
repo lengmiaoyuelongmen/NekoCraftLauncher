@@ -294,6 +294,77 @@ public final class ToolsPanel extends VBox {
                 pauseVisualsBox,
                 hint("优先级独立于智能优化：普通 / 高于正常 / 高。启动后异步设置，失败不会阻止游戏。"));
 
+        Label cpuValue = new Label("—");
+        cpuValue.setStyle("-fx-text-fill: -app-text; -fx-font-size: 20px; -fx-font-weight: bold;");
+        Label processValue = new Label("—");
+        processValue.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
+        Label memValue = new Label("—");
+        memValue.setStyle("-fx-text-fill: -app-text; -fx-font-size: 13px; -fx-font-weight: bold;");
+        Label threadValue = new Label("—");
+        threadValue.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
+        javafx.scene.control.ProgressBar cpuBar = new javafx.scene.control.ProgressBar(0);
+        cpuBar.setMaxWidth(Double.MAX_VALUE);
+        javafx.scene.control.ProgressBar memBar = new javafx.scene.control.ProgressBar(0);
+        memBar.setMaxWidth(Double.MAX_VALUE);
+        VBox monitorCard = card(
+                section("实时性能"),
+                new HBox(18, new VBox(2, cpuValue, processValue), new VBox(2, memValue, threadValue)),
+                cpuBar, memBar,
+                hint("CPU 为系统总占用；内存为整机物理内存。2 秒刷新一次。"));
+        javafx.animation.Timeline monitor = new javafx.animation.Timeline(
+                new javafx.animation.KeyFrame(javafx.util.Duration.seconds(2), e -> {
+                    SystemMetrics.Snapshot m = SystemMetrics.snapshot();
+                    cpuValue.setText("CPU " + SystemMetrics.percent(m.cpuLoad()));
+                    processValue.setText("启动器进程 " + SystemMetrics.percent(m.processCpuLoad()));
+                    memValue.setText("内存 " + SystemMetrics.bytes(m.usedMemory())
+                            + (m.totalMemory() > 0 ? " / " + SystemMetrics.bytes(m.totalMemory()) : ""));
+                    threadValue.setText("线程 " + m.threads());
+                    cpuBar.setProgress(Math.max(0, Math.min(1, m.cpuLoad())));
+                    memBar.setProgress(m.totalMemory() > 0
+                            ? Math.max(0, Math.min(1, (double) m.usedMemory() / m.totalMemory())) : 0);
+                }));
+        monitor.setCycleCount(javafx.animation.Animation.INDEFINITE);
+        monitor.play();
+
+        Label cleanStatus = new Label("清理启动器 Java 堆和当前进程工作集，不会关闭应用。");
+        cleanStatus.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
+        cleanStatus.setWrapText(true);
+        Button extremeClean = smallButton("极限内存清理", e -> {
+            Button button = (Button) e.getSource();
+            button.setDisable(true);
+            cleanStatus.setText("正在清理…");
+            CompletableFuture.runAsync(() -> {
+                long before = SystemMetrics.snapshot().usedMemory();
+                System.gc();
+                try {
+                    Thread.sleep(250);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+                try {
+                    String command = "Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices;"
+                            + " public class NekoMem { [DllImport(\"psapi.dll\")]"
+                            + " public static extern bool EmptyWorkingSet(IntPtr h); }';"
+                            + " [NekoMem]::EmptyWorkingSet((Get-Process -Id " + ProcessHandle.current().pid() + ").Handle)";
+                    Process p = new ProcessBuilder("powershell", "-NoProfile", "-WindowStyle", "Hidden",
+                            "-Command", command).redirectErrorStream(true).start();
+                    p.waitFor();
+                } catch (Exception ignored) {
+                }
+                System.gc();
+                long after = SystemMetrics.snapshot().usedMemory();
+                long delta = before - after;
+                Platform.runLater(() -> {
+                    button.setDisable(false);
+                    cleanStatus.setText("清理完成，可用内存净变化 "
+                            + (delta >= 0 ? "+" : "") + SystemMetrics.bytes(Math.abs(delta))
+                            + "。内存可能随使用回升。");
+                    Toast.ok("极限内存清理完成");
+                });
+            });
+        });
+        VBox cleanCard = card(section("内存清理"), extremeClean, cleanStatus);
+
         VBox card = card(
                 new Label("性能优化") {{
                     setStyle("-fx-text-fill: -app-text; -fx-font-size: 15px; -fx-font-weight: bold;");
@@ -302,7 +373,9 @@ public final class ToolsPanel extends VBox {
                 power, dvr, gameMode, transparency,
                 new HBox(10, apply, restore),
                 status,
-                processCard);
+                processCard,
+                monitorCard,
+                cleanCard);
         return scroll(card);
     }
 
