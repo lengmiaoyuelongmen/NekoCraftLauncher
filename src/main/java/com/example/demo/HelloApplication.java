@@ -1392,7 +1392,8 @@ public class HelloApplication extends Application {
 
         loginBtn.setOnAction(e -> handleLogin(loginTypeCombo, serverField, usernameField, passwordField, loginBtn));
         versionComboBox.valueProperty().addListener((obs, old, value) -> {
-            launchVersionLabel.setText(value == null ? "" : value.getId());
+            launchVersionLabel.setText(value == null ? ""
+                    : InstanceMeta.name(new File(config.getGameDir()), value.getId()));
             if (playerInfoInstance != null) playerInfoInstance.setText(value == null ? "未选择" : value.getId());
             updateInstanceInfo(value == null ? null : value.getId());
             if (value != null && !suppressInstancePersist) {

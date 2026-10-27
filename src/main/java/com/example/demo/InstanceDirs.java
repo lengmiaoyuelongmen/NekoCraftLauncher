@@ -29,8 +29,14 @@ public final class InstanceDirs {
 
     private static boolean looksLikeGameContent(File dir) {
         if (dir == null || !dir.isDirectory()) return false;
-        for (String name : new String[]{"mods", "config", "resourcepacks", "shaderpacks",
-                "saves", "options.txt", "PCL", "PCL.ini"}) {
+        for (String name : new String[]{"mods", "config", "resourcepacks", "shaderpacks", "saves"}) {
+            File child = new File(dir, name);
+            if (child.isDirectory()) {
+                String[] entries = child.list();
+                if (entries != null && entries.length > 0) return true;
+            }
+        }
+        for (String name : new String[]{"options.txt", "PCL", "PCL.ini"}) {
             if (new File(dir, name).exists()) return true;
         }
         return false;

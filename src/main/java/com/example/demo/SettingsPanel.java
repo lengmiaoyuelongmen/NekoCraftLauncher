@@ -731,27 +731,43 @@ public final class SettingsPanel extends VBox {
     }
 
     private ScrollPane buildAiTab() {
-        Label title = new Label("DeepSeek AI");
-        title.setStyle("-fx-text-fill: -app-text; -fx-font-size: 15px; -fx-font-weight: bold;");
-        Label intro = new Label("开启后，启动页命令栏里输入的文字会直接发给 DeepSeek；关闭后恢复为启动器命令 / 游戏命令。"
-                + "未填写 API Key 时自动使用本地免费助手（不联网，只回答启动器 / 常见 MC 问题）。");
+        Label title = new Label("DeepSeek AI 助手");
+        title.setStyle("-fx-text-fill: -app-text; -fx-font-size: 17px; -fx-font-weight: bold;");
+        Label intro = new Label("在启动页底部直接提问：配置 Key 后走 DeepSeek，未配置时使用本地免费助手。");
         intro.setWrapText(true);
-        intro.setStyle("-fx-text-fill: -app-text-dim; -fx-font-size: 12px;");
+        intro.setStyle("-fx-text-fill: -app-text-dim; -fx-font-size: 11.5px;");
+        boolean hasKey = !config.getAiApiKey().isBlank();
+        Label badge = new Label(hasKey ? "在线模型" : "本地助手");
+        badge.setStyle("-fx-text-fill: " + (hasKey ? "#06251f" : "-app-text-2") + ";"
+                + " -fx-background-color: " + (hasKey ? "-app-accent" : "-app-row3") + ";"
+                + " -fx-background-radius: 20; -fx-padding: 4 10; -fx-font-size: 10px;"
+                + " -fx-font-weight: bold;");
+        VBox heroText = new VBox(3, title, intro);
+        HBox.setHgrow(heroText, Priority.ALWAYS);
+        HBox hero = new HBox(12, new StackPane(Icons.node("sparkles", 22, "#5eead4")), heroText, badge);
+        hero.setAlignment(Pos.CENTER_LEFT);
+        hero.setPadding(new Insets(12));
+        hero.setStyle("-fx-background-color: -app-row2; -fx-background-radius: 12;"
+                + " -fx-border-color: -app-border-soft; -fx-border-radius: 12;");
 
         Button test = smallButton("测试连接", e -> testAi());
-        Button openKeys = smallButton("打开 DeepSeek 开放平台", e -> openBrowser("https://platform.deepseek.com/api_keys"));
-        Button webChat = smallButton("DeepSeek 网页版", e -> openBrowser("https://chat.deepseek.com"));
+        Button openKeys = smallButton("获取 API Key", e -> openBrowser("https://platform.deepseek.com/api_keys"));
+        Button webChat = smallButton("打开网页版", e -> openBrowser("https://chat.deepseek.com"));
+        HBox actions = new HBox(8, test, openKeys, webChat);
+        actions.setAlignment(Pos.CENTER_LEFT);
 
         VBox card = card(
-                title,
-                intro,
+                hero,
+                section("工作模式"),
                 aiEnabledBox,
+                hint("关闭后启动页命令栏恢复为启动器 / 游戏命令；开启且未填 Key 时使用本地免费助手。"),
+                section("模型配置"),
                 labeled("API Key", aiKeyField),
                 labeled("模型", aiModelField),
-                new HBox(10, test, openKeys, webChat),
+                section("测试与入口"),
+                actions,
                 aiStatus,
-                hint("DeepSeek 官方 API 需要 Key；未填时使用本地免费助手，不等同于在线模型。"
-                        + " 计费由 DeepSeek 账户承担；不需要 AI 时取消勾选即可。"));
+                hint("Key 只保存在本机配置中，不会写入启动器日志。"));
         return scroll(card);
     }
 
