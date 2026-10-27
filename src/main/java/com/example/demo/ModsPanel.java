@@ -280,6 +280,12 @@ public final class ModsPanel extends VBox {
     /** 每 2 秒扫一次 mods 目录，有变化才重建列表 —— 这就是"实时加载"。 */
     /** 由实例设置页调用：按版本 + 加载器自动筛选在线模组。 */
     /** 切换实例时换掉 mods 目录（版本隔离）。 */
+    public void refreshNow() {
+        lastSignature = "";
+        metaSignature = "";
+        refreshLocal(true);
+    }
+
     public void setModsDir(File dir) {
         if (dir == null || dir.equals(this.modsDir)) return;
         this.modsDir = dir;

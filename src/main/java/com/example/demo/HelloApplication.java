@@ -125,6 +125,8 @@ public class HelloApplication extends Application {
     private Button stopGameButton;
     private File lastDownloadedFile;
     private StackPane dropOverlay;
+    private Label dropTitle;
+    private Label dropHint;
     private VBox playerInfoBox;
     private Label playerInfoType;
     private Label playerInfoUuid;
@@ -356,9 +358,9 @@ public class HelloApplication extends Application {
         dropOverlay.setManaged(false);
         dropOverlay.setMouseTransparent(true);
         dropOverlay.setStyle("-fx-background-color: rgba(5,20,18,0.72);");
-        Label dropTitle = new Label("松开鼠标导入整合包");
+        dropTitle = new Label("松开鼠标导入整合包");
         dropTitle.setStyle("-fx-text-fill: #ccfbf1; -fx-font-size: 24px; -fx-font-weight: bold;");
-        Label dropHint = new Label("支持 .zip / .mrpack，直接拖入窗口即可安装");
+        dropHint = new Label("支持 .zip / .mrpack，直接拖入窗口即可安装");
         dropHint.setStyle("-fx-text-fill: rgba(204,251,241,0.78); -fx-font-size: 12px;");
         VBox dropBox = new VBox(10, Icons.node("download", 42, "#5eead4"), dropTitle, dropHint);
         dropBox.setAlignment(Pos.CENTER);
@@ -414,9 +416,15 @@ public class HelloApplication extends Application {
         scene.setFill(Color.TRANSPARENT);
         scene.addEventFilter(javafx.scene.input.DragEvent.DRAG_OVER, event -> {
             File archive = firstImportArchive(event.getDragboard());
-            if (archive == null) return;
+            File jar = firstModJar(event.getDragboard());
+            if (archive == null && jar == null) return;
             event.acceptTransferModes(javafx.scene.input.TransferMode.COPY);
-            if (dropOverlay != null) dropOverlay.setVisible(true);
+            if (dropOverlay != null) {
+                dropTitle.setText(jar != null ? "松开安装模组" : "松开鼠标导入整合包");
+                dropHint.setText(jar != null ? "支持 .jar，可一次拖入多个文件"
+                        : "支持 .zip / .mrpack，直接拖入窗口即可安装");
+                dropOverlay.setVisible(true);
+            }
             event.consume();
         });
         scene.addEventFilter(javafx.scene.input.DragEvent.DRAG_EXITED, event -> {
@@ -425,10 +433,12 @@ public class HelloApplication extends Application {
         scene.addEventFilter(javafx.scene.input.DragEvent.DRAG_DROPPED, event -> {
             if (dropOverlay != null) dropOverlay.setVisible(false);
             File archive = firstImportArchive(event.getDragboard());
-            if (archive == null) return;
+            java.util.List<File> jars = modJars(event.getDragboard());
+            if (archive == null && jars.isEmpty()) return;
             event.setDropCompleted(true);
             event.consume();
-            importModpack(archive);
+            if (!jars.isEmpty()) installDroppedMods(jars);
+            else importModpack(archive);
         });
         stage.initStyle(javafx.stage.StageStyle.TRANSPARENT);
         stage.setMinWidth(1060);
@@ -4964,6 +4974,53 @@ public class HelloApplication extends Application {
             });
             return null;
         });
+    }
+
+    private File firstModJar(javafx.scene.input.Dragboard board) {
+        java.util.List<File> jars = modJars(board);
+        return jars.isEmpty() ? null : jars.get(0);
+    }
+
+    private java.util.List<File> modJars(javafx.scene.input.Dragboard board) {
+        java.util.List<File> jars = new java.util.ArrayList<>();
+        if (board == null || !board.hasFiles()) return jars;
+        for (File file : board.getFiles()) {
+            String name = file.getName().toLowerCase(java.util.Locale.ROOT);
+            if (name.endsWith(".jar") || name.endsWith(".jar.disabled")) jars.add(file);
+        }
+        return jars;
+    }
+
+    private void installDroppedMods(java.util.List<File> jars) {
+        File game = new File(config.getGameDir());
+        File mods = InstanceDirs.mods(game, currentInstanceId(), config.isIsolation());
+        if (!mods.isDirectory()) mods.mkdirs();
+        int installed = 0;
+        for (File jar : jars) {
+            try {
+                File target = new File(mods, jar.getName());
+                int suffix = 2;
+                while (target.isFile() && target.length() != jar.length()) {
+                    String name = jar.getName();
+                    int dot = name.toLowerCase(java.util.Locale.ROOT).endsWith(".jar.disabled")
+                            ? name.length() - ".jar.disabled".length() : name.length() - 4;
+                    target = new File(mods, name.substring(0, dot) + "-" + suffix++ + name.substring(dot));
+                }
+                if (!target.isFile()) {
+                    java.nio.file.Files.copy(jar.toPath(), target.toPath());
+                    installed++;
+                    logMessage("📦 拖入模组: " + target.getName());
+                }
+            } catch (Exception e) {
+                logMessage("❌ 安装拖入模组失败: " + jar.getName() + " - " + e.getMessage());
+            }
+        }
+        if (installed > 0) {
+            Toast.ok("已安装 " + installed + " 个模组");
+
+        } else {
+            Toast.warn("没有新增模组（可能已存在）");
+        }
     }
 
     private File firstImportArchive(javafx.scene.input.Dragboard board) {
