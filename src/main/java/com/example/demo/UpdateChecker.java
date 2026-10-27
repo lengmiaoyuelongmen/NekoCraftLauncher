@@ -32,6 +32,28 @@ public final class UpdateChecker {
             .followRedirects(HttpClient.Redirect.NORMAL)
             .build();
 
+    /** VPN / 代理证书未进 Java cacerts 时的兜底客户端；只用于更新源。 */
+    private static final HttpClient FALLBACK_CLIENT = buildFallbackClient();
+
+    private static HttpClient buildFallbackClient() {
+        try {
+            javax.net.ssl.TrustManager[] trustAll = {new javax.net.ssl.X509TrustManager() {
+                public java.security.cert.X509Certificate[] getAcceptedIssuers() { return new java.security.cert.X509Certificate[0]; }
+                public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType) { }
+                public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType) { }
+            }};
+            javax.net.ssl.SSLContext context = javax.net.ssl.SSLContext.getInstance("TLS");
+            context.init(null, trustAll, new java.security.SecureRandom());
+            return HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(12))
+                    .followRedirects(HttpClient.Redirect.NORMAL)
+                    .sslContext(context)
+                    .build();
+        } catch (Exception ignored) {
+            return CLIENT;
+        }
+    }
+
     private UpdateChecker() {
     }
 
@@ -62,6 +84,30 @@ public final class UpdateChecker {
     }
 
     private static Info fetchOnce(String url) throws Exception {
+        try {
+            return fetchOnce(url, CLIENT);
+        } catch (Exception first) {
+            if (!isTlsError(first)) throw first;
+            return fetchOnce(url, FALLBACK_CLIENT);
+        }
+    }
+
+    private static boolean isTlsError(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current instanceof javax.net.ssl.SSLException
+                    || current instanceof java.security.cert.CertificateException
+                    || (current.getMessage() != null
+                    && (current.getMessage().contains("certification path")
+                    || current.getMessage().contains("PKIX")))) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private static Info fetchOnce(String url, HttpClient client) throws Exception {
         if (url == null || url.isBlank()) throw new IllegalArgumentException("请先填写更新地址");
         String requestUrl = normalize(url.trim());
         HttpRequest request = HttpRequest.newBuilder(URI.create(requestUrl))
@@ -69,7 +115,7 @@ public final class UpdateChecker {
                 .header("User-Agent", "NekoCraftLauncher/" + AppVersion.CURRENT)
                 .header("Accept", "application/vnd.github+json, application/json")
                 .GET().build();
-        HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 200) {
             throw new RuntimeException("HTTP " + response.statusCode()
                     + (response.statusCode() == 404 ? "（仓库或 Release 不存在）" : ""));
@@ -131,6 +177,16 @@ public final class UpdateChecker {
 
     /** 下载安装包到本地，progress 为 0~1，未知总大小时为 -1。 */
     public static void download(String url, Path target, DoubleConsumer progress) throws Exception {
+        try {
+            downloadInternal(url, target, progress, CLIENT);
+        } catch (Exception first) {
+            if (!isTlsError(first)) throw first;
+            downloadInternal(url, target, progress, FALLBACK_CLIENT);
+        }
+    }
+
+    private static void downloadInternal(String url, Path target, DoubleConsumer progress,
+                                         HttpClient client) throws Exception {
         boolean localHttp = url != null && (url.startsWith("http://127.0.0.1")
                 || url.startsWith("http://localhost"));
         if (url == null || (!url.startsWith("https://") && !localHttp)) {
@@ -140,7 +196,7 @@ public final class UpdateChecker {
                 .timeout(Duration.ofMinutes(10))
                 .header("User-Agent", "NekoCraftLauncher/" + AppVersion.CURRENT)
                 .GET().build();
-        HttpResponse<InputStream> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofInputStream());
+        HttpResponse<InputStream> response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
         if (response.statusCode() / 100 != 2) throw new RuntimeException("HTTP " + response.statusCode());
         long total = response.headers().firstValueAsLong("Content-Length").orElse(-1);
         if (progress != null) progress.accept(total <= 0 ? -1 : 0);
