@@ -1505,12 +1505,29 @@ public final class ModsPanel extends VBox {
         return sb.toString();
     }
 
+    private File iconCacheFile(String url) {
+        return new File(new File(AppPaths.dataDir(), "icon-cache"),
+                Integer.toHexString(url == null ? 0 : url.hashCode()) + ".img");
+    }
+
     private void loadIcon(StackPane pane, String iconUrl, String title) {
         if (iconUrl == null || iconUrl.isBlank()) return;
         Image cached = iconCache.get(iconUrl);
         if (cached != null) {
             showIcon(pane, cached);
             return;
+        }
+        File iconCacheFile = iconCacheFile(iconUrl);
+        if (iconCacheFile.isFile()) {
+            try {
+                Image disk = new Image(iconCacheFile.toURI().toString());
+                if (!disk.isError()) {
+                    iconCache.put(iconUrl, disk);
+                    showIcon(pane, disk);
+                    return;
+                }
+            } catch (Exception ignored) {
+            }
         }
         CompletableFuture.runAsync(() -> {
             try {
@@ -1521,6 +1538,12 @@ public final class ModsPanel extends VBox {
                 Image image = decode(response.body());
                 if (image == null) return;
                 iconCache.put(iconUrl, image);
+                try {
+                    File cacheFile = iconCacheFile(iconUrl);
+                    cacheFile.getParentFile().mkdirs();
+                    java.nio.file.Files.write(cacheFile.toPath(), response.body());
+                } catch (Exception ignored) {
+                }
                 Platform.runLater(() -> showIcon(pane, image));
             } catch (Exception ignored) {
             }

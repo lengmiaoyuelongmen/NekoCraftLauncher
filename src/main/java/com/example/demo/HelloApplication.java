@@ -322,18 +322,6 @@ public class HelloApplication extends Application {
                 e -> ambient.clearPointer());
 
         primaryStage = stage;
-        primaryStage.maximizedProperty().addListener((obs, oldMax, max) -> {
-            if (maximizeWindowButton != null) {
-                maximizeWindowButton.setGraphic(windowIcon(max ? WindowIcon.RESTORE : WindowIcon.MAXIMIZE));
-            }
-            if (!max && primaryStage != null) {
-                Platform.runLater(() -> {
-                    primaryStage.setWidth(1060);
-                    primaryStage.setHeight(792);
-                    primaryStage.centerOnScreen();
-                });
-            }
-        });
         VBox root = new VBox(topBar, contentStack);
         rootPane = root;
         VBox.setVgrow(contentStack, Priority.ALWAYS);
@@ -352,6 +340,7 @@ public class HelloApplication extends Application {
         // 圆角由 root 背景和顶栏 CSS 提供，不再裁剪整个根节点。
         StackPane rootWrap = new StackPane(root, resizeGrip);
         rootWrap.setAlignment(Pos.TOP_LEFT);
+        installResizeHandles(rootWrap, stage);
 
         dropOverlay = new StackPane();
         dropOverlay.setVisible(false);
@@ -671,11 +660,10 @@ public class HelloApplication extends Application {
         // 窗口控制按钮（无边框窗口需要自绘，固定 46x32，图标严格居中）
         Button minimize = windowButton(WindowIcon.MINIMIZE);
         minimize.setOnAction(e -> primaryStage.setIconified(true));
-        maximizeWindowButton = windowButton(WindowIcon.MAXIMIZE);
-        maximizeWindowButton.setOnAction(e -> primaryStage.setMaximized(!primaryStage.isMaximized()));
+
         Button close = windowButton(WindowIcon.CLOSE);
         close.setOnAction(e -> requestClose());
-        HBox windowControls = new HBox(0, minimize, maximizeWindowButton, close);
+        HBox windowControls = new HBox(0, minimize, close);
         windowControls.setAlignment(Pos.CENTER_RIGHT);
         windowControls.getStyleClass().add("window-controls");
 
@@ -691,7 +679,7 @@ public class HelloApplication extends Application {
             primaryStage.setY(e.getScreenY() - dragOffset[1]);
         });
         topBar.setOnMouseClicked(e -> {
-            if (e.getClickCount() == 2) primaryStage.setMaximized(!primaryStage.isMaximized());
+            // 不提供双击全屏，避免透明窗口恢复时布局异常
         });
 
         Button paletteBtn = new Button();
@@ -5850,6 +5838,79 @@ public class HelloApplication extends Application {
         dialog.getDialogPane().setContent(new VBox(10, current, last, open));
         dialog.getDialogPane().getButtonTypes().add(javafx.scene.control.ButtonType.CLOSE);
         dialog.showAndWait();
+    }
+
+    /** 透明窗口的四边 / 四角拖拽缩放。 */
+    private void installResizeHandles(StackPane wrap, javafx.stage.Stage stage) {
+        String[] cursors = {"N_RESIZE", "S_RESIZE", "W_RESIZE", "E_RESIZE",
+                "NW_RESIZE", "NE_RESIZE", "SW_RESIZE", "SE_RESIZE"};
+        for (int i = 0; i < cursors.length; i++) {
+            String cursorName = cursors[i];
+            Region handle = new Region();
+            javafx.scene.Cursor cursor = switch (cursorName) {
+                case "N_RESIZE" -> javafx.scene.Cursor.N_RESIZE;
+                case "S_RESIZE" -> javafx.scene.Cursor.S_RESIZE;
+                case "W_RESIZE" -> javafx.scene.Cursor.W_RESIZE;
+                case "E_RESIZE" -> javafx.scene.Cursor.E_RESIZE;
+                case "NW_RESIZE" -> javafx.scene.Cursor.NW_RESIZE;
+                case "NE_RESIZE" -> javafx.scene.Cursor.NE_RESIZE;
+                case "SW_RESIZE" -> javafx.scene.Cursor.SW_RESIZE;
+                default -> javafx.scene.Cursor.SE_RESIZE;
+            };
+            handle.setCursor(cursor);
+            handle.setStyle("-fx-background-color: transparent;");
+            handle.setPickOnBounds(true);
+            boolean top = cursorName.startsWith("N");
+            boolean bottom = cursorName.startsWith("S");
+            boolean left = cursorName.startsWith("W") || cursorName.equals("NW_RESIZE") || cursorName.equals("SW_RESIZE");
+            boolean right = cursorName.startsWith("E") || cursorName.equals("NE_RESIZE") || cursorName.equals("SE_RESIZE");
+            if (cursorName.equals("N_RESIZE") || cursorName.equals("S_RESIZE")) {
+                handle.setPrefHeight(5);
+                handle.setMaxWidth(Double.MAX_VALUE);
+            } else if (cursorName.equals("W_RESIZE") || cursorName.equals("E_RESIZE")) {
+                handle.setPrefWidth(5);
+                handle.setMaxHeight(Double.MAX_VALUE);
+            } else {
+                handle.setPrefSize(12, 12);
+            }
+            if (top) StackPane.setAlignment(handle, left ? Pos.TOP_LEFT : right ? Pos.TOP_RIGHT : Pos.TOP_CENTER);
+            else if (bottom) StackPane.setAlignment(handle, left ? Pos.BOTTOM_LEFT : right ? Pos.BOTTOM_RIGHT : Pos.BOTTOM_CENTER);
+            else StackPane.setAlignment(handle, left ? Pos.CENTER_LEFT : Pos.CENTER_RIGHT);
+            if (top) StackPane.setMargin(handle, new Insets(0, 0, 0, 0));
+            final double[] start = new double[6];
+            handle.setOnMousePressed(e -> {
+                if (stage.isMaximized()) return;
+                start[0] = e.getScreenX();
+                start[1] = e.getScreenY();
+                start[2] = stage.getX();
+                start[3] = stage.getY();
+                start[4] = stage.getWidth();
+                start[5] = stage.getHeight();
+                e.consume();
+            });
+            handle.setOnMouseDragged(e -> {
+                if (stage.isMaximized()) return;
+                double dx = e.getScreenX() - start[0];
+                double dy = e.getScreenY() - start[1];
+                double minW = 980, minH = 640;
+                if (left) {
+                    double w = Math.max(minW, start[4] - dx);
+                    stage.setX(start[2] + (start[4] - w));
+                    stage.setWidth(w);
+                } else if (right) {
+                    stage.setWidth(Math.max(minW, start[4] + dx));
+                }
+                if (top) {
+                    double h = Math.max(minH, start[5] - dy);
+                    stage.setY(start[3] + (start[5] - h));
+                    stage.setHeight(h);
+                } else if (bottom) {
+                    stage.setHeight(Math.max(minH, start[5] + dy));
+                }
+                e.consume();
+            });
+            wrap.getChildren().add(handle);
+        }
     }
 
     private void openDir(File dir) {

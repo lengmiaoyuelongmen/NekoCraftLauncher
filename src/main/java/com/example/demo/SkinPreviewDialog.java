@@ -33,10 +33,10 @@ public final class SkinPreviewDialog {
         dialog.setTitle("皮肤 / 披风预览");
         dialog.setHeaderText(null);
 
-        Canvas canvas = new Canvas(320, 400);
+        Skin3DPreview preview3D = new Skin3DPreview();
         Image[] skin = {load(config.getPreviewSkinPath())};
         Image[] cape = {load(config.getPreviewCapePath())};
-        Runnable redraw = () -> draw(canvas, skin[0], cape[0]);
+        Runnable redraw = () -> preview3D.setImages(skin[0], cape[0]);
         redraw.run();
 
         Label title = new Label("皮肤 / 披风预览");
@@ -53,7 +53,7 @@ public final class SkinPreviewDialog {
         hero.setStyle("-fx-background-color: -app-row2; -fx-background-radius: 14;"
                 + " -fx-border-color: -app-border-soft; -fx-border-radius: 14; -fx-padding: 12;");
 
-        StackPane preview = new StackPane(canvas);
+        StackPane preview = new StackPane(preview3D);
         preview.setStyle("-fx-background-color: -app-card-alt; -fx-background-radius: 16;"
                 + " -fx-border-color: -app-border-soft; -fx-border-radius: 16; -fx-padding: 8;");
 
@@ -107,12 +107,7 @@ public final class SkinPreviewDialog {
         });
 
         Button manage = actionButton("打开 LittleSkin 材质管理");
-        manage.setOnAction(e -> {
-            try {
-                java.awt.Desktop.getDesktop().browse(java.net.URI.create("https://littleskin.cn/user/player"));
-            } catch (Exception ignored) {
-            }
-        });
+        manage.setOnAction(e -> LittleSkinWebDialog.show(owner));
 
         Button clear = actionButton("清除预览");
         clear.setOnAction(e -> {
@@ -182,44 +177,69 @@ public final class SkinPreviewDialog {
         double w = canvas.getWidth();
         double h = canvas.getHeight();
         g.clearRect(0, 0, w, h);
-        g.setFill(Color.web("#e8f8df"));
+        g.setFill(Color.web("#f4fbef"));
         g.fillRoundRect(0, 0, w, h, 22, 22);
-        g.setFill(Color.web("#7aa76b"));
-        g.fillText("Neko Skin Preview", 20, 24);
+        g.setFill(Color.web("#8fbd86"));
+        g.fillText("NEKO SKIN PREVIEW", 20, 26);
 
-        double unit = 9.0;
-        double cx = 138;
-        double top = 58;
+        double cx = 170;
+        double top = 54;
+        double unit = 10.5;
+        double head = 8 * unit;
+        double bodyW = 8 * unit;
+        double bodyH = 12 * unit;
+        double armW = 4 * unit;
+        double armH = 12 * unit;
+        double legW = 4 * unit;
+        double legH = 12 * unit;
+
+        // 地面阴影
+        g.setFill(Color.web("#cfe6c8", 0.55));
+        g.fillOval(cx - 92, top + 386, 184, 22);
+
         if (cape != null) {
             g.save();
-            g.setGlobalAlpha(0.95);
+            g.setGlobalAlpha(0.92);
             g.drawImage(cape, 0, 0, cape.getWidth(), cape.getHeight(),
-                    cx + 74, top + 44, 62, 104);
+                    cx + 72, top + 48, 66, 108);
             g.restore();
         }
         if (skin == null) {
-            g.setFill(Color.web("#b8c4b5"));
-            g.fillRoundRect(cx - 36, top + 4, 80, 80, 10, 10);
-            g.fillRoundRect(cx - 36, top + 88, 80, 112, 10, 10);
-            g.fillRoundRect(cx - 64, top + 88, 24, 100, 8, 8);
-            g.fillRoundRect(cx + 48, top + 88, 24, 100, 8, 8);
-            g.fillRoundRect(cx - 36, top + 204, 34, 104, 8, 8);
-            g.fillRoundRect(cx + 4, top + 204, 34, 104, 8, 8);
-            g.setFill(Color.web("#566b52"));
-            g.fillText("选择皮肤 PNG 开始预览", 74, 365);
+            g.setStroke(Color.web("#9ecb96"));
+            g.setLineWidth(2);
+            g.strokeOval(cx - 54, top + 10, 108, 96);
+            g.strokePolygon(new double[]{cx - 20, cx - 6, cx + 6, cx + 20},
+                    new double[]{top + 14, top - 4, top - 4, top + 14}, 4);
+            g.strokeRoundRect(cx - 42, top + 118, 84, 120, 18, 18);
+            g.strokeRoundRect(cx - 72, top + 118, 22, 98, 11, 11);
+            g.strokeRoundRect(cx + 50, top + 118, 22, 98, 11, 11);
+            g.strokeRoundRect(cx - 38, top + 248, 30, 114, 12, 12);
+            g.strokeRoundRect(cx + 8, top + 248, 30, 114, 12, 12);
+            g.setFill(Color.web("#7ca476"));
+            g.fillText("选择皮肤 PNG 开始预览", 92, 424);
             return;
         }
 
         double tex = skin.getWidth() / 64.0;
-        part(g, skin, tex, 4, 20, 4, 12, cx - 54, top + 204, unit);   // right leg
-        part(g, skin, tex, 20, 52, 4, 12, cx + 18, top + 204, unit);  // left leg
-        part(g, skin, tex, 20, 20, 8, 12, cx - 36, top + 88, unit);   // body
-        part(g, skin, tex, 44, 20, 4, 12, cx + 36, top + 88, unit);   // right arm
-        part(g, skin, tex, 36, 52, 4, 12, cx - 72, top + 88, unit);   // left arm
-        part(g, skin, tex, 8, 8, 8, 8, cx - 36, top + 4, unit);       // head
-        part(g, skin, tex, 40, 8, 8, 8, cx - 36, top + 4, unit);      // hat overlay
-        g.setFill(Color.web("#566b52"));
-        g.fillText("本地预览 · 不会上传", 82, 365);
+        // 腿
+        part(g, skin, tex, 4, 20, 4, 12, cx - 36, top + 250, unit);
+        part(g, skin, tex, 20, 52, 4, 12, cx + 6, top + 250, unit);
+        part(g, skin, tex, 4, 36, 4, 12, cx - 36, top + 250, unit);
+        part(g, skin, tex, 4, 52, 4, 12, cx + 6, top + 250, unit);
+        // 身体
+        part(g, skin, tex, 20, 20, 8, 12, cx - bodyW / 2, top + 128, unit);
+        part(g, skin, tex, 20, 36, 8, 12, cx - bodyW / 2, top + 128, unit);
+        // 手臂
+        part(g, skin, tex, 44, 20, 4, 12, cx - 72, top + 128, unit);
+        part(g, skin, tex, 36, 52, 4, 12, cx + 32, top + 128, unit);
+        part(g, skin, tex, 44, 36, 4, 12, cx - 72, top + 128, unit);
+        part(g, skin, tex, 52, 52, 4, 12, cx + 32, top + 128, unit);
+        // 头
+        part(g, skin, tex, 8, 8, 8, 8, cx - head / 2, top + 20, unit);
+        part(g, skin, tex, 40, 8, 8, 8, cx - head / 2, top + 20, unit);
+
+        g.setFill(Color.web("#5f865a"));
+        g.fillText("本地预览 · 不会上传", 112, 424);
     }
 
     private static void part(GraphicsContext g, Image skin, double tex,
