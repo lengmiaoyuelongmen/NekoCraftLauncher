@@ -5865,13 +5865,19 @@ public class HelloApplication extends Application {
             boolean left = cursorName.startsWith("W") || cursorName.equals("NW_RESIZE") || cursorName.equals("SW_RESIZE");
             boolean right = cursorName.startsWith("E") || cursorName.equals("NE_RESIZE") || cursorName.equals("SE_RESIZE");
             if (cursorName.equals("N_RESIZE") || cursorName.equals("S_RESIZE")) {
+                handle.setMinHeight(5);
                 handle.setPrefHeight(5);
+                handle.setMaxHeight(5);
                 handle.setMaxWidth(Double.MAX_VALUE);
             } else if (cursorName.equals("W_RESIZE") || cursorName.equals("E_RESIZE")) {
+                handle.setMinWidth(5);
                 handle.setPrefWidth(5);
+                handle.setMaxWidth(5);
                 handle.setMaxHeight(Double.MAX_VALUE);
             } else {
+                handle.setMinSize(12, 12);
                 handle.setPrefSize(12, 12);
+                handle.setMaxSize(12, 12);
             }
             if (top) StackPane.setAlignment(handle, left ? Pos.TOP_LEFT : right ? Pos.TOP_RIGHT : Pos.TOP_CENTER);
             else if (bottom) StackPane.setAlignment(handle, left ? Pos.BOTTOM_LEFT : right ? Pos.BOTTOM_RIGHT : Pos.BOTTOM_CENTER);
