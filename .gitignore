@@ -49,3 +49,11 @@ release/
 
 .idea/vcs.xml
 local-github/
+
+### 本地运行产物（含账号 token / 解包引擎 / 日志）
+/accounts.json
+/config-history/
+/cp.txt
+/engine/
+/icon-cache/
+*.tmp

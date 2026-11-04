@@ -25,9 +25,21 @@ public final class CrashAnalyzer {
     private CrashAnalyzer() {
     }
 
+    /** 本次启动的时间戳；用于过滤上一个会话遗留的 crash-report。 */
+    private static volatile long SESSION_START_MS;
+
+    /** 启动游戏时调用，标记本次会话开始时间。 */
+    public static void markSessionStart(long millis) {
+        SESSION_START_MS = millis;
+    }
+
     public static Report analyze(File gameDir) {
         File crash = newestCrash(gameDir);
         File log = new File(new File(gameDir, "logs"), "latest.log");
+        // 只认「本次启动之后」的崩溃报告，否则上一次会话的报告会被算到这次头上
+        if (crash != null && SESSION_START_MS > 0 && crash.lastModified() < SESSION_START_MS) {
+            crash = null;
+        }
         File source = crash != null ? crash : (log.isFile() ? log : null);
         String text = source == null ? "" : readTail(source, 600_000);
         List<Finding> findings = new ArrayList<>();
@@ -43,7 +55,12 @@ public final class CrashAnalyzer {
                 "当前 Java 版本低于模组/游戏要求。",
                 "安装对应 Java（1.20.1 用 17，1.21+ 用 21），并在设置里指定。");
         rule(text, findings,
-                new String[]{"Missing or unsupported mandatory dependencies", "requires"},
+                new String[]{
+                        "Missing or unsupported mandatory dependencies",
+                        "Incompatible mod set",
+                        "requires any version of",
+                        "Mod requires"
+                },
                 "缺少前置模组",
                 "模组依赖没有安装或版本不对。",
                 "打开实例设置 → 模组，点「检查前置」补齐依赖。");
@@ -63,7 +80,13 @@ public final class CrashAnalyzer {
                 "运行期找不到类/方法，常见于 Forge/Fabric 版本不对。",
                 "检查加载器版本与模组要求的版本是否一致。");
         rule(text, findings,
-                new String[]{"GLFW error", "Failed to create window", "OpenGL"},
+                new String[]{
+                        "GLFW error",
+                        "Failed to create window",
+                        "OpenGL context",
+                        "Pixel format not accelerated",
+                        "The driver does not appear to support OpenGL"
+                },
                 "显卡 / 窗口创建失败",
                 "显卡驱动或硬件加速有问题。",
                 "更新显卡驱动；远程桌面下可在设置里关闭硬件加速。");

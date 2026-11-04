@@ -1,0 +1,17 @@
+Neko Craft Launcher 内置下载引擎说明
+====================================
+
+内置的 aria2c.exe 来自 aria2 项目（构建标识：aria2 version 1.37.0-motrix.14，
+取自 Motrix 发行包 resources/extra/win32/x64/aria2c.exe）。
+
+aria2 许可：GNU General Public License v2.0
+许可全文：https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
+项目主页：https://aria2.github.io/
+源码仓库：https://github.com/aria2/aria2
+
+本启动器以「独立进程」方式调用该可执行文件（与 Motrix 的做法相同），
+不修改其代码；如果你再分发本启动器，请一并保留此说明与 GPLv2 全文，
+或让用户自行下载 aria2 并把路径写入 -Dneko.aria2=... 。
+
+内置引擎可以关闭：工具 → 性能优化 → 网络加速 →
+「使用 Motrix 的 aria2 引擎加速下载」，关闭后使用启动器自带的 HTTP 下载器。

@@ -119,9 +119,13 @@ public final class BootScreen extends StackPane {
                 + " -fx-border-radius: 4;");
         progressFill.setPrefHeight(9);
         progressFill.setMaxHeight(9);
+        progressFill.setMaxWidth(Double.MAX_VALUE);
         progressFill.setSnapToPixel(true);
         progressFill.setStyle("-fx-background-color: linear-gradient(to right, #8cc984, #b3dda9);"
                 + " -fx-background-radius: 4;");
+        // 进度条改用裁剪宽度推进：只改渲染，不触发父容器布局（原来是每帧 setPrefWidth）
+        javafx.scene.shape.Rectangle fillClip = new javafx.scene.shape.Rectangle();
+        progressFill.setClip(fillClip);
         progressTrack.getChildren().add(progressFill);
         StackPane.setAlignment(progressFill, Pos.CENTER_LEFT);
 
@@ -135,7 +139,7 @@ public final class BootScreen extends StackPane {
         StackPane.setAlignment(progressTrack, Pos.CENTER_LEFT);
         StackPane.setAlignment(catMarker, Pos.CENTER_LEFT);
         progressStack.widthProperty().addListener((obs, old, value) -> {
-            progressFill.setPrefWidth(Math.max(0, value.doubleValue() * lastProgress - 2));
+            fillClip.setWidth(Math.max(0, value.doubleValue() * lastProgress - 2));
             catMarker.setTranslateX(Math.max(-12, value.doubleValue() * lastProgress - 20));
         });
 
@@ -189,7 +193,7 @@ public final class BootScreen extends StackPane {
                     statusLabel.setText("猫猫团已就绪，正在加载中…");
                 }
                 lastProgress = Math.min(1.0, display);
-                progressFill.setPrefWidth(Math.max(0, progressStack.getWidth() * lastProgress - 2));
+                fillClip.setWidth(Math.max(0, progressStack.getWidth() * lastProgress - 2));
                 catMarker.setTranslateX(Math.max(-12, progressStack.getWidth() * lastProgress - 20));
                 percentLabel.setText((int) (display * 100) + "%");
                 if (progress >= 1 && ready) finish();

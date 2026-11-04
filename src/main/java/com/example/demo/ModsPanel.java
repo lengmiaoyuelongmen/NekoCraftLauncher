@@ -104,7 +104,6 @@ public final class ModsPanel extends VBox {
     private final Map<String, List<String>> missingDeps = new LinkedHashMap<>();
     private final Map<String, List<String>> missingByFile = new LinkedHashMap<>();
     private final Label depsHint = new Label();
-    private Button installDepsButton;
     private String metaSignature = "";
 
     /** @param modsDir 直接就是 mods 目录（调用方用 InstanceDirs.mods(...) 计算） */
@@ -150,7 +149,7 @@ public final class ModsPanel extends VBox {
         Button checkUpdate = miniButton("检查更新");
         checkUpdate.setOnAction(e -> checkUpdates());
 
-        HBox bulkRow = new HBox(8);
+        javafx.scene.layout.FlowPane bulkRow = new javafx.scene.layout.FlowPane(8, 6);
         Button enableAllBtn = miniButton("全启用");
         enableAllBtn.setOnAction(e -> setAllEnabled(true));
         Button disableAllBtn = miniButton("全禁用");
@@ -187,9 +186,7 @@ public final class ModsPanel extends VBox {
                 enableAllBtn, disableAllBtn, deleteDisabledBtn);
         bulkRow.setAlignment(Pos.CENTER_LEFT);
         localHeader.getChildren().addAll(localTitle, localSpacer, localCount);
-        Button checkDeps = miniButton("检查前置");
-        checkDeps.setOnAction(e -> checkDependencies());
-        HBox localTools = new HBox(8, refresh, checkUpdate, openDir, checkDeps);
+        HBox localTools = new HBox(8, refresh, checkUpdate, openDir);
         localTools.setAlignment(Pos.CENTER_LEFT);
 
         localScroll = new ScrollPane(localList);
@@ -201,13 +198,7 @@ public final class ModsPanel extends VBox {
         depsHint.setWrapText(true);
         HBox.setHgrow(depsHint, Priority.ALWAYS);
         depsHint.setMaxWidth(Double.MAX_VALUE);
-        installDepsButton = miniButton("补齐前置");
-        installDepsButton.setStyle("-fx-background-color: #9ca3af; -fx-text-fill: #111827; -fx-cursor: hand;"
-                + " -fx-background-radius: 6; -fx-padding: 4 10; -fx-font-size: 12px; -fx-font-weight: bold;");
-        installDepsButton.setVisible(false);
-        installDepsButton.setManaged(false);
-        installDepsButton.setOnAction(e -> installMissingDependencies());
-        HBox depsRow = new HBox(8, depsHint, installDepsButton);
+        HBox depsRow = new HBox(8, depsHint);
         depsRow.setAlignment(Pos.CENTER_LEFT);
 
         localCard.getChildren().addAll(localHeader, localTools, bulkRow, updateHint, depsRow, localScroll);
@@ -370,9 +361,35 @@ public final class ModsPanel extends VBox {
                     + modsDir.getAbsolutePath()));
             return;
         }
+        // 按「已启用 / 已禁用」分组，避免启用和禁用的 jar 混在一起
+        java.util.List<File> enabledFiles = new java.util.ArrayList<>();
+        java.util.List<File> disabledFiles = new java.util.ArrayList<>();
         for (File file : files) {
-            localList.getChildren().add(localRow(file));
+            if (file.getName().toLowerCase().endsWith(".disabled")) {
+                disabledFiles.add(file);
+            } else {
+                enabledFiles.add(file);
+            }
         }
+        if (!enabledFiles.isEmpty()) {
+            localList.getChildren().add(modsSection("已启用 · " + enabledFiles.size()));
+            for (File file : enabledFiles) {
+                localList.getChildren().add(localRow(file));
+            }
+        }
+        if (!disabledFiles.isEmpty()) {
+            localList.getChildren().add(modsSection("已禁用 · " + disabledFiles.size()));
+            for (File file : disabledFiles) {
+                localList.getChildren().add(localRow(file));
+            }
+        }
+    }
+
+    private Label modsSection(String text) {
+        Label label = new Label(text);
+        label.setStyle("-fx-text-fill: -app-text-dim-3; -fx-font-size: 11px; -fx-font-weight: bold;");
+        label.setPadding(new Insets(10, 4, 2, 4));
+        return label;
     }
 
     // ================== 前置依赖 ==================
@@ -393,12 +410,10 @@ public final class ModsPanel extends VBox {
     }
 
     private void updateDepsHint() {
-        if (installDepsButton == null) return;
+        if (depsHint == null) return;
         if (missingDeps.isEmpty()) {
             depsHint.setText(modInfos.isEmpty() ? "" : "✅ 前置依赖齐全");
             depsHint.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
-            installDepsButton.setVisible(false);
-            installDepsButton.setManaged(false);
             return;
         }
         StringBuilder text = new StringBuilder("⚠ 缺少前置：");
@@ -411,79 +426,9 @@ public final class ModsPanel extends VBox {
         if (missingDeps.size() > 3) text.append(" 等 ").append(missingDeps.size()).append(" 个");
         depsHint.setText(text.toString());
         depsHint.setStyle("-fx-text-fill: #ffb74d; -fx-font-size: 11px;");
-        installDepsButton.setVisible(true);
-        installDepsButton.setManaged(true);
     }
-
-    /** 「补齐前置」：按 modId 在 Modrinth 上找项目，逐个装上。 */
-    private void installMissingDependencies() {
-        List<String> ids = new ArrayList<>(missingDeps.keySet());
-        if (ids.isEmpty()) return;
-        installDepsButton.setDisable(true);
-        installDepsButton.setText("安装中…");
-        depsHint.setText("正在安装 " + ids.size() + " 个前置…");
-
-        CompletableFuture.runAsync(() -> {
-            int installed = 0;
-            for (String id : ids) {
-                try {
-                    Resolved resolved = resolveProject(id);
-                    if (resolved == null) {
-                        logLater("❌ Modrinth 上找不到前置 " + id);
-                        continue;
-                    }
-                    Downloaded downloaded = downloadProjectVersion(resolved.id(), resolved.title());
-                    rememberDownloaded(downloaded);
-                    installed++;
-                    logLater("📎 已安装前置 " + resolved.title() + " → " + downloaded.fileName());
-                } catch (Exception e) {
-                    logLater("❌ 前置 " + id + " 安装失败: " + e.getMessage());
-                }
-            }
-            int ok = installed;
-            Platform.runLater(() -> {
-                installDepsButton.setDisable(false);
-                installDepsButton.setText("补齐前置");
-                log("📎 前置安装完成：" + ok + "/" + ids.size());
-                if (ok > 0) Toast.ok("已补齐 " + ok + " 个前置");
-                else Toast.warn("没有找到可安装的前置");
-                lastSignature = "";
-                refreshLocal(true);
-            });
-        });
-    }
-
     /** 新装的模组如果还有缺失前置，按设置自动补装（最多递归两层，防止环）。 */
-    private void autoInstallDependencies(File jar, int depth) {
-        if (jar == null || depth > 2) return;
-        if (config != null && !config.isAutoInstallDeps()) return;
-        try {
-            List<ModDependencyScanner.ModInfo> all = ModDependencyScanner.scan(modsDir);
-            ModDependencyScanner.ModInfo info = ModDependencyScanner.scanJar(jar);
-            List<String> missing = ModDependencyScanner.missingFor(info, all);
-            if (missing.isEmpty()) return;
-            logLater("📎 " + ModDependencyScanner.displayName(info) + " 需要前置: " + String.join(", ", missing));
-            for (String id : missing) {
-                try {
-                    Resolved resolved = resolveProject(id);
-                    if (resolved == null) {
-                        logLater("❌ 找不到前置 " + id + "，可以在右侧手动搜索");
-                        continue;
-                    }
-                    Downloaded downloaded = downloadProjectVersion(resolved.id(), resolved.title());
-                    rememberDownloaded(downloaded);
-                    logLater("📎 自动安装前置 " + resolved.title() + " → " + downloaded.fileName());
-                    autoInstallDependencies(new File(modsDir, downloaded.fileName()), depth + 1);
-                } catch (Exception e) {
-                    logLater("❌ 自动安装前置 " + id + " 失败: " + e.getMessage());
-                }
-            }
-        } catch (Exception ignored) {
-            // jar 损坏 / 没有元数据：不影响安装结果
-        }
-    }
-
-    private HBox localRow(File file) {
+        private HBox localRow(File file) {
         boolean disabled = file.getName().toLowerCase().endsWith(".disabled");
         String displayName = disabled
                 ? file.getName().substring(0, file.getName().length() - ".disabled".length())
@@ -558,6 +503,13 @@ public final class ModsPanel extends VBox {
     }
 
     // ================== 在线搜索 / 安装 ==================
+
+    /** 供 AI 助手 / 外部调用：带关键词打开搜索。 */
+    public void searchFor(String query) {
+        if (query == null || query.isBlank()) return;
+        searchField.setText(query.trim());
+        search();
+    }
 
     /** 重新搜索：清空列表，从第一页开始。 */
     private void search() {
@@ -759,7 +711,6 @@ public final class ModsPanel extends VBox {
                     log("✅ 已从 CurseForge 镜像安装 " + file.fileName());
                     Toast.ok("已安装 " + hit.name());
                 });
-                autoInstallDependencies(out, 0);
             } catch (Exception e) {
                 Platform.runLater(() -> {
                     button.setDisable(false);
@@ -911,21 +862,6 @@ public final class ModsPanel extends VBox {
         row.getChildren().addAll(icon, info, star, quick, detail);
         return row;
     }
-
-    private void checkDependencies() {
-        List<ModDependencyScanner.ModInfo> mods = ModDependencyScanner.scan(modsDir);
-        Map<String, List<String>> missing = ModDependencyScanner.findMissingDependencies(mods);
-        if (missing.isEmpty()) {
-            Toast.ok("前置依赖齐全");
-            log("✅ 前置依赖齐全（共 " + mods.size() + " 个模组）");
-            return;
-        }
-        missingDeps.clear();
-        missingDeps.putAll(missing);
-        log("📎 检测到 " + missing.size() + " 个缺失前置，开始补齐");
-        installMissingDependencies();
-    }
-
     public void openProjectDetail(String projectId, String title) {
         openModDetail(projectId, title);
     }
@@ -1160,7 +1096,6 @@ public final class ModsPanel extends VBox {
                     log("✅ 已安装模组 " + downloaded.fileName() + "（" + (size / 1024) + " KB）");
                     Toast.ok("已安装 " + downloaded.title());
                 });
-                autoInstallDependencies(new File(modsDir, downloaded.fileName()), 0);
             } catch (Exception e) {
                 logLater("❌ 安装失败: " + e.getMessage());
             }
@@ -1245,7 +1180,6 @@ public final class ModsPanel extends VBox {
                     log("✅ 已从 CurseForge 安装 " + file.name());
                     Toast.ok("已从 CurseForge 安装 " + title);
                 });
-                autoInstallDependencies(out, 0);
             } catch (Exception e) {
                 Platform.runLater(() -> {
                     button.setDisable(false);
@@ -1285,7 +1219,6 @@ public final class ModsPanel extends VBox {
                                 log("✅ 已安装模组 " + downloaded.fileName() + "（" + (size / 1024) + " KB）");
                                 Toast.ok("已安装 " + downloaded.title());
                             });
-                            autoInstallDependencies(new File(modsDir, downloaded.fileName()), 0);
                         } catch (Exception e) {
                             Platform.runLater(() -> {
                                 button.setDisable(false);
@@ -1671,20 +1604,21 @@ public final class ModsPanel extends VBox {
             Toast.info("先勾选要删除的模组");
             return;
         }
-        boolean ok = Dialogs.confirm(getScene() == null ? null : getScene().getWindow(),
-                "删除选中模组", "确定删除选中的 " + selectedMods.size() + " 个模组吗？",
-                "文件会直接从 mods 目录删除，无法恢复。");
-        if (!ok) return;
-        int removed = 0;
-        for (String name : new ArrayList<>(selectedMods)) {
-            if (new File(modsDir, name).delete()) removed++;
-        }
-        log("🗑️ 已删除 " + removed + " 个选中模组");
-        Toast.ok("已删除 " + removed + " 个模组");
-        selectedMods.clear();
-        lastSignature = "";
-        metaSignature = "";
-        refreshLocal(true);
+        InAppDialog.confirm(null,
+                "删除选中模组", "确定删除选中的 " + selectedMods.size() + " 个模组吗？文件会直接从 mods 目录删除，无法恢复。",
+                "删除",
+                () -> {
+            int removed = 0;
+            for (String name : new ArrayList<>(selectedMods)) {
+                if (new File(modsDir, name).delete()) removed++;
+            }
+            log("🗑️ 已删除 " + removed + " 个选中模组");
+            Toast.ok("已删除 " + removed + " 个模组");
+            selectedMods.clear();
+            lastSignature = "";
+            metaSignature = "";
+            refreshLocal(true);
+                });
     }
 
     // ================== 模组更新 ==================

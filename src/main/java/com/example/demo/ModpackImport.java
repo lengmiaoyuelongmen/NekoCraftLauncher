@@ -14,6 +14,7 @@ import java.util.Locale;
 import java.util.function.Consumer;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
+import java.util.zip.ZipOutputStream;
 
 /**
  * 整合包导入：支持 Modrinth (.mrpack)、CurseForge (manifest.json)、
@@ -32,8 +33,69 @@ public final class ModpackImport {
     private ModpackImport() {
     }
 
+    private static final java.util.Map<String, File> REPAIRED = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** 某些中文 ZIP 使用错误编码写文件名，JDK ZipFile 会报 invalid CEN header。用 7-Zip/NanaZip 重打包。 */
+    private static ZipFile open(File archive) throws Exception {
+        try {
+            return new ZipFile(archive);
+        } catch (Exception first) {
+            File repaired = repair(archive);
+            if (repaired == null) throw first;
+            return new ZipFile(repaired);
+        }
+    }
+
+    private static File repair(File archive) {
+        String key = archive.getAbsolutePath() + "|" + archive.length() + "|" + archive.lastModified();
+        File cached = REPAIRED.get(key);
+        if (cached != null && cached.isFile()) return cached;
+        try {
+            File temp = java.nio.file.Files.createTempDirectory("neko-unzip-").toFile();
+            java.util.List<String> command = new java.util.ArrayList<>();
+            String[] candidates = {
+                    System.getenv("LOCALAPPDATA") + "\\Microsoft\\WindowsApps\\7z.exe",
+                    System.getenv("ProgramFiles") + "\\7-Zip\\7z.exe",
+                    System.getenv("ProgramFiles") + "\\NanaZip\\NanaZipC.exe",
+                    "7z"
+            };
+            boolean found = false;
+            for (String candidate : candidates) {
+                if (candidate == null || candidate.contains("null")) continue;
+                if (candidate.equals("7z") || new File(candidate).isFile()) {
+                    command.add(candidate);
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) return null;
+            command.add("x");
+            command.add("-y");
+            command.add("-o" + temp.getAbsolutePath());
+            command.add(archive.getAbsolutePath());
+            Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
+            process.getInputStream().transferTo(java.io.OutputStream.nullOutputStream());
+            if (process.waitFor() != 0) return null;
+            File out = new File(temp, "repaired-" + System.nanoTime() + ".zip");
+            try (ZipOutputStream zip = new ZipOutputStream(new java.io.FileOutputStream(out));
+                 java.util.stream.Stream<java.nio.file.Path> walk = java.nio.file.Files.walk(temp.toPath())) {
+                for (java.nio.file.Path path : walk.filter(java.nio.file.Files::isRegularFile).toList()) {
+                    if (path.equals(out.toPath())) continue;
+                    String name = temp.toPath().relativize(path).toString().replace('\\', '/');
+                    zip.putNextEntry(new ZipEntry(name));
+                    java.nio.file.Files.copy(path, zip);
+                    zip.closeEntry();
+                }
+            }
+            REPAIRED.put(key, out);
+            return out;
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
     public static Pack inspect(File archive) throws Exception {
-        try (ZipFile zip = new ZipFile(archive)) {
+        try (ZipFile zip = open(archive)) {
             ZipEntry index = zip.getEntry("modrinth.index.json");
             if (index != null) {
                 JsonObject json = JsonParser.parseString(new String(
@@ -166,7 +228,7 @@ public final class ModpackImport {
      */
     public static int extract(File archive, File targetDir, Consumer<String> log) throws Exception {
         int count = 0;
-        try (ZipFile zip = new ZipFile(archive)) {
+        try (ZipFile zip = open(archive)) {
             Enumeration<? extends ZipEntry> entries = zip.entries();
             while (entries.hasMoreElements()) {
                 ZipEntry entry = entries.nextElement();
@@ -192,7 +254,7 @@ public final class ModpackImport {
     /** 按 Modrinth 索引里的 files 列表补齐实际模组文件。overrides 只包含配置，不含大部分模组。 */
     public static int installIndexedFiles(File archive, File targetDir, Consumer<String> log) throws Exception {
         java.util.List<DownloadManager.Task> tasks = new java.util.ArrayList<>();
-        try (ZipFile zip = new ZipFile(archive)) {
+        try (ZipFile zip = open(archive)) {
             ZipEntry index = zip.getEntry("modrinth.index.json");
             if (index != null) {
                 JsonObject json = JsonParser.parseString(new String(
@@ -249,10 +311,32 @@ public final class ModpackImport {
         if (tasks.isEmpty()) return 0;
         if (log != null) log.accept("正在补齐索引中的 " + tasks.size() + " 个模组文件…");
         DownloadManager.Stats stats = DownloadManager.downloadAll(tasks, 8, null, "auto", 0);
-        int installed = tasks.size() - stats.failed;
-        if (log != null) log.accept("索引文件完成: " + installed + "/" + tasks.size()
-                + (stats.failed > 0 ? "，失败 " + stats.failed : ""));
+        java.util.List<DownloadManager.Task> failed = new java.util.ArrayList<>();
+        for (DownloadManager.Task task : tasks) {
+            if (!ok(task)) failed.add(task);
+        }
+        if (!failed.isEmpty()) {
+            // 少数文件常被 CDN 限流/403，换源再试一轮，避免装完缺模组
+            if (log != null) log.accept("↻ 有 " + failed.size() + " 个文件没下完整，正在重试…");
+            DownloadManager.downloadAll(failed, 4, null, "official", 0);
+        }
+        int installed = 0;
+        for (DownloadManager.Task task : tasks) {
+            if (ok(task)) installed++;
+        }
+        int finalFailed = tasks.size() - installed;
+        if (log != null) {
+            log.accept("索引文件完成: " + installed + "/" + tasks.size()
+                    + (finalFailed > 0 ? "，失败 " + finalFailed : ""));
+        }
         return installed;
+    }
+
+    /** 文件是否已完整落盘（大小对得上）。 */
+    private static boolean ok(DownloadManager.Task task) {
+        java.io.File file = task.target;
+        if (!file.isFile() || file.length() == 0) return false;
+        return task.size <= 0 || file.length() == task.size;
     }
 
     /** 将 mods/** 子目录里的 jar 移到 mods 根目录，否则启动器/Minecraft 不会读取。 */

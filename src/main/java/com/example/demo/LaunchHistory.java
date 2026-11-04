@@ -46,13 +46,21 @@ public final class LaunchHistory {
         return load(gameDir);
     }
 
+    /**
+     * 旧版本把「日志里出现异常」也记成 crash，退出码 0 的正常退出同样被标红。
+     * 这里统一按退出码修正，避免概览里出现一整列「异常」。
+     */
+    public static boolean isCrash(Entry entry) {
+        return entry.crash() && (entry.exitCode() != 0 || entry.sessionSeconds() <= 0);
+    }
+
     public static synchronized Summary summary(File gameDir) {
         List<Entry> entries = load(gameDir);
         int crashes = 0;
         long prepTotal = 0;
         int prepCount = 0;
         for (Entry entry : entries) {
-            if (entry.crash()) crashes++;
+            if (isCrash(entry)) crashes++;
             if (entry.prepMs() > 0) {
                 prepTotal += entry.prepMs();
                 prepCount++;

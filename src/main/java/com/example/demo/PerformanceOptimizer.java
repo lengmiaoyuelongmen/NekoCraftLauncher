@@ -91,7 +91,14 @@ public final class PerformanceOptimizer {
             steps.add(new Step("系统检查", false, "仅支持 Windows"));
             return new Result(steps);
         }
+        File backupFile = backupFile(gameDir);
+        boolean backupExists = backupFile.isFile();
         Backup backup = load(gameDir);
+        if (backup == null && backupExists) {
+            // 文件在但解析失败：绝不能用空备份覆盖唯一可回滚的原值记录
+            steps.add(new Step("优化备份", false, "优化备份已损坏，已拒绝应用（避免无法回滚）"));
+            return new Result(steps);
+        }
         if (backup == null) backup = new Backup();
 
         if (powerPlan && backup.powerScheme == null) {

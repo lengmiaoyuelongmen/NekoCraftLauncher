@@ -2,6 +2,7 @@ package com.example.demo;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Button;
@@ -20,6 +21,7 @@ import javafx.stage.FileChooser;
 import javafx.stage.Window;
 
 import java.io.File;
+import java.util.List;
 
 /** 本地皮肤 / 披风预览，不上传材质站。 */
 public final class SkinPreviewDialog {
@@ -28,17 +30,23 @@ public final class SkinPreviewDialog {
     }
 
     public static void show(Window owner, LauncherConfig config, String accountSkinUrl) {
-        Dialog<Void> dialog = new Dialog<>();
-        if (owner != null) dialog.initOwner(owner);
-        dialog.setTitle("皮肤 / 披风预览");
-        dialog.setHeaderText(null);
+        InAppDialog.customSized(
+                null,
+                "皮肤 / 披风预览",
+                buildContent(owner, config, accountSkinUrl),
+                List.of(InAppDialog.Action.secondary("关闭", null)),
+                null,
+                820,
+                820);
+    }
+
+    private static Node buildContent(Window owner, LauncherConfig config, String accountSkinUrl) {
 
         Skin3DPreview preview3D = new Skin3DPreview();
         Image[] skin = {load(config.getPreviewSkinPath())};
         Image[] cape = {load(config.getPreviewCapePath())};
         Runnable redraw = () -> preview3D.setImages(skin[0], cape[0]);
         redraw.run();
-
         Label title = new Label("皮肤 / 披风预览");
         title.setStyle("-fx-text-fill: -app-text; -fx-font-size: 19px; -fx-font-weight: bold;");
         Label subtitle = new Label("本地模型预览，不会上传到 LittleSkin");
@@ -59,6 +67,20 @@ public final class SkinPreviewDialog {
 
         Label skinName = new Label(skin[0] == null ? "未选择皮肤" : "已载入皮肤");
         Label capeName = new Label(cape[0] == null ? "未选择披风" : "已载入披风");
+        if (accountSkinUrl != null && !accountSkinUrl.isBlank()) {
+            String freshUrl = accountSkinUrl + (accountSkinUrl.contains("?") ? "&" : "?")
+                    + "t=" + System.currentTimeMillis();
+            Image fresh = new Image(freshUrl, true);
+            fresh.progressProperty().addListener((obs, old, value) -> {
+                if (value.doubleValue() >= 1 && !fresh.isError()) {
+                    skin[0] = fresh;
+                    skinName.setText("已重新获取账号高清皮肤");
+                    redraw.run();
+                }
+            });
+        }
+
+
         String nameStyle = "-fx-text-fill: -app-text-muted; -fx-font-size: 10px;";
         skinName.setStyle(nameStyle);
         capeName.setStyle(nameStyle);
@@ -121,9 +143,25 @@ public final class SkinPreviewDialog {
             redraw.run();
         });
 
+        javafx.scene.control.CheckBox slimBox = new javafx.scene.control.CheckBox("纤细手臂 (Slim)");
+        slimBox.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 11px;");
+        slimBox.selectedProperty().addListener((o, a, on) -> preview3D.setSlim(on));
+        javafx.scene.control.ComboBox<String> poseBox = new javafx.scene.control.ComboBox<>();
+        poseBox.getItems().addAll("待机", "行走", "奔跑", "挥手");
+        poseBox.setValue("待机");
+        poseBox.setMaxWidth(Double.MAX_VALUE);
+        poseBox.valueProperty().addListener((o, a, v) -> preview3D.setPose(
+                "行走".equals(v) ? "walk" : "奔跑".equals(v) ? "run" : "挥手".equals(v) ? "wave" : "idle"));
+        javafx.scene.control.ComboBox<String> bgBox = new javafx.scene.control.ComboBox<>();
+        bgBox.getItems().addAll("浅绿", "天空", "粉色", "夜景", "透明");
+        bgBox.setValue("浅绿");
+        bgBox.setMaxWidth(Double.MAX_VALUE);
+        bgBox.valueProperty().addListener((o, a, v) -> preview3D.setBackgroundMode(v));
+
         VBox controls = new VBox(9,
                 section("当前材质"), skinName, capeName,
                 section("载入"), chooseSkin, chooseCape, account,
+                section("预览"), slimBox, poseBox, bgBox,
                 section("材质站"), manage, clear,
                 hint);
         controls.setPrefWidth(250);
@@ -131,15 +169,15 @@ public final class SkinPreviewDialog {
                 + " -fx-border-color: -app-border-soft; -fx-border-radius: 16; -fx-padding: 14;");
         HBox body = new HBox(16, preview, controls);
         body.setAlignment(Pos.TOP_LEFT);
-        VBox content = new VBox(14, hero, body);
+        javafx.scene.control.ScrollPane bodyScroll = new javafx.scene.control.ScrollPane(body);
+        bodyScroll.setFitToWidth(true);
+        bodyScroll.setHbarPolicy(javafx.scene.control.ScrollPane.ScrollBarPolicy.NEVER);
+        bodyScroll.setVbarPolicy(javafx.scene.control.ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        bodyScroll.setStyle("-fx-background: transparent; -fx-background-color: transparent; -fx-border-color: transparent;");
+        javafx.scene.layout.VBox content = new javafx.scene.layout.VBox(14, hero, bodyScroll);
+        javafx.scene.layout.VBox.setVgrow(bodyScroll, javafx.scene.layout.Priority.ALWAYS);
         content.setPadding(new Insets(2, 0, 4, 0));
-        dialog.getDialogPane().setContent(content);
-        dialog.getDialogPane().getButtonTypes().add(new ButtonType("关闭", ButtonBar.ButtonData.CANCEL_CLOSE));
-        dialog.getDialogPane().getStyleClass().add("dialog-pane");
-        if (owner != null && owner.getScene() != null) {
-            dialog.getDialogPane().getStylesheets().addAll(owner.getScene().getStylesheets());
-        }
-        dialog.showAndWait();
+        return content;
     }
 
     private static Label section(String text) {

@@ -29,6 +29,10 @@ public class LauncherConfig {
         return cwd;
     }
     private static final File CONFIG_FILE = resolveConfigFile();
+
+    public static File file() {
+        return CONFIG_FILE;
+    }
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     /** 最大堆内存，单位 MB */
@@ -82,6 +86,16 @@ public class LauncherConfig {
     /** 界面动画（关掉相当于性能模式，低配机器更顺） */
     private boolean animations = true;
 
+    /** 下载加速：检测到 Motrix 的 aria2c 时优先用它下载。 */
+    private boolean aria2Enabled = true;
+
+    /** 网络加速：启动时自动测速并配置 DNS（需要管理员权限，失败不影响启动）。 */
+    private boolean networkBoost = true;
+
+    /** 上次选中的 DNS 服务器。 */
+    private String preferredDns = "";
+
+
     /** 启动前自动检查并补全缺失的库文件 */
     private boolean autoRepairLibraries = true;
 
@@ -102,6 +116,7 @@ public class LauncherConfig {
     private String avatarImage = "";
     private boolean avatarUseSkin = false;
     private String lastImportDir = "";
+    private String lastPage = "launch";
     private String previewSkinPath = "";
     private String previewCapePath = "";
     private String updateMirrorUrl = "";
@@ -112,8 +127,8 @@ public class LauncherConfig {
     /** 是否启用 DeepSeek AI（开启后命令栏输入直接发给模型） */
     private boolean aiEnabled;
 
-    /** DeepSeek API Key（保存在 config.json，请勿分享该文件） */
-    private String aiApiKey = "";
+    /** DeepSeek API Key（transient，注册表存储，不进入 config.json） */
+    private transient String aiApiKey = "";
 
     /** DeepSeek 模型名 */
     private String aiModel = "deepseek-chat";
@@ -171,6 +186,9 @@ public class LauncherConfig {
             try (Reader reader = new FileReader(CONFIG_FILE)) {
                 LauncherConfig loaded = GSON.fromJson(reader, LauncherConfig.class);
                 if (loaded != null) {
+                    // aiApiKey 是 transient，不会从 config.json 读回来，必须从注册表恢复；
+                    // 少了这一步，每次重启 Key 都是空的，save() 还会把注册表里的 Key 覆盖成空。
+                    loaded.aiApiKey = SecretStore.loadAiApiKey();
                     String before = loaded.updateUrl;
                     loaded.normalize();
                     if (before == null || !before.equals(loaded.updateUrl)) loaded.save();
@@ -181,6 +199,7 @@ public class LauncherConfig {
             }
         }
         LauncherConfig config = new LauncherConfig();
+        config.aiApiKey = SecretStore.loadAiApiKey();
         config.save();
         return config;
     }
@@ -190,6 +209,7 @@ public class LauncherConfig {
      */
     public void save() {
         normalize();
+        SecretStore.saveAiApiKey(aiApiKey);
         // 相对路径保存：发布目录整体移动后仍能找到 game
         String originalGameDir = gameDir;
         java.util.List<String> originalDirs = new java.util.ArrayList<>(gameDirs);
@@ -198,6 +218,7 @@ public class LauncherConfig {
         java.util.List<String> portableDirs = new java.util.ArrayList<>();
         for (String dir : gameDirs) portableDirs.add(portablePath(dir, base));
         gameDirs = portableDirs;
+        ConfigHistory.snapshot(CONFIG_FILE);
         try (Writer writer = new FileWriter(CONFIG_FILE)) {
             GSON.toJson(this, writer);
         } catch (Exception ignored) {
@@ -230,6 +251,7 @@ public class LauncherConfig {
         if (jvmArgs == null) jvmArgs = "";
         if (avatarImage == null) avatarImage = "";
         if (lastImportDir == null) lastImportDir = "";
+        if (lastPage == null || lastPage.isBlank()) lastPage = "launch";
         if (previewSkinPath == null) previewSkinPath = "";
         if (previewCapePath == null) previewCapePath = "";
         if (updateMirrorUrl == null) updateMirrorUrl = "";
@@ -382,6 +404,30 @@ public class LauncherConfig {
         this.uiOpacity = uiOpacity;
     }
 
+    public boolean isAria2Enabled() {
+        return aria2Enabled;
+    }
+
+    public void setAria2Enabled(boolean aria2Enabled) {
+        this.aria2Enabled = aria2Enabled;
+    }
+
+    public boolean isNetworkBoost() {
+        return networkBoost;
+    }
+
+    public void setNetworkBoost(boolean networkBoost) {
+        this.networkBoost = networkBoost;
+    }
+
+    public String getPreferredDns() {
+        return preferredDns == null ? "" : preferredDns;
+    }
+
+    public void setPreferredDns(String preferredDns) {
+        this.preferredDns = preferredDns == null ? "" : preferredDns;
+    }
+
     public boolean isAnimations() {
         return animations;
     }
@@ -389,6 +435,7 @@ public class LauncherConfig {
     public void setAnimations(boolean animations) {
         this.animations = animations;
     }
+
 
     public double getAnimationSpeed() {
         return animationSpeed;
@@ -507,6 +554,14 @@ public class LauncherConfig {
 
     public void setPreviewCapePath(String path) {
         this.previewCapePath = path;
+    }
+
+    public String getLastPage() {
+        return lastPage == null || lastPage.isBlank() ? "launch" : lastPage;
+    }
+
+    public void setLastPage(String lastPage) {
+        this.lastPage = lastPage;
     }
 
     public String getLastImportDir() {

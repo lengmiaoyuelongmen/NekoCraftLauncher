@@ -17,15 +17,47 @@ public final class SingleInstance {
     private SingleInstance() {
     }
 
+    /** 上一次 acquire 失败的真实原因（供界面区分「已在运行」和「目录不可写」）。 */
+    private static String lastError = "";
+
+    public static String lastError() {
+        return lastError == null ? "" : lastError;
+    }
+
     public static boolean acquire(File gameDir) {
+        lastError = "";
+        FileChannel ch = null;
         try {
             File file = new File(gameDir, ".launcher.lock");
-            channel = new FileOutputStream(file, true).getChannel();
-            lock = channel.tryLock();
-            return lock != null;
-        } catch (Exception e) {
-            // 锁失败时按“已在运行”处理，避免配置被并发覆盖
+            ch = new FileOutputStream(file, true).getChannel();
+            FileLock acquired = ch.tryLock();
+            if (acquired == null) {
+                // 这才是真的「已有实例在运行」
+                lastError = "已有启动器实例持有锁";
+                ch.close();
+                return false;
+            }
+            channel = ch;
+            lock = acquired;
+            return true;
+        } catch (java.nio.channels.OverlappingFileLockException overlap) {
+            lastError = "已有启动器实例持有锁";
+            closeQuietly(ch);
             return false;
+        } catch (Exception e) {
+            // 权限/磁盘问题不能被误报成「已在运行」
+            lastError = "无法创建锁文件：" + e.getMessage();
+            closeQuietly(ch);
+            return false;
+        }
+    }
+
+    private static void closeQuietly(FileChannel ch) {
+        if (ch == null) return;
+        try {
+            ch.close();
+        } catch (IOException ignored) {
+            // 关闭失败无所谓
         }
     }
 

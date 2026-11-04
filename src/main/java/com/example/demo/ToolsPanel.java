@@ -46,9 +46,11 @@ public final class ToolsPanel extends VBox {
         setSpacing(0);
 
         VBox side = new VBox(2);
-        side.setPrefWidth(190);
-        side.setMinWidth(190);
-        side.setMaxWidth(190);
+        javafx.beans.binding.DoubleBinding sideWidth =
+                javafx.beans.binding.Bindings.when(widthProperty().lessThan(1120)).then(168.0).otherwise(190.0);
+        side.prefWidthProperty().bind(sideWidth);
+        side.minWidthProperty().bind(sideWidth);
+        side.maxWidthProperty().bind(sideWidth);
         side.setPadding(new Insets(14, 8, 12, 8));
         side.setStyle("-fx-background-color: -app-nav;"
                 + " -fx-border-color: transparent -app-border-5 transparent transparent;");
@@ -60,7 +62,8 @@ public final class ToolsPanel extends VBox {
                 tabItem("缓存"),
                 sectionLabel("其他"),
                 tabItem("快捷入口"),
-                tabItem("百宝箱"));
+                tabItem("百宝箱"),
+                tabItem("插件"));
 
         pages.put("环境", buildEnvironment());
         pages.put("性能优化", buildPerformance());
@@ -68,6 +71,7 @@ public final class ToolsPanel extends VBox {
         pages.put("缓存", buildCache());
         pages.put("快捷入口", buildShortcuts());
         pages.put("百宝箱", buildToolbox());
+        pages.put("插件", buildPlugins());
 
         content.setStyle("-fx-background-color: transparent;");
         HBox.setHgrow(content, Priority.ALWAYS);
@@ -325,6 +329,14 @@ public final class ToolsPanel extends VBox {
                 }));
         monitor.setCycleCount(javafx.animation.Animation.INDEFINITE);
         monitor.play();
+        // 工具页不可见时停掉 2 秒一次的采样，避免后台空转
+        visibleProperty().addListener((o, was, now) -> {
+            if (Boolean.TRUE.equals(now)) {
+                monitor.play();
+            } else {
+                monitor.stop();
+            }
+        });
 
         Label cleanStatus = new Label("清理启动器 Java 堆和当前进程工作集，不会关闭应用。");
         cleanStatus.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
@@ -363,6 +375,107 @@ public final class ToolsPanel extends VBox {
                 });
             });
         });
+        Label dnsStatus = new Label("当前：" + NetworkBoost.describe());
+        dnsStatus.setStyle("-fx-text-fill: -app-text-dim; -fx-font-size: 11.5px;");
+        dnsStatus.setWrapText(true);
+        Label dnsProbe = new Label("点「自动加速」会先测速再写入 DNS");
+        dnsProbe.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
+        dnsProbe.setWrapText(true);
+
+        Button autoBoost = smallButton("自动加速（测速并配置 DNS）", e -> {
+            Button button = (Button) e.getSource();
+            button.setDisable(true);
+            dnsProbe.setText("正在测速…");
+            CompletableFuture.supplyAsync(NetworkBoost::autoApply)
+                    .thenAccept(result -> Platform.runLater(() -> {
+                        button.setDisable(false);
+                        dnsProbe.setText(result.message());
+                        log.accept((result.ok() ? "🌐 " : "⚠️ ") + result.message());
+                        if (result.ok()) {
+                            config.setNetworkBoost(true);
+                            if (result.chosen() != null) {
+                                config.setPreferredDns(result.chosen().server());
+                            }
+                            config.save();
+                            Toast.ok("网络加速已应用");
+                        }
+                        dnsStatus.setText("当前：" + NetworkBoost.describe());
+                    }))
+                    .exceptionally(ex -> {
+                        Platform.runLater(() -> {
+                            button.setDisable(false);
+                            dnsProbe.setText("测速失败：" + ex.getMessage());
+                        });
+                        return null;
+                    });
+        });
+
+        Button dnsReset = smallButton("恢复自动 DNS", e -> {
+            Button button = (Button) e.getSource();
+            button.setDisable(true);
+            CompletableFuture.supplyAsync(NetworkBoost::reset)
+                    .thenAccept(result -> Platform.runLater(() -> {
+                        button.setDisable(false);
+                        dnsProbe.setText(result.message());
+                        if (result.ok()) {
+                            config.setNetworkBoost(false);
+                            config.save();
+                            Toast.ok("已恢复自动 DNS");
+                        }
+                        dnsStatus.setText("当前：" + NetworkBoost.describe());
+                    }));
+        });
+
+        Button dnsTest = smallButton("只测速不改设置", e -> {
+            ((Button) e.getSource()).setDisable(true);
+            dnsProbe.setText("正在测速…");
+            CompletableFuture.supplyAsync(NetworkBoost::summary)
+                    .thenAccept(text -> Platform.runLater(() -> {
+                        dnsProbe.setText(text);
+                        dnsStatus.setText("当前：" + NetworkBoost.describe());
+                    }));
+        });
+        Button dnsFlush = smallButton("清空 DNS 缓存", e -> {
+            if (NetworkBoost.flushDns()) {
+                Toast.ok("DNS 缓存已清空");
+            } else {
+                Toast.error("清空失败");
+            }
+        });
+
+        Label engineStatus =
+                new Label("下载引擎：" + (Aria2Downloader.available() ? "aria2（" + Aria2Downloader.describe() + "）" : "内置 HTTP（未检测到 Motrix）"));
+        engineStatus.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 10.5px;");
+        engineStatus.setWrapText(true);
+        CheckBox aria2Box = new CheckBox("使用 Motrix 的 aria2 引擎加速下载（大文件多连接）");
+        aria2Box.setSelected(config.isAria2Enabled());
+        aria2Box.setStyle("-fx-text-fill: -app-text-2;");
+        aria2Box.selectedProperty().addListener((o, a, value) -> {
+            config.setAria2Enabled(value);
+            config.save();
+            DownloadManager.setAria2Enabled(value);
+            Toast.info(value ? "已启用 aria2 下载加速" : "已切换回内置下载器");
+        });
+
+        CheckBox boostOnStart = new CheckBox("启动时自动测速并配置（需要管理员权限，失败不影响启动）");
+        boostOnStart.setSelected(config.isNetworkBoost());
+        boostOnStart.setStyle("-fx-text-fill: -app-text-2;");
+        boostOnStart.selectedProperty().addListener((o, a, value) -> {
+            config.setNetworkBoost(value);
+            config.save();
+        });
+
+        VBox networkCard = card(
+                section("网络加速"),
+                dnsStatus,
+                new HBox(10, autoBoost, dnsTest),
+                new HBox(10, dnsReset, dnsFlush),
+                boostOnStart,
+                aria2Box,
+                engineStatus,
+                dnsProbe,
+                hint("只改本机 DNS，不动 hosts、不装驱动、不改代理。需要管理员权限，失败时仅提示。"));
+
         VBox cleanCard = card(section("内存清理"), extremeClean, cleanStatus);
 
         VBox card = card(
@@ -376,6 +489,35 @@ public final class ToolsPanel extends VBox {
                 processCard,
                 monitorCard,
                 cleanCard);
+        return scroll(card);
+    }
+
+    private ScrollPane buildPlugins() {
+        File pluginDir = new File(AppPaths.dataDir(), "plugins");
+        if (!pluginDir.isDirectory()) pluginDir.mkdirs();
+        Label path = new Label(pluginDir.getAbsolutePath());
+        path.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
+        path.setWrapText(true);
+        Label status = new Label("插件通过 ServiceLoader 加载，命令会出现在 Ctrl+K 面板。");
+        status.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
+        status.setWrapText(true);
+        Button reload = smallButton("启用 / 重新加载插件", e -> {
+            ((Button) e.getSource()).setDisable(true);
+            status.setText("正在扫描插件…");
+            CompletableFuture.supplyAsync(() -> PluginManager.load(log))
+                    .thenAccept(commands -> Platform.runLater(() -> {
+                        ((Button) e.getSource()).setDisable(false);
+                        status.setText("已加载 " + commands.size() + " 个插件命令。");
+                        Toast.ok("插件加载完成，共 " + commands.size() + " 个命令");
+                    }));
+        });
+        Button open = smallButton("打开插件目录", e -> openDir(pluginDir));
+        VBox card = card(
+                section("第三方插件"),
+                path,
+                new HBox(10, reload, open),
+                status,
+                hint("把插件 jar 放入该目录，实现 com.example.demo.NekoPlugin 并注册 META-INF/services。"));
         return scroll(card);
     }
 

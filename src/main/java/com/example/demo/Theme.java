@@ -89,6 +89,28 @@ public final class Theme {
         return light;
     }
 
+    /**
+     * 给对话框套上当前主题：基础样式 + 浅色模式样式。
+     *
+     * <p>对话框有自己独立的 Scene，主界面的浅色样式表不会自动生效，
+     * 少了这一步浅色模式下弹出的确认框会用深色变量，看起来「颜色不对」。
+     */
+    public static void applyDialogStyles(javafx.scene.control.DialogPane pane) {
+        if (pane == null) return;
+        var base = Theme.class.getResource("/com/example/demo/app.css");
+        if (base != null) {
+            String path = base.toExternalForm();
+            if (!pane.getStylesheets().contains(path)) pane.getStylesheets().add(path);
+        }
+        if (light) {
+            var lightCss = Theme.class.getResource("/com/example/demo/app-light.css");
+            if (lightCss != null) {
+                String path = lightCss.toExternalForm();
+                if (!pane.getStylesheets().contains(path)) pane.getStylesheets().add(path);
+            }
+        }
+    }
+
     public static void apply(Node root) {
         if (root == null) return;
         recolor(root);

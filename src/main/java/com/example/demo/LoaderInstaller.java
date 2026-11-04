@@ -286,16 +286,53 @@ public final class LoaderInstaller {
     }
 
     private static void download(String url, File target) throws Exception {
-        if (target.isFile() && target.length() > 1024) return;
+        Files.deleteIfExists(target.toPath());
         Files.createDirectories(target.getParentFile().toPath());
+        File part = new File(target.getAbsolutePath() + ".part");
+        Files.deleteIfExists(part.toPath());
         HttpRequest request = HttpRequest.newBuilder(URI.create(url))
                 .timeout(Duration.ofMinutes(10))
                 .header("User-Agent", "MCLauncher/1.0")
                 .GET().build();
         HttpResponse<java.nio.file.Path> response = CLIENT.send(request,
-                HttpResponse.BodyHandlers.ofFile(target.toPath(),
+                HttpResponse.BodyHandlers.ofFile(part.toPath(),
                         java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE));
-        if (response.statusCode() != 200) throw new RuntimeException("下载失败 HTTP " + response.statusCode());
+        if (response.statusCode() != 200) {
+            part.delete();
+            throw new RuntimeException("下载失败 HTTP " + response.statusCode());
+        }
+        long expected = response.headers().firstValueAsLong("Content-Length").orElse(-1);
+        if (expected > 0 && part.length() != expected) {
+            part.delete();
+            throw new RuntimeException("安装器下载不完整: " + part.length() + "/" + expected);
+        }
+        if (!isValidJar(part)) {
+            part.delete();
+            throw new RuntimeException("安装器不是有效 JAR");
+        }
+        Files.move(part.toPath(), target.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    private static boolean isValidJar(File file) {
+        try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(file)) {
+            boolean forge = zip.getEntry("install_profile.json") != null;
+            boolean manifest = zip.getEntry("META-INF/MANIFEST.MF") != null;
+            if (!forge && !manifest) return false;
+            java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = zip.entries();
+            byte[] buffer = new byte[8192];
+            while (entries.hasMoreElements()) {
+                java.util.zip.ZipEntry entry = entries.nextElement();
+                if (entry.isDirectory()) continue;
+                try (java.io.InputStream in = zip.getInputStream(entry)) {
+                    while (in.read(buffer) != -1) {
+                        // 读完整条目，提前发现截断的 ZIP
+                    }
+                }
+            }
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private static void runInstaller(String javaPath, File installer, File gameDir, Consumer<String> log) throws Exception {
@@ -303,7 +340,11 @@ public final class LoaderInstaller {
         // "There is no Minecraft launcher profile ... you need to run the launcher first!"
         ensureLauncherProfiles(gameDir);
 
-        ProcessBuilder pb = new ProcessBuilder(javaPath, "-jar", installer.getAbsolutePath(),
+        String java = resolveJava(javaPath);
+        if (java == null) {
+            throw new RuntimeException("没有可用的 Java：实例里没有内置运行时，设置里也没填 Java 路径");
+        }
+        ProcessBuilder pb = new ProcessBuilder(java, "-jar", installer.getAbsolutePath(),
                 "--installClient", gameDir.getAbsolutePath());
         pb.directory(gameDir);
         pb.redirectErrorStream(true);
@@ -331,6 +372,26 @@ public final class LoaderInstaller {
             for (String line : recent) log.accept("   | " + line);
             throw new RuntimeException("安装器退出码 " + code);
         }
+    }
+
+    /**
+     * 挑一个真的能跑的 java.exe：传进来的路径可能不存在（内置运行时下载失败时会回退成不存在的路径），
+     * 也可能只是 "java"（PATH 里没有 java 时 CreateProcess error=2）。
+     */
+    private static String resolveJava(String javaPath) {
+        if (javaPath != null) {
+            String trimmed = javaPath.trim();
+            if (!trimmed.isEmpty() && !"java".equalsIgnoreCase(trimmed)) {
+                File file = new File(trimmed);
+                if (file.isFile()) return file.getAbsolutePath();
+            }
+        }
+        File home = new File(System.getProperty("java.home", ""));
+        File exe = new File(home, "bin/java.exe");
+        if (exe.isFile()) return exe.getAbsolutePath();
+        File bin = new File(home, "bin/java");
+        if (bin.isFile()) return bin.getAbsolutePath();
+        return null;
     }
 
     /** 某些安装器会把这里当成"官方启动器已运行"的标记。 */

@@ -45,8 +45,6 @@ import java.util.function.Consumer;
  */
 public final class SettingsPanel extends VBox {
 
-    private javafx.scene.layout.HBox windowRatioRow;
-
     private final LauncherConfig config;
     private final Consumer<String> log;
 
@@ -108,24 +106,45 @@ public final class SettingsPanel extends VBox {
         aiEnabledBox.setSelected(config.isAiEnabled());
         aiEnabledBox.setStyle("-fx-text-fill: -app-text-2;");
         aiKeyField = new PasswordField();
-        aiKeyField.setPromptText("sk-...");
-        aiKeyField.setText(config.getAiApiKey());
+        String savedKey = config.getAiApiKey();
+        if (savedKey.isBlank()) {
+            aiKeyField.setPromptText("sk-...");
+        } else {
+            // 已经存过 Key 就只显示尾部，留空表示不修改
+            String tail = savedKey.length() <= 4 ? "****" : savedKey.substring(savedKey.length() - 4);
+            aiKeyField.setPromptText("已保存（…" + tail + "），留空保持不变");
+        }
+        aiKeyField.setText(savedKey);
         aiModelField = new TextField(config.getAiModel());
         aiModelField.setPromptText("deepseek-chat");
-        aiStatus = new Label("Key 保存在本机 config.json，不会上传到除 DeepSeek 之外的服务。");
+        aiStatus = new Label(
+                savedKey.isBlank()
+                        ? "还没有 Key：当前使用本地免费助手。填好 Key 后点「测试连接」，再点「保存」。"
+                        : "Key 已保存在本机注册表（不写入 config.json，也不会随设置导出）。");
         aiStatus.setWrapText(true);
         aiStatus.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
 
         // ---------- 左：页签 ----------
         VBox side = new VBox(2);
-        side.setPrefWidth(190);
-        side.setMinWidth(190);
-        side.setMaxWidth(190);
+        javafx.beans.binding.DoubleBinding sideWidth =
+                javafx.beans.binding.Bindings.when(widthProperty().lessThan(1120)).then(168.0).otherwise(190.0);
+        side.prefWidthProperty().bind(sideWidth);
+        side.minWidthProperty().bind(sideWidth);
+        side.maxWidthProperty().bind(sideWidth);
         side.setPadding(new Insets(14, 8, 12, 8));
         side.setStyle("-fx-background-color: -app-nav;"
                 + " -fx-border-color: transparent -app-border-5 transparent transparent;");
 
+        TextField tabSearch = new TextField();
+        tabSearch.setPromptText("搜索设置…");
+        tabSearch.setStyle("-fx-background-color: -app-row3; -fx-text-fill: -app-text;"
+                + " -fx-prompt-text-fill: -app-text-muted; -fx-background-radius: 8;"
+                + " -fx-border-color: -app-border-soft; -fx-border-radius: 8; -fx-padding: 5 9;"
+                + " -fx-font-size: 11px;");
+        tabSearch.textProperty().addListener((o, old, text) -> filterSettings(text));
+
         side.getChildren().addAll(
+                tabSearch,
                 sectionLabel("游戏"),
                 tabItem("启动"),
                 tabItem("Java"),
@@ -147,40 +166,6 @@ public final class SettingsPanel extends VBox {
         memorySpinner = spinner(512, 16384, config.getMemoryMb(), 512, 130);
         widthSpinner = spinner(320, 3840, config.getWindowWidth(), 10, 100);
         heightSpinner = spinner(240, 2160, config.getWindowHeight(), 10, 100);
-
-        javafx.scene.control.ToggleGroup ratioGroup = new javafx.scene.control.ToggleGroup();
-        javafx.scene.layout.HBox ratioRow = new javafx.scene.layout.HBox(6);
-        String[][] ratios = {{"16:9", "16", "9"}, {"16:10", "16", "10"},
-                {"4:3", "4", "3"}, {"21:9", "21", "9"}};
-        double currentRatio = config.getWindowHeight() <= 0 ? 0
-                : (double) config.getWindowWidth() / config.getWindowHeight();
-        for (String[] ratio : ratios) {
-            double value = Double.parseDouble(ratio[1]) / Double.parseDouble(ratio[2]);
-            javafx.scene.control.ToggleButton chip = new javafx.scene.control.ToggleButton(ratio[0]);
-            chip.setToggleGroup(ratioGroup);
-            chip.setUserData(value);
-            chip.setStyle("-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 4 11;"
-                    + " -fx-background-color: -app-row2; -fx-text-fill: -app-text-muted; -fx-cursor: hand;");
-            chip.setOnAction(e -> {
-                if (!chip.isSelected()) {
-                    chip.setSelected(true);
-                    return;
-                }
-                int width = widthSpinner.getValue();
-                int height = (int) Math.round(width / value);
-                height = Math.max(240, Math.min(2160, height));
-                heightSpinner.getValueFactory().setValue(height);
-            });
-            ratioGroup.selectedToggleProperty().addListener((obs, old, selected) -> {
-                boolean on = selected == chip;
-                chip.setStyle("-fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 4 11;"
-                        + " -fx-cursor: hand; -fx-background-color: " + (on ? "-app-accent" : "-app-row2") + ";"
-                        + " -fx-text-fill: " + (on ? "#06251f" : "-app-text-muted") + ";");
-            });
-            if (Math.abs(currentRatio - value) < 0.02) chip.setSelected(true);
-            ratioRow.getChildren().add(chip);
-        }
-        windowRatioRow = ratioRow;
 
         ToggleGroup memoryGroup = new ToggleGroup();
         autoMemoryRadio = new RadioButton("自动配置");
@@ -306,7 +291,9 @@ public final class SettingsPanel extends VBox {
 
         autoJava = check("自动检测并选择最合适的 Java（推荐）", config.isAutoSelectJava());
         isolationBox = check("开启版本隔离（每个实例独立 mods / config / saves）", config.isIsolation());
-        autoDepsBox = check("安装模组时自动补装缺失的前置依赖", config.isAutoInstallDeps());
+        autoDepsBox = check("安装模组时自动补装缺失的前置依赖", false);
+        autoDepsBox.setVisible(false);
+        autoDepsBox.setManaged(false);
         autoRepairBox = check("启动前自动补全缺失的库文件", config.isAutoRepairLibraries());
         hardwareAccelBox = check("启用硬件加速（显卡渲染；关闭后需重启启动器）", config.isHardwareAcceleration());
         animationsBox = check("界面动画效果（关闭 = 性能模式）", config.isAnimations());
@@ -344,18 +331,19 @@ public final class SettingsPanel extends VBox {
         importConfig.setOnAction(e -> importConfig());
         Button exportConfig = smallButton("导出设置");
         exportConfig.setOnAction(e -> exportConfig());
+        Button history = smallButton("配置历史");
+        history.setOnAction(e -> showConfigHistory());
         Button reset = smallButton("恢复默认");
         reset.setOnAction(e -> resetDefaults());
         Button save = new Button("保存");
-        save.setStyle("-fx-background-color: linear-gradient(to bottom right, #9ca3af, #6b7280);"
-                + " -fx-text-fill: #111827; -fx-font-weight: bold; -fx-background-radius: 9;"
-                + " -fx-padding: 9 28; -fx-cursor: hand;");
+        save.getStyleClass().add("btn-primary");
+        save.setStyle("-fx-padding: 9 28;");
         Motion.press(save);
         save.setOnAction(e -> saveAll());
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        HBox bottom = new HBox(10, savedHint, spacer, importConfig, exportConfig, reset, save);
+        HBox bottom = new HBox(10, savedHint, spacer, importConfig, exportConfig, history, reset, save);
         bottom.setAlignment(Pos.CENTER_LEFT);
         bottom.setPadding(new Insets(12, 22, 14, 22));
         bottom.setStyle("-fx-background-color: -app-nav;"
@@ -408,6 +396,33 @@ public final class SettingsPanel extends VBox {
         return item;
     }
 
+    private void filterSettings(String query) {
+        String q = query == null ? "" : query.trim().toLowerCase(java.util.Locale.ROOT);
+        java.util.Map<String, String> keywords = java.util.Map.ofEntries(
+                java.util.Map.entry("启动", "内存 java 窗口 下载 网络 参数 游戏"),
+                java.util.Map.entry("Java", "java 路径 运行时 jdk"),
+                java.util.Map.entry("管理", "实例 目录 隔离 版本"),
+                java.util.Map.entry("联机", "服务器 联机 端口"),
+                java.util.Map.entry("AI", "ai deepseek key 模型 助手"),
+                java.util.Map.entry("个性化", "主题 颜色 字体 背景 透明度 动画"),
+                java.util.Map.entry("语言", "中文 英文 语言"),
+                java.util.Map.entry("杂项", "缓存 日志 关闭 托盘"),
+                java.util.Map.entry("软件信息", "版本 关于"),
+                java.util.Map.entry("软件更新", "更新 镜像 gitee github"),
+                java.util.Map.entry("反馈", "反馈 问题"),
+                java.util.Map.entry("查看日志", "日志 log"));
+        String first = null;
+        for (java.util.Map.Entry<String, HBox> entry : tabItems.entrySet()) {
+            String name = entry.getKey();
+            String haystack = (name + " " + keywords.getOrDefault(name, "")).toLowerCase(java.util.Locale.ROOT);
+            boolean match = q.isBlank() || haystack.contains(q);
+            entry.getValue().setVisible(match);
+            entry.getValue().setManaged(match);
+            if (match && first == null) first = name;
+        }
+        if (!q.isBlank() && first != null) selectTab(first);
+    }
+
     private void selectTab(String name) {
         currentTab = name;
         for (Map.Entry<String, HBox> entry : tabItems.entrySet()) {
@@ -416,9 +431,9 @@ public final class SettingsPanel extends VBox {
             box.getStyleClass().remove("app-tab-active");
             if (active) box.getStyleClass().add("app-tab-active");
             if (box.getChildren().size() >= 2) {
-                box.getChildren().get(0).setStyle("-fx-fill: " + (active ? "#d1d5db" : "transparent") + ";");
-                box.getChildren().get(1).setStyle("-fx-text-fill: " + (active ? "-app-text" : "-app-text-dim")
-                        + "; -fx-font-size: 13px;");
+                box.getChildren().get(0).setStyle("-fx-fill: " + (active ? "#cbd5e1" : "transparent") + ";");
+                box.getChildren().get(1).setStyle("-fx-text-fill: " + (active ? "-app-text-strong" : "-app-text-dim")
+                        + "; -fx-font-size: 13px;" + (active ? " -fx-font-weight: bold;" : ""));
             }
         }
         Node page = tabPages.get(name);
@@ -437,7 +452,6 @@ public final class SettingsPanel extends VBox {
                 new HBox(8, memorySpinner, hint("MB")));
         VBox card = card(
                 section("启动设置"),
-                labeled("窗口比例", windowRatioRow),
                 labeled("窗口尺寸", new HBox(8, widthSpinner, new Label("×"), heightSpinner, hint("像素"))),
                 section("游戏内存"),
                 new HBox(18, autoMemoryRadio, customMemoryRadio),
@@ -556,7 +570,7 @@ public final class SettingsPanel extends VBox {
                 autoDepsBox,
                 autoRepairBox,
                 labeled("完整性抽样", new HBox(10, assetSampleSpinner, hint("每个实例抽样校验的 assets 对象数，0 = 不抽样"))),
-                hint("自动补装前置依赖：最多递归两层，找不到会写进日志"));
+                hint("模组依赖只做提示，不再自动补装"));
         return scroll(card);
     }
 
@@ -711,9 +725,19 @@ public final class SettingsPanel extends VBox {
             copyToClipboard(ip + ":25565");
             Toast.ok("已复制局域网地址");
         });
+        Button portable = smallButton("创建便携服务器", e -> {
+            String instanceId = config.getLastInstance();
+            if (instanceId == null || instanceId.isBlank()) {
+                Toast.warn("请先选择一个实例");
+                return;
+            }
+            PortableServerDialog.show(owner(), new File(config.getGameDir()),
+                    instanceId, config.isIsolation());
+        });
         VBox card = card(
                 section("局域网联机"),
                 labeled("本机地址", new HBox(12, address, copy)),
+                new HBox(10, portable, hint("基于当前实例生成独立服务端目录")),
                 hint("进入游戏后按 Esc → 对局域网开放，其他玩家用上面的地址直连（同一局域网）。"),
                 hint("PCL CE 的 Natayark 大厅联机需要账号与官方服务，本启动器暂未接入；这里只提供局域网直连信息。"),
                 section("快速步骤"),
@@ -753,7 +777,15 @@ public final class SettingsPanel extends VBox {
         Button test = smallButton("测试连接", e -> testAi());
         Button openKeys = smallButton("获取 API Key", e -> openBrowser("https://platform.deepseek.com/api_keys"));
         Button webChat = smallButton("打开网页版", e -> openBrowser("https://chat.deepseek.com"));
-        HBox actions = new HBox(8, test, openKeys, webChat);
+        Button clearKey = smallButton("清除 Key", e -> {
+            config.setAiApiKey("");
+            config.save();
+            aiKeyField.clear();
+            aiKeyField.setPromptText("sk-...");
+            aiStatus.setText("已清除本机保存的 Key，AI 回到本地免费助手模式。");
+            aiStatus.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
+        });
+        HBox actions = new HBox(8, test, openKeys, webChat, clearKey);
         actions.setAlignment(Pos.CENTER_LEFT);
 
         VBox card = card(
@@ -767,12 +799,16 @@ public final class SettingsPanel extends VBox {
                 section("测试与入口"),
                 actions,
                 aiStatus,
-                hint("Key 只保存在本机配置中，不会写入启动器日志。"));
+                hint("Key 存储位置：" + SecretStore.location() + "，不会写入 config.json 或启动器日志。"));
         return scroll(card);
     }
 
     private void testAi() {
         String key = aiKeyField.getText() == null ? "" : aiKeyField.getText().trim();
+        if (key.isBlank()) {
+            key = config.getAiApiKey();
+        }
+        final String testKey = key;
         if (key.isBlank()) {
             aiStatus.setText("未填写 Key：本地免费助手可用，不需要联网。");
             aiStatus.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
@@ -781,13 +817,16 @@ public final class SettingsPanel extends VBox {
         aiStatus.setText("正在测试 DeepSeek 连接…");
         CompletableFuture.supplyAsync(() -> {
             try {
-                return DeepSeekClient.chat(key, config.getAiBaseUrl(), aiModelField.getText(),
+                return DeepSeekClient.chat(testKey, config.getAiBaseUrl(), aiModelField.getText(),
                         List.of(new DeepSeekClient.Message("user", "只回复两个字：可用")));
             } catch (Exception ex) {
                 throw new java.util.concurrent.CompletionException(ex);
             }
         }).thenAccept(reply -> Platform.runLater(() -> {
-            aiStatus.setText("连接成功，模型回复：" + reply);
+            // 测试通过说明 Key 有效，直接落盘，省得还要再点一次「保存」
+            config.setAiApiKey(testKey);
+            config.save();
+            aiStatus.setText("连接成功并已保存 Key，模型回复：" + reply);
             aiStatus.setStyle("-fx-text-fill: #4CAF50; -fx-font-size: 11px;");
         })).exceptionally(ex -> {
             Platform.runLater(() -> {
@@ -880,6 +919,53 @@ public final class SettingsPanel extends VBox {
             });
             return null;
         });
+    }
+
+    private void showConfigHistory() {
+        javafx.scene.control.Dialog<Void> dialog = new javafx.scene.control.Dialog<>();
+        dialog.initOwner(owner());
+        dialog.setTitle("配置历史");
+        dialog.setHeaderText("选择一份历史配置恢复，重启启动器后生效");
+        ListView<File> list = new ListView<>();
+        list.getItems().setAll(ConfigHistory.list());
+        list.setCellFactory(v -> new javafx.scene.control.ListCell<>() {
+            @Override
+            protected void updateItem(File file, boolean empty) {
+                super.updateItem(file, empty);
+                if (empty || file == null) {
+                    setText(null);
+                    return;
+                }
+                setText(file.getName() + "    "
+                        + new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+                        .format(new java.util.Date(file.lastModified())));
+            }
+        });
+        Button restore = new Button("恢复选中");
+        restore.setOnAction(e -> {
+            File selected = list.getSelectionModel().getSelectedItem();
+            if (selected == null) return;
+            javafx.scene.control.Alert confirm = new javafx.scene.control.Alert(
+                    javafx.scene.control.Alert.AlertType.CONFIRMATION,
+                    "用这份历史覆盖当前 config.json？当前配置会先自动备份。",
+                    javafx.scene.control.ButtonType.OK, javafx.scene.control.ButtonType.CANCEL);
+            confirm.initOwner(owner());
+            if (confirm.showAndWait().orElse(javafx.scene.control.ButtonType.CANCEL)
+                    != javafx.scene.control.ButtonType.OK) return;
+            try {
+                ConfigHistory.restore(selected, LauncherConfig.file());
+                Toast.ok("配置已恢复，重启启动器后生效");
+                dialog.close();
+            } catch (Exception ex) {
+                Toast.error("恢复失败：" + ex.getMessage());
+            }
+        });
+        VBox content = new VBox(10, list, restore);
+        VBox.setVgrow(list, Priority.ALWAYS);
+        content.setPrefSize(560, 380);
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().getButtonTypes().add(javafx.scene.control.ButtonType.CLOSE);
+        dialog.showAndWait();
     }
 
     private ScrollPane buildUpdateTab() {
@@ -1116,7 +1202,11 @@ public final class SettingsPanel extends VBox {
         commitSpinner(assetSampleSpinner);
 
         config.setAiEnabled(aiEnabledBox.isSelected());
-        config.setAiApiKey(aiKeyField.getText() == null ? "" : aiKeyField.getText().trim());
+        // 输入框留空 = 保持已保存的 Key（避免手滑清空注册表里的 Key）
+        String typedKey = aiKeyField.getText() == null ? "" : aiKeyField.getText().trim();
+        if (!typedKey.isEmpty()) {
+            config.setAiApiKey(typedKey);
+        }
         config.setAiModel(aiModelField.getText() == null ? "" : aiModelField.getText().trim());
         config.setMemoryMb(memorySpinner.getValue());
         config.setAutoMemory(autoMemoryRadio.isSelected());
@@ -1411,8 +1501,8 @@ public final class SettingsPanel extends VBox {
         VBox box = new VBox(13);
         box.setPadding(new Insets(20));
         box.setStyle("-fx-background-color: linear-gradient(to bottom, -app-card-top, -app-card-alt2);"
-                + " -fx-background-radius: 18; -fx-border-color: -app-border-soft; -fx-border-radius: 18;"
-                + " -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.28), 22, 0.12, 0, 7);");
+                + " -fx-background-radius: 16; -fx-border-color: -app-border-soft; -fx-border-radius: 16;"
+                + " -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.16), 18, 0.10, 0, 6);");
         box.getChildren().addAll(children);
         box.setMaxWidth(780);
         return box;
@@ -1445,14 +1535,14 @@ public final class SettingsPanel extends VBox {
 
     private static Label section(String text) {
         Label label = new Label(text);
-        label.setStyle("-fx-text-fill: #9ca3af; -fx-font-size: 12px; -fx-font-weight: bold;");
+        label.setStyle("-fx-text-fill: -app-text-dim-3; -fx-font-size: 12px; -fx-font-weight: bold;");
         label.setPadding(new Insets(6, 0, 0, 0));
         return label;
     }
 
     private static Label hint(String text) {
         Label label = new Label(text);
-        label.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
+        label.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11.5px;");
         return label;
     }
 
@@ -1508,8 +1598,7 @@ public final class SettingsPanel extends VBox {
 
     private Button smallButton(String text, javafx.event.EventHandler<javafx.event.ActionEvent> handler) {
         Button button = new Button(text);
-        button.setStyle("-fx-background-color: -app-border-4; -fx-text-fill: -app-text-2; -fx-cursor: hand;"
-                + " -fx-background-radius: 8; -fx-padding: 8 16; -fx-font-size: 12px;");
+        button.getStyleClass().add("btn-secondary");
         button.setMinWidth(Region.USE_PREF_SIZE);
         Motion.press(button);
         if (handler != null) button.setOnAction(handler);

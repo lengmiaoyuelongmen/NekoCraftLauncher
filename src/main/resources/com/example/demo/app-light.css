@@ -205,3 +205,75 @@
     -fx-border-radius: 0 0 8 8;
     -fx-padding: 4;
 }
+
+
+/* ---------------- 全局按钮悬浮 ---------------- */
+.button, .toggle-button {
+    -fx-border-color: transparent;
+    -fx-border-width: 1;
+    -fx-border-radius: 7;
+    -fx-background-insets: 0;
+    -fx-cursor: hand;
+}
+
+.button:hover, .toggle-button:hover {
+    -fx-border-color: -app-accent;
+    -fx-effect: dropshadow(gaussian, -app-accent-soft, 9, 0.25, 0, 0);
+}
+
+.button:pressed, .toggle-button:pressed {
+    -fx-border-color: -app-accent;
+    -fx-effect: innershadow(gaussian, rgba(0,0,0,0.35), 6, 0.2, 0, 1);
+}
+
+.button:disabled, .toggle-button:disabled {
+    -fx-cursor: default;
+}
+
+
+/* 浅色右键菜单 */
+.context-menu {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #d8e0ea;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-padding: 5;
+}
+.menu-item {
+    -fx-background-color: transparent;
+    -fx-background-radius: 7;
+}
+.menu-item .label {
+    -fx-text-fill: #1f2937;
+    -fx-font-size: 12px;
+}
+.menu-item:focused {
+    -fx-background-color: #e6ecf3;
+}
+.menu-item:focused .label {
+    -fx-text-fill: #0b1220;
+}
+
+
+/* 关闭确认框：浅色模式下的淡青按钮 */
+.dialog-pane .button.btn-cyan {
+    -fx-background-color: #dcf7f1;
+    -fx-text-fill: #0b6b5f;
+    -fx-border-color: #a3e6da;
+}
+.dialog-pane .button.btn-cyan:hover {
+    -fx-background-color: #c9efe8;
+    -fx-border-color: #7fd9c9;
+}
+
+
+/* 浅色模式的幽灵按钮：浅底上要有可见描边 */
+.btn-ghost {
+    -fx-border-color: #c3d2e3;
+    -fx-text-fill: #47576b;
+}
+.btn-ghost:hover {
+    -fx-background-color: #e8f0fb;
+    -fx-border-color: -app-accent;
+    -fx-text-fill: #16324a;
+}

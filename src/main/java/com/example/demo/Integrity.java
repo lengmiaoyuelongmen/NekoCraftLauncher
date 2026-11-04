@@ -88,13 +88,15 @@ public final class Integrity {
             String path = artifact.has("path") ? artifact.get("path").getAsString() : null;
             if (path == null || path.isBlank()) continue;
             checked++;
-            if (new File(new File(gameDir, "libraries"), path.replace('/', File.separatorChar)).isFile()) continue;
             String url = artifact.has("url") ? artifact.get("url").getAsString() : "";
             if (url == null || url.isBlank()) {
                 url = defaultUrl(path);
             }
             String sha1 = artifact.has("sha1") ? artifact.get("sha1").getAsString() : null;
             long size = artifact.has("size") ? artifact.get("size").getAsLong() : -1;
+            File local = new File(new File(gameDir, "libraries"), path.replace('/', File.separatorChar));
+            // 存在不等于完整：大小对不上（0 字节/截断）同样算缺失，否则永远报「已补全」
+            if (local.isFile() && (size <= 0 || local.length() == size)) continue;
             issues.add(new Issue(id, path, url, sha1, size, Kind.LIBRARY));
         }
 
@@ -168,7 +170,7 @@ public final class Integrity {
         // 失败的重试一次：换成更可能命中的源
         for (Issue issue : issues) {
             File target = target(gameDir, issue);
-            if (target.isFile()) continue;
+            if (target.isFile() && (issue.size() <= 0 || target.length() == issue.size())) continue;
             String fallback = fallbackUrl(issue);
             if (fallback == null || fallback.equals(issue.url())) continue;
             DownloadManager.downloadAll(
@@ -177,7 +179,11 @@ public final class Integrity {
 
         int fixed = 0;
         for (Issue issue : issues) {
-            if (target(gameDir, issue).isFile()) fixed++;
+            File file = target(gameDir, issue);
+            // 存在不等于修好：大小对不上（0 字节/截断）仍然算失败
+            if (!file.isFile()) continue;
+            if (issue.size() > 0 && file.length() != issue.size()) continue;
+            fixed++;
         }
         return fixed;
     }

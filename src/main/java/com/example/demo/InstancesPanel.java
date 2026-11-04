@@ -77,8 +77,10 @@ public final class InstancesPanel extends HBox {
         setStyle("-fx-background-color: transparent;");
 
         // ---------- 左侧 ----------
-        side.setPrefWidth(196);
-        side.setMinWidth(196);
+        javafx.beans.binding.DoubleBinding sideWidth =
+                javafx.beans.binding.Bindings.when(widthProperty().lessThan(1120)).then(172.0).otherwise(196.0);
+        side.prefWidthProperty().bind(sideWidth);
+        side.minWidthProperty().bind(sideWidth);
         side.setStyle("-fx-background-color: -app-nav-2; -fx-border-color: transparent -app-row3 transparent transparent;");
         side.setPadding(new Insets(16, 0, 0, 0));
         renderSide();
@@ -107,13 +109,20 @@ public final class InstancesPanel extends HBox {
                 + " -fx-padding: 6 14; -fx-cursor: hand; -fx-font-size: 12px;");
         refresh.setOnAction(e -> reload());
 
+        Button fileManager = new Button("文件管理");
+        fileManager.setStyle("-fx-background-color: -app-row3; -fx-text-fill: -app-text-2; -fx-background-radius: 8;"
+                + " -fx-padding: 6 14; -fx-cursor: hand; -fx-font-size: 12px;");
+        fileManager.setOnAction(e -> InstanceFileManager.show(
+                getScene() == null ? null : getScene().getWindow(),
+                InstanceDirs.root(gameDir, selectedId, config.isIsolation()), gameDir));
+
         searchField.setPromptText("搜索游戏实例");
         searchField.setStyle("-fx-background-color: -app-input; -fx-text-fill: -app-text;"
                 + " -fx-prompt-text-fill: -app-text-muted; -fx-background-radius: 9;");
         searchField.setPrefHeight(38);
         HBox.setHgrow(searchField, Priority.ALWAYS);
         searchField.textProperty().addListener((obs, old, value) -> render());
-        header.getChildren().addAll(searchField, favorites, refresh);
+        header.getChildren().addAll(searchField, favorites, refresh, fileManager);
 
         emptyHint.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 13px;");
         emptyHint.setWrapText(true);

@@ -38,9 +38,7 @@ public final class Dialogs {
         dialog.getDialogPane().setContent(content);
         ButtonType ok = new ButtonType("保存", ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(ok, ButtonType.CANCEL);
-        if (HelloApplication.THEME_URL != null) {
-            dialog.getDialogPane().getStylesheets().add(HelloApplication.THEME_URL);
-        }
+        Theme.applyDialogStyles(dialog.getDialogPane());
         dialog.setResultConverter(button -> button == ok ? field.getText() : null);
         javafx.application.Platform.runLater(() -> {
             field.requestFocus();
@@ -55,9 +53,7 @@ public final class Dialogs {
         alert.setHeaderText(header);
         alert.setContentText(content);
         if (owner != null) alert.initOwner(owner);
-        if (HelloApplication.THEME_URL != null) {
-            alert.getDialogPane().getStylesheets().add(HelloApplication.THEME_URL);
-        }
+        Theme.applyDialogStyles(alert.getDialogPane());
         Optional<ButtonType> result = alert.showAndWait();
         return result.isPresent() && result.get() == ButtonType.OK;
     }

@@ -33,10 +33,8 @@ public final class InstanceSettingsPanel extends HBox {
     private final Label breadcrumb = new Label();
     private String tab = "overview";
     private ModuleHeader instanceHeader;
+    private HBox instanceTabs;
     private StackPane screenshotOverlay;
-    private boolean navPointerInside;
-    private double navMouseX;
-    private double navMouseY;
     private String instanceId;
 
     private VBox overviewTab;
@@ -50,17 +48,19 @@ public final class InstanceSettingsPanel extends HBox {
     private final Consumer<String> onDelete;
     private final Consumer<String> onTest;
     private final Consumer<String> onReinstall;
+    private final Consumer<String> onJoinServer;
 
     public InstanceSettingsPanel(File gameDir, LauncherConfig config, String instanceId,
                                  Consumer<String> log, Runnable onBack,
                                  Consumer<String> onRepair, Consumer<String> onExportScript,
                                  Consumer<String> onDelete, Consumer<String> onTest,
-                                 Consumer<String> onReinstall) {
+                                 Consumer<String> onReinstall, Consumer<String> onJoinServer) {
         this.onRepair = onRepair;
         this.onExportScript = onExportScript;
         this.onDelete = onDelete;
         this.onTest = onTest;
         this.onReinstall = onReinstall;
+        this.onJoinServer = onJoinServer;
         this.gameDir = gameDir;
         this.config = config;
         this.instanceId = instanceId;
@@ -68,16 +68,6 @@ public final class InstanceSettingsPanel extends HBox {
         this.onBack = onBack;
 
         setSpacing(0);
-        addEventFilter(javafx.scene.input.MouseEvent.MOUSE_MOVED, e -> {
-            navPointerInside = true;
-            navMouseX = e.getSceneX();
-            navMouseY = e.getSceneY();
-            refreshNavStyles();
-        });
-        addEventFilter(javafx.scene.input.MouseEvent.MOUSE_EXITED, e -> {
-            navPointerInside = false;
-            refreshNavStyles();
-        });
 
         // ---------- 左侧 ----------
         VBox side = new VBox(0);
@@ -133,10 +123,19 @@ public final class InstanceSettingsPanel extends HBox {
                 instanceId == null ? "" : instanceId);
         HBox headerWrap = new HBox(instanceHeader);
         headerWrap.setPadding(new Insets(14, 22, 0, 22));
-        VBox right = new VBox(headerWrap, content);
+        instanceTabs = new HBox(6);
+        instanceTabs.setPadding(new Insets(0, 22, 0, 22));
+        ScrollPane tabScroll = new ScrollPane(instanceTabs);
+        tabScroll.setFitToHeight(true);
+        tabScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        tabScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        tabScroll.setStyle("-fx-background: transparent; -fx-background-color: transparent; -fx-border-color: transparent;");
+        VBox headerArea = new VBox(6, headerWrap, tabScroll);
+        VBox right = new VBox(headerArea, content);
         VBox.setVgrow(content, Priority.ALWAYS);
         HBox.setHgrow(right, Priority.ALWAYS);
         getChildren().addAll(side, right);
+        refreshInstanceTabs();
         select("overview");
     }
 
@@ -145,7 +144,27 @@ public final class InstanceSettingsPanel extends HBox {
         updateBreadcrumb();
         if (instanceHeader != null) instanceHeader.setMeta(instanceId);
         applyModFilter();
+        refreshInstanceTabs();
         select(tab);
+    }
+
+    private void refreshInstanceTabs() {
+        if (instanceTabs == null) return;
+        instanceTabs.getChildren().clear();
+        java.util.List<Instance> instances = Instance.list(gameDir);
+        int count = 0;
+        for (Instance instance : instances) {
+            if (count++ >= 12) break;
+            boolean active = instance.id.equals(instanceId);
+            Button tab = new Button(InstanceMeta.name(gameDir, instance.id));
+            tab.setStyle("-fx-background-color: " + (active ? "-app-accent" : "-app-row2") + ";"
+                    + " -fx-text-fill: " + (active ? "#06251f" : "-app-text-2") + ";"
+                    + " -fx-background-radius: 8; -fx-padding: 4 10; -fx-font-size: 10.5px;"
+                    + " -fx-cursor: hand;");
+            tab.setTooltip(new javafx.scene.control.Tooltip(instance.id));
+            tab.setOnAction(e -> setInstance(instance.id));
+            instanceTabs.getChildren().add(tab);
+        }
     }
 
     /** 把当前实例的版本 + 加载器告诉模组页，用于自动筛选。 */
@@ -173,13 +192,18 @@ public final class InstanceSettingsPanel extends HBox {
         if (modsTab != null) modsTab.openProjectDetail(projectId, title);
     }
 
+    /** AI 助手识别到「安装模组 xxx」时，切到模组页并带上搜索词。 */
+    public void openModsSearch(String query) {
+        select("mods");
+        if (modsTab != null) modsTab.searchFor(query);
+    }
+
     private void updateBreadcrumb() {
         breadcrumb.setText("实例设置 · " + (instanceId == null ? "-" : instanceId));
     }
 
     private void select(String tabName) {
         this.tab = tabName;
-        navPointerInside = false;
         for (Node node : navBox.getChildren()) {
             if (node.getUserData() instanceof String key) {
                 boolean active = key.equals(tabName);
@@ -330,7 +354,23 @@ public final class InstanceSettingsPanel extends HBox {
         openMods.setOnAction(e -> openDir(InstanceDirs.mods(gameDir, instance.id, config.isIsolation())));
         Button goMods = ghostButton("管理模组");
         goMods.setOnAction(e -> select("mods"));
-        shortcuts.getChildren().addAll(openInstance, openMods, goMods);
+        Button files = ghostButton("文件管理");
+        files.setOnAction(e -> InstanceFileManager.show(
+                getScene() == null ? null : getScene().getWindow(),
+                InstanceDirs.root(gameDir, instance.id, config.isIsolation()), gameDir));
+        Button worlds = ghostButton("世界管理");
+        worlds.setOnAction(e -> WorldManagerDialog.show(
+                getScene() == null ? null : getScene().getWindow(),
+                InstanceDirs.saves(gameDir, instance.id, config.isIsolation()),
+                this::log));
+        Button screenshots = ghostButton("截图管理");
+        screenshots.setOnAction(e -> ScreenshotManagerDialog.show(
+                getScene() == null ? null : getScene().getWindow(),
+                new File(InstanceDirs.root(gameDir, instance.id, config.isIsolation()), "screenshots")));
+        Button servers = ghostButton("服务器列表");
+        servers.setOnAction(e -> ServerListDialog.show(
+                getScene() == null ? null : getScene().getWindow(), gameDir, onJoinServer));
+        shortcuts.getChildren().addAll(openInstance, openMods, goMods, worlds, screenshots, servers, files);
 
         HBox personal = new HBox(10);
         Button rename = ghostButton("修改实例名");
@@ -369,10 +409,13 @@ public final class InstanceSettingsPanel extends HBox {
         remove.setStyle("-fx-background-color: #7f1d1d; -fx-text-fill: #fecaca; -fx-background-radius: 8;"
                 + " -fx-padding: 7 14; -fx-cursor: hand; -fx-font-size: 12px;");
         remove.setOnAction(e -> {
-            boolean ok = Dialogs.confirm(getScene() == null ? null : getScene().getWindow(),
-                    "删除实例", "确定删除 " + instance.id + " 吗？",
-                    "会删除 versions/" + instance.id + " 整个目录（客户 jar、模组、存档等），不可恢复。");
-            if (ok && onDelete != null) onDelete.accept(instance.id);
+            InAppDialog.confirm(null, "删除实例",
+                    "确定删除 " + instance.id + " 吗？会删除 versions/" + instance.id
+                            + " 整个目录（客户 jar、模组、存档等），不可恢复。",
+                    "删除",
+                    () -> {
+                        if (onDelete != null) onDelete.accept(instance.id);
+                    });
         });
         Button repairCore = ghostButton("修复核心");
         repairCore.setOnAction(e -> {
@@ -398,10 +441,13 @@ public final class InstanceSettingsPanel extends HBox {
         });
         Button reinstall = ghostButton("重装");
         reinstall.setOnAction(e -> {
-            boolean ok = Dialogs.confirm(getScene() == null ? null : getScene().getWindow(),
-                    "重装实例", "确定重装 " + instance.id + " 吗？",
-                    "会删除该实例的文件并重新下载客户端与依赖（mods/config/saves 也会被清空）。");
-            if (ok && onReinstall != null) onReinstall.accept(instance.id);
+            InAppDialog.confirm(null, "重装实例",
+                    "确定重装 " + instance.id + " 吗？会删除该实例的文件并重新下载客户端与依赖"
+                            + "（mods/config/saves 也会被清空）。",
+                    "重装",
+                    () -> {
+                        if (onReinstall != null) onReinstall.accept(instance.id);
+                    });
         });
         advanced.getChildren().addAll(repair, repairCore, test, reinstall, export, remove);
 

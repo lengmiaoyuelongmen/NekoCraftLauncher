@@ -19,8 +19,8 @@ import java.util.List;
  */
 public final class Motion {
 
-    public static final Duration FAST = Duration.millis(100);
-    public static final Duration NORMAL = Duration.millis(180);
+    public static final Duration FAST = Duration.millis(120);
+    public static final Duration NORMAL = Duration.millis(210);
     public static final Duration SLOW = Duration.millis(420);
 
     /** ease-out-expo，起步快、收尾慢，比默认曲线更有“质感”。 */
@@ -48,7 +48,7 @@ public final class Motion {
     }
 
     public static void pageIn(Node node) {
-        pageIn(node, 26);
+        pageIn(node, 18);
     }
 
     /**
@@ -60,7 +60,7 @@ public final class Motion {
         int seq = nextSeq(node);
         node.setOpacity(0);
         node.setTranslateX(fromX);
-        node.setTranslateY(6);
+        node.setTranslateY(4);
         node.setScaleX(1);
         node.setScaleY(1);
         if (!enabled) {
@@ -99,10 +99,11 @@ public final class Motion {
             if (onFinished != null) onFinished.run();
             return;
         }
-        FadeTransition fade = new FadeTransition(scaled(FAST), node);
+        Duration outDuration = scaled(Duration.millis(140));
+        FadeTransition fade = new FadeTransition(outDuration, node);
         fade.setToValue(0);
         fade.setInterpolator(IN_OUT);
-        TranslateTransition slide = new TranslateTransition(scaled(FAST), node);
+        TranslateTransition slide = new TranslateTransition(outDuration, node);
         double currentX = node.getTranslateX();
         slide.setToX(currentX > 0 ? -18 : 18);
         slide.setInterpolator(IN_OUT);
@@ -193,7 +194,7 @@ public final class Motion {
     /** 按压反馈：按下缩到 0.96，松开弹性回弹。不改布局，只改渲染变换。 */
     public static void press(Node node) {
         if (!enabled) return;
-        node.addEventHandler(MouseEvent.MOUSE_PRESSED, e -> scaleTo(node, 0.975, FAST, OUT));
+        node.addEventHandler(MouseEvent.MOUSE_PRESSED, e -> scaleTo(node, 0.986, FAST, OUT));
         node.addEventHandler(MouseEvent.MOUSE_RELEASED, e -> scaleTo(node, 1.0, FAST, SPRING));
         node.addEventHandler(MouseEvent.MOUSE_EXITED, e -> scaleTo(node, 1.0, FAST, OUT));
     }
