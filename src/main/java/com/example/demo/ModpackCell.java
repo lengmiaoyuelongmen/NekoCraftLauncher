@@ -205,18 +205,31 @@ public final class ModpackCell extends ListCell<ModpackProject> {
 
   private void loadCellIcon(String url, String iconKey, ModpackProject project) {
     try {
-      HttpRequest req =
-          HttpRequest.newBuilder(URI.create(IconProxy.resolve(url)))
-              .timeout(java.time.Duration.ofSeconds(10L))
-              .GET()
-              .build();
-      HttpResponse<InputStream> resp =
-          host.httpClient().send(req, HttpResponse.BodyHandlers.ofInputStream());
-      if (resp.statusCode() == 200) {
-        byte[] bytes = resp.body().readAllBytes();
+      byte[] bytes = null;
+      for (String candidate : IconProxy.candidates(url)) {
+        try {
+          HttpRequest req =
+              HttpRequest.newBuilder(URI.create(candidate))
+                  .timeout(java.time.Duration.ofSeconds(8L))
+                  .GET()
+                  .build();
+          HttpResponse<InputStream> resp =
+              host.httpClient().send(req, HttpResponse.BodyHandlers.ofInputStream());
+          if (resp.statusCode() == 200) {
+            bytes = resp.body().readAllBytes();
+            if (bytes.length > 0) {
+              break;
+            }
+          }
+        } catch (Exception ignored) {
+          // 换下一个源
+        }
+      }
+      final byte[] iconBytes = bytes;
+      if (iconBytes != null && iconBytes.length > 0) {
         Platform.runLater(
             () -> {
-              Image img = host.decodeIcon(bytes);
+              Image img = host.decodeIcon(iconBytes);
               if (img != null && !img.isError()) {
                 host.iconCache().put(iconKey, img);
                 if (getItem() == project) {

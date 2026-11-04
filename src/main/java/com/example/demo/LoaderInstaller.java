@@ -138,14 +138,22 @@ public final class LoaderInstaller {
                 log.accept("   使用 Forge " + version);
 
                 String full = gameVersion + "-" + version;
-                String url = "https://maven.minecraftforge.net/net/minecraftforge/forge/" + full
+                String official = "https://maven.minecraftforge.net/net/minecraftforge/forge/" + full
                         + "/forge-" + full + "-installer.jar";
+                String mirrored = mavenMirror == null ? null
+                        : mavenMirror + "net/minecraftforge/forge/" + full
+                                + "/forge-" + full + "-installer.jar";
                 File installer = new File(gameDir, "downloads/forge-installer-" + full + ".jar");
                 log.accept("📥 下载 Forge 安装器...");
-                download(url, installer);
+                if (mirrored != null) {
+                    downloadAny(installer, log, official, mirrored);
+                } else {
+                    downloadAny(installer, log, official);
+                }
 
+                prefetchInstallerLibraries(installer, gameDir, log);
                 log.accept("⚙️ 正在静默运行 Forge 安装器（需要几分钟）...");
-                runInstaller(javaPath, installer, gameDir, log);
+                runInstaller(javaPath, installer, gameDir, log, mirrorEnabled());
 
                 String id = findNewVersion(gameDir, gameVersion, "-forge-");
                 if (id == null) throw new RuntimeException("安装器执行完毕但没找到 Forge 版本目录");
@@ -169,7 +177,13 @@ public final class LoaderInstaller {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 log.accept("🦊 查询 NeoForge 版本...");
-                String metadata = get("https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml");
+                String officialMeta =
+                        "https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml";
+                String mirroredMeta = mavenMirror == null ? null
+                        : mavenMirror + "net/neoforged/neoforge/maven-metadata.xml";
+                String metadata = mirroredMeta != null
+                        ? getAny(log, officialMeta, mirroredMeta)
+                        : getAny(log, officialMeta);
                 String prefix = neoforgePrefix(gameVersion);
                 List<String> versions = new ArrayList<>();
                 Matcher m = Pattern.compile("<version>([^<]+)</version>").matcher(metadata);
@@ -181,14 +195,22 @@ public final class LoaderInstaller {
                         ? versions.get(versions.size() - 1) : requestedVersion;
                 log.accept("   使用 NeoForge " + version);
 
-                String url = "https://maven.neoforged.net/releases/net/neoforged/neoforge/" + version
-                        + "/neoforge-" + version + "-installer.jar";
+                String official = "https://maven.neoforged.net/releases/net/neoforged/neoforge/"
+                        + version + "/neoforge-" + version + "-installer.jar";
+                String mirrored = mavenMirror == null ? null
+                        : mavenMirror + "net/neoforged/neoforge/" + version
+                                + "/neoforge-" + version + "-installer.jar";
                 File installer = new File(gameDir, "downloads/neoforge-installer-" + version + ".jar");
                 log.accept("📥 下载 NeoForge 安装器...");
-                download(url, installer);
+                if (mirrored != null) {
+                    downloadAny(installer, log, official, mirrored);
+                } else {
+                    downloadAny(installer, log, official);
+                }
 
+                prefetchInstallerLibraries(installer, gameDir, log);
                 log.accept("⚙️ 正在静默运行 NeoForge 安装器（需要几分钟）...");
-                runInstaller(javaPath, installer, gameDir, log);
+                runInstaller(javaPath, installer, gameDir, log, mirrorEnabled());
 
                 String id = findNewVersion(gameDir, gameVersion, "-neoforge-");
                 if (id == null) throw new RuntimeException("安装器执行完毕但没找到 NeoForge 版本目录");
@@ -273,9 +295,21 @@ public final class LoaderInstaller {
                 StandardCharsets.UTF_8);
     }
 
+    /** 可选的 Maven 镜像（BMCLAPI）；为 null 时只走官方源。 */
+    private static volatile String mavenMirror = "https://bmclapi2.bangbang93.com/maven/";
+
+    /** 主类按「下载源」设置调用：official → null，其它 → BMCLAPI 镜像。 */
+    public static void setMavenMirror(String mirror) {
+        mavenMirror = mirror;
+    }
+
+    private static boolean mirrorEnabled() {
+        return mavenMirror != null && !mavenMirror.isBlank();
+    }
+
     private static String get(String url) throws Exception {
         HttpRequest request = HttpRequest.newBuilder(URI.create(url))
-                .timeout(Duration.ofSeconds(60))
+                .timeout(Duration.ofSeconds(20))
                 .header("User-Agent", "MCLauncher/1.0")
                 .GET().build();
         HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
@@ -283,6 +317,21 @@ public final class LoaderInstaller {
             throw new RuntimeException("HTTP " + response.statusCode() + " -> " + url);
         }
         return response.body();
+    }
+
+    /** 依次尝试多个源，返回第一个成功的响应；都失败时抛出带源清单的异常。 */
+    private static String getAny(Consumer<String> log, String... urls) {
+        StringBuilder errors = new StringBuilder();
+        for (String url : urls) {
+            try {
+                return get(url);
+            } catch (Exception e) {
+                String reason = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+                errors.append("\n  - ").append(url).append(" → ").append(reason);
+                if (log != null) log.accept("   ↳ 源不可用: " + reason);
+            }
+        }
+        throw new RuntimeException("所有下载源都连接失败:" + errors);
     }
 
     private static void download(String url, File target) throws Exception {
@@ -313,6 +362,213 @@ public final class LoaderInstaller {
         Files.move(part.toPath(), target.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
     }
 
+    /**
+     * 预取安装器依赖的库文件。
+     *
+     * <p>Forge/NeoForge 的安装器会直接连 maven.neoforged.net 下载库（"--mirror" 只影响部分下载），
+     * 国内网络连不上就会 "HTTP connect timed out"。这里先按安装器里的 install_profile.json
+     * 从 BMCLAPI 镜像把库下好，安装器执行时就能直接在本地命中。
+     */
+    private static void prefetchInstallerLibraries(File installer, File gameDir, Consumer<String> log) {
+        if (mavenMirror == null || mavenMirror.isBlank()) {
+            return;
+        }
+        List<String> paths = new ArrayList<>();
+        List<String> hashes = new ArrayList<>();
+        try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(installer)) {
+            // 安装器会同时处理 install_profile 与 version.json 里的库，两边都要预取
+            collectLibraries(zip, "install_profile.json", paths, hashes);
+            collectLibraries(zip, "version.json", paths, hashes);
+        } catch (Exception e) {
+            return;
+        }
+        if (paths.isEmpty()) {
+            return;
+        }
+
+        int downloaded = 0;
+        int skipped = 0;
+        int failed = 0;
+        File libRoot = new File(gameDir, "libraries");
+        for (int i = 0; i < paths.size(); i++) {
+            String path = paths.get(i);
+            File out = new File(libRoot, path.replace('/', File.separatorChar));
+            String sha1 = hashes.get(i);
+            if (out.isFile() && out.length() > 0
+                    && (sha1.isBlank() || sha1.equalsIgnoreCase(sha1Of(out)))) {
+                skipped++;
+                continue;
+            }
+            try {
+                downloadRaw(mavenMirror + path, out, sha1);
+                downloaded++;
+            } catch (Exception e) {
+                failed++;
+            }
+        }
+        log.accept("   \uD83D\uDCE6 预取安装库: 下载 " + downloaded + " / 已存在 " + skipped
+                + (failed > 0 ? " / 失败 " + failed : ""));
+    }
+
+    /** 从安装器 jar 里的某个 JSON 收集需要预取的库（libraries + processors.classpath）。 */
+    private static void collectLibraries(
+            java.util.zip.ZipFile zip, String entryName, List<String> paths, List<String> hashes) {
+        try {
+            java.util.zip.ZipEntry entry = zip.getEntry(entryName);
+            if (entry == null) {
+                return;
+            }
+            JsonObject root = JsonParser.parseString(
+                    new String(zip.getInputStream(entry).readAllBytes(), StandardCharsets.UTF_8))
+                    .getAsJsonObject();
+            if (root.has("libraries") && root.get("libraries").isJsonArray()) {
+                for (JsonElement element : root.getAsJsonArray("libraries")) {
+                    if (!element.isJsonObject()) continue;
+                    JsonObject library = element.getAsJsonObject();
+                    String path = null;
+                    String sha1 = "";
+                    if (library.has("downloads") && library.get("downloads").isJsonObject()) {
+                        JsonObject downloads = library.getAsJsonObject("downloads");
+                        if (downloads.has("artifact") && downloads.get("artifact").isJsonObject()) {
+                            JsonObject artifact = downloads.getAsJsonObject("artifact");
+                            if (artifact.has("path")) {
+                                path = artifact.get("path").getAsString();
+                            }
+                            if (artifact.has("sha1") && !artifact.get("sha1").isJsonNull()) {
+                                sha1 = artifact.get("sha1").getAsString();
+                            }
+                        }
+                    }
+                    if (path == null && library.has("name")) {
+                        path = mavenPath(library.get("name").getAsString());
+                    }
+                    if (path == null || path.isBlank()) continue;
+                    if (!paths.contains(path)) {
+                        paths.add(path);
+                        hashes.add(sha1);
+                    }
+                }
+            }
+            if (root.has("processors") && root.get("processors").isJsonArray()) {
+                for (JsonElement element : root.getAsJsonArray("processors")) {
+                    if (!element.isJsonObject()) continue;
+                    JsonObject processor = element.getAsJsonObject();
+                    if (!processor.has("classpath") || !processor.get("classpath").isJsonArray()) continue;
+                    for (JsonElement cp : processor.getAsJsonArray("classpath")) {
+                        String path = mavenPath(cp.getAsString());
+                        if (path != null && !paths.contains(path)) {
+                            paths.add(path);
+                            hashes.add("");
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+            // 某个 JSON 解析失败不影响另一个
+        }
+    }
+
+    /** group:artifact:version@ext → maven 相对路径。 */
+    private static String mavenPath(String coordinate) {
+        if (coordinate == null || coordinate.isBlank()) {
+            return null;
+        }
+        try {
+            String ext = "jar";
+            String name = coordinate;
+            int at = name.indexOf('@');
+            if (at > 0) {
+                ext = name.substring(at + 1);
+                name = name.substring(0, at);
+            }
+            String[] parts = name.split(":");
+            if (parts.length < 3) {
+                return null;
+            }
+            String group = parts[0].replace('.', '/');
+            String artifact = parts[1];
+            String version = parts[2];
+            return group + "/" + artifact + "/" + version + "/" + artifact + "-" + version + "." + ext;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static String sha1Of(File file) {
+        try (java.io.InputStream in = Files.newInputStream(file.toPath())) {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-1");
+            byte[] buffer = new byte[65536];
+            int read;
+            while ((read = in.read(buffer)) != -1) {
+                digest.update(buffer, 0, read);
+            }
+            StringBuilder sb = new StringBuilder();
+            for (byte b : digest.digest()) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    /** 依次尝试多个源下载安装器，成功即返回；都失败时给出每个源的原因。 */
+    private static void downloadAny(File target, Consumer<String> log, String... urls) {
+        StringBuilder errors = new StringBuilder();
+        for (String url : urls) {
+            try {
+                download(url, target);
+                log.accept("   ✔ 已从 " + hostOf(url) + " 下载安装器");
+                return;
+            } catch (Exception e) {
+                String reason = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+                errors.append("\n  - ").append(url).append(" → ").append(reason);
+                if (log != null) log.accept("   ↳ 下载失败(" + hostOf(url) + "): " + reason);
+            }
+        }
+        throw new RuntimeException("所有下载源都失败:" + errors);
+    }
+
+    private static String hostOf(String url) {
+        try {
+            String host = java.net.URI.create(url).getHost();
+            return host == null ? url : host;
+        } catch (Exception e) {
+            return url;
+        }
+    }
+
+    /** 下载任意类型的文件（库/压缩包），只校验长度与 sha1，不做 JAR 结构检查。 */
+    private static void downloadRaw(String url, File target, String sha1) throws Exception {
+        Files.deleteIfExists(target.toPath());
+        Files.createDirectories(target.getParentFile().toPath());
+        File part = new File(target.getAbsolutePath() + ".part");
+        Files.deleteIfExists(part.toPath());
+        HttpRequest request = HttpRequest.newBuilder(URI.create(url))
+                .timeout(Duration.ofMinutes(10))
+                .header("User-Agent", "MCLauncher/1.0")
+                .GET().build();
+        HttpResponse<java.nio.file.Path> response = CLIENT.send(request,
+                HttpResponse.BodyHandlers.ofFile(part.toPath(),
+                        java.nio.file.StandardOpenOption.CREATE,
+                        java.nio.file.StandardOpenOption.WRITE));
+        if (response.statusCode() != 200) {
+            part.delete();
+            throw new RuntimeException("下载失败 HTTP " + response.statusCode());
+        }
+        long expected = response.headers().firstValueAsLong("Content-Length").orElse(-1);
+        if (expected > 0 && part.length() != expected) {
+            part.delete();
+            throw new RuntimeException("文件不完整: " + part.length() + "/" + expected);
+        }
+        if (sha1 != null && !sha1.isBlank() && !sha1.equalsIgnoreCase(sha1Of(part))) {
+            part.delete();
+            throw new RuntimeException("SHA1 校验失败");
+        }
+        Files.move(part.toPath(), target.toPath(),
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+    }
+
     private static boolean isValidJar(File file) {
         try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(file)) {
             boolean forge = zip.getEntry("install_profile.json") != null;
@@ -335,7 +591,13 @@ public final class LoaderInstaller {
         }
     }
 
-    private static void runInstaller(String javaPath, File installer, File gameDir, Consumer<String> log) throws Exception {
+    private static void runInstaller(String javaPath, File installer, File gameDir, Consumer<String> log)
+            throws Exception {
+        runInstaller(javaPath, installer, gameDir, log, false);
+    }
+
+    private static void runInstaller(String javaPath, File installer, File gameDir, Consumer<String> log,
+                                     boolean useMirror) throws Exception {
         // Forge/NeoForge 安装器要求目录里已经存在 launcher_profiles.json，否则直接报
         // "There is no Minecraft launcher profile ... you need to run the launcher first!"
         ensureLauncherProfiles(gameDir);
@@ -344,8 +606,18 @@ public final class LoaderInstaller {
         if (java == null) {
             throw new RuntimeException("没有可用的 Java：实例里没有内置运行时，设置里也没填 Java 路径");
         }
-        ProcessBuilder pb = new ProcessBuilder(java, "-jar", installer.getAbsolutePath(),
-                "--installClient", gameDir.getAbsolutePath());
+        List<String> command = new ArrayList<>();
+        command.add(java);
+        command.add("-jar");
+        command.add(installer.getAbsolutePath());
+        command.add("--installClient");
+        command.add(gameDir.getAbsolutePath());
+        if (useMirror && mavenMirror != null) {
+            // 安装器自己下载库文件也走镜像，否则国内会卡在 maven.neoforged.net
+            command.add("--mirror");
+            command.add(mavenMirror);
+        }
+        ProcessBuilder pb = new ProcessBuilder(command);
         pb.directory(gameDir);
         pb.redirectErrorStream(true);
         Process process = pb.start();

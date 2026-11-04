@@ -27,6 +27,22 @@
 - **版本列表并行竞速**：镜像与官方同时请求，6 秒超时、9 秒总兜底，先返回有效 JSON 的那个胜出
 - **「重新获取」真正重发请求**：清掉缓存后重新调用数据源，不再只是退回列表
 - **窗口圆角/白边修复**：去掉场景根节点外多包的一层 StackPane（它会破坏 16px 圆角），并移除根节点 1px 外描边
+## 2.8.3（2026-11-04）
+
+修复国内网络下「安装加载器超时」和「图标加载不出来」。
+
+### 加载器安装
+
+- **NeoForge / Forge 多源下载**：官方 maven 与 BMCLAPI 镜像依次尝试，日志会显示每个源失败的原因（`↳ 源不可用: Connect timed out`）
+- **预取安装库**：安装器自己会直连 `maven.neoforged.net` 拉库（`--mirror` 覆盖不到），现在解析安装器里的 `install_profile.json` 与 `version.json`，先从 BMCLAPI 镜像把库/压缩包预取到 `libraries`，安装器执行时直接命中本地文件
+- 实测：NeoForge 21.1.80 在只有镜像可达的网络下完整安装成功（`Successfully installed client into launcher`）
+- 安装器日志里逐条显示 `exists. Checksum valid.`，不再出现 `HTTP connect timed out`
+
+### 图标
+
+- **图标多源回退**：`MCIM 镜像 → cdn.modrinth.com → wsrv.nl 代理`，任一可用即可显示；之前只走 wsrv.nl，代理不可达时整片图标空白
+- 覆盖整合包卡片、模组面板、启动预渲染三处图标加载
+
 ## 2.8.2（2026-11-04）
 
 这一版集中在「装得上、起得来、下得快」：整合包安装更稳、启动不再卡在缺父版本、下载走 aria2 多连接、安装页拆成下载/安装两条进度。

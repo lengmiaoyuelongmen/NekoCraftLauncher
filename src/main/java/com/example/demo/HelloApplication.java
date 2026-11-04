@@ -350,6 +350,11 @@ public class HelloApplication extends Application {
   {
     // 下载引擎跟随设置（检测不到 aria2c 时会自动回退内置下载器）
     DownloadManager.setAria2Enabled(this.config.isAria2Enabled());
+    // 加载器安装器同样跟随下载源：official 直连，其它走 BMCLAPI maven 镜像
+    LoaderInstaller.setMavenMirror(
+        "official".equals(this.config.getDownloadSource())
+            ? null
+            : "https://bmclapi2.bangbang93.com/maven/");
   }
   public static String THEME_URL = null;
   private StackPane commandPaletteOverlay;
@@ -8613,18 +8618,12 @@ public class HelloApplication extends Application {
       return;
     }
     try {
-      HttpRequest req =
-          HttpRequest.newBuilder(URI.create(IconProxy.resolve(urlStr)))
-              .timeout(java.time.Duration.ofSeconds(8L))
-              .GET()
-              .build();
-      HttpResponse<InputStream> resp =
-          httpClient.send(req, HttpResponse.BodyHandlers.ofInputStream());
-      if (resp.statusCode() == 200) {
-        byte[] bytes = resp.body().readAllBytes();
+      byte[] iconBytes = IconProxy.fetch(httpClient, urlStr);
+      if (iconBytes != null) {
+        final byte[] finalBytes = iconBytes;
         Platform.runLater(
             () -> {
-              Image img = this.decodeIcon(bytes);
+              Image img = this.decodeIcon(finalBytes);
               if (img != null && !img.isError()) {
                 this.iconMemoryCache.put(key, img);
               }
@@ -8662,18 +8661,12 @@ public class HelloApplication extends Application {
       return;
     }
     try {
-      HttpRequest req =
-          HttpRequest.newBuilder(URI.create(IconProxy.resolve(urlStr)))
-              .timeout(java.time.Duration.ofSeconds(10L))
-              .GET()
-              .build();
-      HttpResponse<InputStream> resp =
-          httpClient.send(req, HttpResponse.BodyHandlers.ofInputStream());
-      if (resp.statusCode() == 200) {
-        byte[] bytes = resp.body().readAllBytes();
+      byte[] iconBytes = IconProxy.fetch(httpClient, urlStr);
+      if (iconBytes != null) {
+        final byte[] finalBytes = iconBytes;
         Platform.runLater(
             () -> {
-              Image img = this.decodeIcon(bytes);
+              Image img = this.decodeIcon(finalBytes);
               if (img != null && !img.isError()) {
                 this.iconMemoryCache.put(key, img);
               }

@@ -1464,17 +1464,15 @@ public final class ModsPanel extends VBox {
         }
         CompletableFuture.runAsync(() -> {
             try {
-                HttpRequest request = HttpRequest.newBuilder(URI.create(IconProxy.resolve(iconUrl)))
-                        .timeout(java.time.Duration.ofSeconds(10)).GET().build();
-                HttpResponse<byte[]> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofByteArray());
-                if (response.statusCode() != 200) return;
-                Image image = decode(response.body());
+                byte[] bytes = IconProxy.fetch(CLIENT, iconUrl);
+                if (bytes == null) return;
+                Image image = decode(bytes);
                 if (image == null) return;
                 iconCache.put(iconUrl, image);
                 try {
                     File cacheFile = iconCacheFile(iconUrl);
                     cacheFile.getParentFile().mkdirs();
-                    java.nio.file.Files.write(cacheFile.toPath(), response.body());
+                    java.nio.file.Files.write(cacheFile.toPath(), bytes);
                 } catch (Exception ignored) {
                 }
                 Platform.runLater(() -> showIcon(pane, image));
