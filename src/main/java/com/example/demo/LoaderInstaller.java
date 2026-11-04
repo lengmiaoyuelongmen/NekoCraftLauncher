@@ -155,7 +155,7 @@ public final class LoaderInstaller {
                 log.accept("⚙️ 正在静默运行 Forge 安装器（需要几分钟）...");
                 runInstaller(javaPath, installer, gameDir, log, mirrorEnabled());
 
-                String id = findNewVersion(gameDir, gameVersion, "-forge-");
+                String id = findNewVersion(gameDir, gameVersion, "-forge-", version);
                 if (id == null) throw new RuntimeException("安装器执行完毕但没找到 Forge 版本目录");
                 log.accept("✅ Forge 安装完成: " + id);
                 return id;
@@ -212,7 +212,7 @@ public final class LoaderInstaller {
                 log.accept("⚙️ 正在静默运行 NeoForge 安装器（需要几分钟）...");
                 runInstaller(javaPath, installer, gameDir, log, mirrorEnabled());
 
-                String id = findNewVersion(gameDir, gameVersion, "-neoforge-");
+                String id = findNewVersion(gameDir, gameVersion, "-neoforge-", version);
                 if (id == null) throw new RuntimeException("安装器执行完毕但没找到 NeoForge 版本目录");
                 log.accept("✅ NeoForge 安装完成: " + id);
                 return id;
@@ -681,11 +681,28 @@ public final class LoaderInstaller {
         Files.writeString(profiles.toPath(), content, StandardCharsets.UTF_8);
     }
 
-    private static String findNewVersion(File gameDir, String gameVersion, String marker) {
+    /**
+     * 找到安装器刚产出的版本目录。
+     *
+     * <p>优先匹配请求的加载器版本（之前直接取第一个匹配项，会把旧版本当成刚装好的）。
+     */
+    private static String findNewVersion(File gameDir, String gameVersion, String marker,
+                                         String preferVersion) {
         Set<String> ids = new LinkedHashSet<>(VersionProfile.installedIds(gameDir));
+        String newest = null;
+        long newestTime = -1;
         for (String id : ids) {
-            if (id.startsWith(gameVersion) && id.contains(marker)) return id;
+            if (!id.startsWith(gameVersion) || !id.contains(marker)) continue;
+            if (preferVersion != null && !preferVersion.isBlank() && id.contains(preferVersion)) {
+                return id;
+            }
+            File json = VersionProfile.jsonFile(gameDir, id);
+            long time = json.isFile() ? json.lastModified() : 0;
+            if (time > newestTime) {
+                newestTime = time;
+                newest = id;
+            }
         }
-        return null;
+        return newest;
     }
 }

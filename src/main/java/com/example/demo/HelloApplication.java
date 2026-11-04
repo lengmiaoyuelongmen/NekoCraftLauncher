@@ -5773,17 +5773,27 @@ public class HelloApplication extends Application {
               return;
             } catch (Exception e) {
               deleteTree(staging);
-              String message = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+              String message = rootMessage(e);
               this.logLine("❌ 第 " + attempt + " 次安装失败: " + message);
+              for (Throwable cause = e.getCause(); cause != null; cause = cause.getCause()) {
+                if (cause.getMessage() != null && !message.contains(cause.getMessage())) {
+                  this.logLine("   ↳ " + cause.getMessage());
+                }
+              }
               rollbackCreatedInstance(gameDir, instanceId, createdInstance);
               if (attempt >= maxAttempts) {
-                this.logLine("❌ 导入失败: " + message);
+                String hint = importFailureHint(message);
+                this.logLine("❌ 导入失败: " + message + (hint.isEmpty() ? "" : "（" + hint + "）"));
+                String finalMessage = message;
                 Platform.runLater(
                     () -> {
                       stopDlListener.run();
                       window.clearDownload();
-                      window.finish(false, "导入失败（已重试 " + maxAttempts + " 次）：" + message);
-                      Toast.error("导入失败，详情见日志");
+                      window.finish(
+                          false,
+                          "导入失败（已重试 " + maxAttempts + " 次）：" + finalMessage
+                              + (hint.isEmpty() ? "" : " · " + hint));
+                      Toast.error("导入失败：" + finalMessage);
                     });
                 return;
               }
@@ -5797,6 +5807,38 @@ public class HelloApplication extends Application {
         });
   }
 
+  /** 取最内层异常的消息，避免只显示 "RuntimeException: ..." 这种壳。 */
+  private static String rootMessage(Throwable error) {
+    Throwable current = error;
+    String message = error.getMessage();
+    while (current.getCause() != null && current.getCause() != current) {
+      current = current.getCause();
+      if (current.getMessage() != null && !current.getMessage().isBlank()) {
+        message = current.getMessage();
+      }
+    }
+    return message == null || message.isBlank() ? error.getClass().getSimpleName() : message;
+  }
+
+  /** 按异常类型给出可操作提示。 */
+  private static String importFailureHint(String message) {
+    String lower = message == null ? "" : message.toLowerCase(Locale.ROOT);
+    if (lower.contains("java")) {
+      return "内置运行时缺失或不可用，可在 设置 → 启动 → Java 路径 指定 java.exe";
+    }
+    if (lower.contains("timed out") || lower.contains("connect") || lower.contains("http")
+        || lower.contains("下载源") || lower.contains("unreachable")) {
+      return "网络不稳定，可在 设置 → 下载源 选「镜像优先」后重试";
+    }
+    if (lower.contains("space") || lower.contains("空间")) {
+      return "磁盘空间不足，清理后再试";
+    }
+    if (lower.contains("access") || lower.contains("权限") || lower.contains("denied")) {
+      return "目录没有写权限，换个目录或以管理员身份运行";
+    }
+    return "";
+  }
+
   /** 递归复制目录内容（覆盖同名文件）。 */
   private static void copyTree(File from, File to) throws java.io.IOException {
     if (from == null || !from.isDirectory()) {
@@ -5806,7 +5848,8 @@ public class HelloApplication extends Application {
     try (java.util.stream.Stream<java.nio.file.Path> walk = java.nio.file.Files.walk(base)) {
       for (java.nio.file.Path path : walk.toList()) {
         java.nio.file.Path relative = base.relativize(path);
-        File target = new File(to, relative.toString());
+        File target = ModpackImport.safeTarget(to, relative.toString());
+        if (target == null) continue;
         if (java.nio.file.Files.isDirectory(path)) {
           target.mkdirs();
         } else {

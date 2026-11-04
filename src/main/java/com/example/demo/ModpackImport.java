@@ -228,6 +228,7 @@ public final class ModpackImport {
      */
     public static int extract(File archive, File targetDir, Consumer<String> log) throws Exception {
         int count = 0;
+        java.util.List<String> skipped = new java.util.ArrayList<>();
         try (ZipFile zip = open(archive)) {
             Enumeration<? extends ZipEntry> entries = zip.entries();
             while (entries.hasMoreElements()) {
@@ -236,19 +237,58 @@ public final class ModpackImport {
                 if (entry.isDirectory()) continue;
                 String path = mapPath(raw);
                 if (path == null || path.isBlank()) continue;
-                File out = new File(targetDir, path);
-                if (!out.toPath().normalize().startsWith(targetDir.toPath())) continue;
+                File out = safeTarget(targetDir, path);
+                if (out == null) continue;
                 File parent = out.getParentFile();
                 if (parent != null && !parent.exists()) parent.mkdirs();
                 try (InputStream in = zip.getInputStream(entry);
                      FileOutputStream output = new FileOutputStream(out)) {
                     in.transferTo(output);
+                } catch (Exception writeError) {
+                    // 单个文件写不进去（路径非法/被占用/磁盘满）不该让整个安装失败
+                    skipped.add(path + " (" + writeError.getMessage() + ")");
+                    continue;
                 }
                 count++;
             }
         }
-        if (log != null) log.accept("解出 " + count + " 个文件到 " + targetDir.getAbsolutePath());
+        if (log != null) {
+            log.accept("解出 " + count + " 个文件到 " + targetDir.getAbsolutePath());
+            if (!skipped.isEmpty()) {
+                log.accept("⚠ 有 " + skipped.size() + " 个文件没能写入，已跳过：");
+                for (int i = 0; i < Math.min(5, skipped.size()); i++) {
+                    log.accept("   " + skipped.get(i));
+                }
+            }
+        }
         return count;
+    }
+
+    /**
+     * 把索引里的相对路径映射成本机可写文件。
+     *
+     * <p>处理两类 Windows 常见坑：路径超过 260 字符（加 \\?\ 前缀）、文件名含非法字符（替换成 _）。
+     */
+    static File safeTarget(File baseDir, String relative) {
+        if (relative == null || relative.isBlank()) {
+            return null;
+        }
+        String cleaned = relative.replace('/', File.separatorChar);
+        // Windows 文件名非法字符
+        cleaned = cleaned.replaceAll("[<>:\"|?*]", "_");
+        File file = new File(baseDir, cleaned);
+        try {
+            if (!file.toPath().normalize().startsWith(baseDir.toPath().normalize())) {
+                return null;
+            }
+        } catch (Exception e) {
+            return null;
+        }
+        String absolute = file.getAbsolutePath();
+        if (absolute.length() > 240 && !absolute.startsWith("\\\\?\\")) {
+            return new File("\\\\?\\" + absolute);
+        }
+        return file;
     }
 
     /** 按 Modrinth 索引里的 files 列表补齐实际模组文件。overrides 只包含配置，不含大部分模组。 */
@@ -268,8 +308,8 @@ public final class ModpackImport {
                         if (path.startsWith("mods/") && path.indexOf('/', 5) > 0) {
                             path = "mods/" + new File(path).getName();
                         }
-                        File out = new File(targetDir, path);
-                        if (!out.toPath().normalize().startsWith(targetDir.toPath())) continue;
+                        File out = safeTarget(targetDir, path);
+                        if (out == null) continue;
                         String url = "";
                         if (file.has("downloads") && file.get("downloads").isJsonArray()
                                 && !file.getAsJsonArray("downloads").isEmpty()) {
