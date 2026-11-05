@@ -6044,6 +6044,15 @@ public class HelloApplication extends Application {
 
   private void downloadFileAsync(
       String url, File targetFile, TextArea logArea, Consumer<File> onDone) {
+    downloadFileAsync(url, targetFile, logArea, onDone, null);
+  }
+
+  private void downloadFileAsync(
+      String url,
+      File targetFile,
+      TextArea logArea,
+      Consumer<File> onDone,
+      Consumer<String> onFail) {
     logArea.appendText("📥 正在下载: " + targetFile.getName() + "\n");
     CompletableFuture.runAsync(
         () -> {
@@ -6056,6 +6065,9 @@ public class HelloApplication extends Application {
                 () -> {
                   if (stats.failed > 0 || size <= 0L) {
                     logArea.appendText("❌ 下载失败: " + targetFile.getName() + "\n");
+                    if (onFail != null) {
+                      onFail.accept("下载失败：" + targetFile.getName());
+                    }
                     return;
                   }
                   this.lastDownloadedFile = targetFile;
@@ -6066,7 +6078,13 @@ public class HelloApplication extends Application {
                   }
                 });
           } catch (Exception e) {
-            Platform.runLater(() -> logArea.appendText("❌ 下载失败: " + e.getMessage() + "\n"));
+            Platform.runLater(
+                () -> {
+                  logArea.appendText("❌ 下载失败: " + e.getMessage() + "\n");
+                  if (onFail != null) {
+                    onFail.accept("下载失败：" + e.getMessage());
+                  }
+                });
           }
         });
   }
@@ -8862,11 +8880,63 @@ if (files != null && files.size() > 0) {
     targetDir.mkdirs();
   }
   File saveFile = new File(targetDir, fileName);
+  boolean isModpack =
+      fileName.toLowerCase(Locale.ROOT).endsWith(".mrpack") || "整合包".equals(projectType);
+  InstallProgressPage downloadPage = null;
+  java.util.function.Consumer<DownloadManager.Status> dlListener = null;
+  if (isModpack) {
+    // 点「下载」立刻进专用页面，不再让用户在列表里干等
+    downloadPage =
+        new InstallProgressPage(
+            "正在下载：" + fileName, List.of("下载整合包", "安装到实例", "完成"));
+    downloadPage.setStep(0, "run");
+    downloadPage.setProgress(-1);
+    downloadPage.setOnCancel(DownloadManager::cancelAll);
+    downloadPage.setOnBack(() -> this.switchPage("instances"));
+    if (!"download".equals(this.currentPage)) {
+      this.switchPage("download");
+    }
+    this.showDownloadPanel(downloadPage.node());
+    final InstallProgressPage pageRef = downloadPage;
+    dlListener =
+        status ->
+            Platform.runLater(
+                () ->
+                    pageRef.setDownloadItems(
+                        status.done(),
+                        status.total(),
+                        status.bytes(),
+                        status.totalBytes(),
+                        status.speedBps(),
+                        status.file()));
+    DownloadManager.addStatusListener(dlListener);
+  }
+  final InstallProgressPage pageForDone = downloadPage;
+  final java.util.function.Consumer<DownloadManager.Status> listenerForDone = dlListener;
+  java.util.function.Consumer<String> onFail =
+      pageForDone == null
+          ? null
+          : reason -> {
+            if (listenerForDone != null) {
+              DownloadManager.removeStatusListener(listenerForDone);
+            }
+            pageForDone.setStep(0, "fail");
+            pageForDone.clearDownload();
+            pageForDone.finish(false, reason + "，点「返回」重试或检查网络");
+          };
   this.downloadFileAsync(
       downloadUrl,
       saveFile,
       this.logArea,
       saved -> {
+        if (listenerForDone != null) {
+          DownloadManager.removeStatusListener(listenerForDone);
+        }
+        if (pageForDone != null) {
+          pageForDone.clearDownload();
+          pageForDone.setStep(0, "ok");
+          pageForDone.setStep(1, "run");
+        }
         if (saved.getName().toLowerCase().endsWith(".mrpack")) {
           this.importModpack(saved);
         } else if ("模组".equals(projectType)
@@ -8876,7 +8946,8 @@ if (files != null && files.size() > 0) {
           this.logArea.appendText(
               "✅ 已放入 " + this.installDirFor(projectType) + "/，启动游戏即可生效\n");
         }
-      });
+      },
+      onFail);
 } else {
   this.logArea.appendText("⚠️ 该版本下未找到可下载的文件。\n");
 }
