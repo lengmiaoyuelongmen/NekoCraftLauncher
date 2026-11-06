@@ -211,8 +211,19 @@ public class SmokeWin {
         $el = $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $cond)
         if (-not $el) { throw "找不到导航按钮：$($p.nav)" }
         $el.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
-        Start-Sleep -Milliseconds 2500
-        Capture-Window $p.name
+        # 等页面真的换掉：截图哈希和上一页不同才算切换成功，最多等 10 秒
+        $pageDeadline = (Get-Date).AddSeconds(10)
+        while ($true) {
+            Capture-Window $p.name
+            $pageHash = (Get-FileHash (Join-Path $outDir "$($p.name).png") -Algorithm SHA256).Hash
+            if (-not $prevHash -or $pageHash -ne $prevHash) { break }
+            if ((Get-Date) -gt $pageDeadline) {
+                Write-Host ("  ! {0} 没有切换到新页面" -f $p.name) -ForegroundColor Yellow
+                break
+            }
+            Start-Sleep -Milliseconds 400
+        }
+        $prevHash = $pageHash
         Write-Host ("  · {0}（{1}）" -f $p.name, $p.nav) -ForegroundColor DarkGray
     }
 
