@@ -237,6 +237,7 @@ import com.example.demo.core.download.ModrinthSearch;
 import com.example.demo.core.mod.ProjectFormat;
 import com.example.demo.core.model.InstanceId;
 import com.example.demo.core.launch.ServerAddress;
+import com.example.demo.ui.page.DownloadPage;
 public class HelloApplication extends Application {
   private static final Set<String> CLONE_DATA_DIRS =
       Set.of(
@@ -267,6 +268,7 @@ public class HelloApplication extends Application {
   private String navHighlight;
   private boolean testMode;
   private WindowChrome windowChrome;
+  private DownloadPage downloadPage;
   private Stage stageRef;
   private volatile boolean testSuccess;
   private Rectangle navIndicator;
@@ -353,8 +355,6 @@ public class HelloApplication extends Application {
   private Label downloadStatsLabel;
   private Label launchVersionLabel;
   private ImageView avatarImageView;
-  private Rectangle downloadNavIndicator;
-  private VBox downloadNavBox;
   private String minecraftFilter = "all";
   private VBox favoritesPanel;
   private VBox worldsNoticePanel;
@@ -363,7 +363,6 @@ public class HelloApplication extends Application {
   private TextField favoritesSearch;
   private ComboBox<String> favoritesSortCombo;
   private String favoritesQuery = "";
-  private StackPane downloadContentArea;
   private VBox communityPanel;
   private VBox minecraftPanel;
   private VBox installerPanel;
@@ -1306,29 +1305,9 @@ public class HelloApplication extends Application {
   }
 
   private void alignDownloadNavIndicator() {
-    if (this.downloadNavIndicator == null || this.downloadNavBox == null) {
-      return;
+    if (this.downloadPage != null) {
+      this.downloadPage.alignIndicator();
     }
-    for (Node node : this.downloadNavBox.getChildren()) {
-      Label label;
-      Object e;
-      HBox item;
-      if (!(node instanceof HBox)
-          || (item = (HBox) node).getChildren().size() < 2
-          || !((e = item.getChildren().get(1)) instanceof Label)
-          || !"整合包".equals((label = (Label) e).getText())) continue;
-      if (item.getHeight() <= 0.0) {
-        Platform.runLater(this::alignDownloadNavIndicator);
-        return;
-      }
-      this.downloadNavIndicator.setHeight(Math.max(24.0, item.getHeight() - 8.0));
-      this.downloadNavIndicator.setTranslateY(this.centeredIndicatorY(item));
-      return;
-    }
-  }
-
-  private double centeredIndicatorY(HBox item) {
-    return item.getLayoutY() + (item.getHeight() - this.downloadNavIndicator.getHeight()) / 2.0;
   }
 
   private VBox createAdvisorPanel() {
@@ -2557,174 +2536,120 @@ public class HelloApplication extends Application {
   }
 
   private HBox createDownloadPanel() {
-    String[] items2;
-    HBox panel = new HBox(0.0);
-    panel.setStyle("-fx-background-color: -app-bg;");
-    VBox sidebar = new VBox(0.0);
-    sidebar.setPrefWidth(230.0);
-    sidebar.setMinWidth(230.0);
-    sidebar.setMaxWidth(230.0);
-    sidebar.setStyle(
-        "-fx-background-color: linear-gradient(to bottom, -app-nav, -app-surface-2); -fx-padding:"
-            + " 20 0 0 0; -fx-border-color: transparent -app-border-2 transparent transparent;");
-    this.downloadNavIndicator = new Rectangle(4.0, 42.0);
-    this.downloadNavIndicator.setFill(javafx.scene.paint.Color.web("#9ca3af"));
-    this.downloadNavIndicator.setArcWidth(4.0);
-    this.downloadNavIndicator.setArcHeight(4.0);
-    this.downloadNavIndicator.setMouseTransparent(true);
-    this.downloadNavBox = new VBox(0.0);
-    StackPane navContainer = new StackPane(this.downloadNavBox, this.downloadNavIndicator);
-    StackPane.setAlignment(this.downloadNavIndicator, Pos.TOP_LEFT);
-    navContainer.setAlignment(Pos.TOP_LEFT);
-    ScrollPane navScroll = new ScrollPane(navContainer);
-    navScroll.setFitToWidth(true);
-    navScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-    navScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-    navScroll.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
-    Label group1 = new Label("游戏");
-    group1.setStyle(
-        "-fx-text-fill: -app-text-muted-2; -fx-font-size: 13px; -fx-font-weight: bold; -fx-padding:"
-            + " 10 20 5 25;");
-    this.downloadNavBox.getChildren().add(group1);
-    this.downloadNavBox.getChildren().add(this.createDownloadNavItem("Minecraft"));
-    Label group2 = new Label("社区资源");
-    group2.setStyle(
-        "-fx-text-fill: -app-text-muted-2; -fx-font-size: 13px; -fx-font-weight: bold; -fx-padding:"
-            + " 25 20 5 25;");
-    this.downloadNavBox.getChildren().add(group2);
-    for (String item : items2 = new String[] {"模组", "整合包", "数据包", "资源包", "光影包", "世界", "收藏夹"}) {
-      DownloadNavItem navItem = this.createDownloadNavItem(item);
-      if (item.equals("整合包")) {
-        navItem.setActive(true);
+    this.downloadPage =
+        new DownloadPage(
+            new DownloadPage.Host() {
+              @Override
+              public Node communityPanel() {
+                return HelloApplication.this.communityPanelNode();
+              }
+
+              @Override
+              public Node minecraftPanel() {
+                return HelloApplication.this.minecraftPanelNode();
+              }
+
+              @Override
+              public Node worldsNoticePanel() {
+                return HelloApplication.this.worldsNoticePanelNode();
+              }
+
+              @Override
+              public Node favoritesPanel() {
+                return HelloApplication.this.favoritesPanelNode();
+              }
+
+              @Override
+              public void onSelect(String text) {
+                HelloApplication.this.onDownloadSelect(text);
+              }
+            });
+    return this.downloadPage.build();
+  }
+
+  private StackPane downloadContentArea() {
+    return this.downloadPage == null ? null : this.downloadPage.contentArea();
+  }
+
+  private Node communityPanelNode() {
+    if (this.communityPanel == null) {
+      this.communityPanel = this.createCommunityPanel();
+    }
+    return this.communityPanel;
+  }
+
+  private Node minecraftPanelNode() {
+    if (this.minecraftPanel == null) {
+      this.minecraftPanel = this.createMinecraftPanel();
+    }
+    return this.minecraftPanel;
+  }
+
+  private Node worldsNoticePanelNode() {
+    if (this.worldsNoticePanel == null) {
+      this.worldsNoticePanel = this.createWorldsNoticePanel();
+    }
+    return this.worldsNoticePanel;
+  }
+
+  private Node favoritesPanelNode() {
+    if (this.favoritesPanel == null) {
+      this.favoritesPanel = this.createFavoritesPanel();
+    }
+    return this.favoritesPanel;
+  }
+
+  /** 下载页左侧分类被选中后的业务分发（导航与指示器由 DownloadPage 负责）。 */
+  private void onDownloadSelect(String text) {
+    boolean installer =
+        text.equals("Fabric")
+            || text.equals("Quilt")
+            || text.equals("Forge")
+            || text.equals("NeoForge")
+            || text.equals("OptiFine");
+    if (installer) {
+      if (text.equals("OptiFine")) {
+        this.openBrowser("https://optifine.net/downloads");
+        Toast.info("OptiFine 官网安装器需要手动运行");
+        return;
       }
-      this.downloadNavBox.getChildren().add(navItem);
+      if (this.installerPanel == null) {
+        this.installerPanel = this.createInstallerPanel();
+        this.downloadContentArea().getChildren().add(this.installerPanel);
+      }
+      this.showDownloadPanel(this.installerPanel);
+      this.showInstaller(text);
+      return;
     }
-    Label group3 = new Label("安装包");
-    group3.setStyle(
-        "-fx-text-fill: -app-text-muted-2; -fx-font-size: 13px; -fx-font-weight: bold; -fx-padding:"
-            + " 25 20 5 25;");
-    this.downloadNavBox.getChildren().add(group3);
-    for (String loader : new String[] {"OptiFine", "Fabric", "Quilt", "Forge", "NeoForge"}) {
-      this.downloadNavBox.getChildren().add(this.createDownloadNavItem(loader));
+    if (text.equals("Minecraft")) {
+      this.showDownloadPanel(this.minecraftPanelNode());
+      this.loadMinecraftVersions();
+    } else if (text.equals("世界")) {
+      this.showDownloadPanel(this.worldsNoticePanelNode());
+    } else if (text.equals("收藏夹")) {
+      this.refreshFavoritesPanel();
+      this.showDownloadPanel(this.favoritesPanelNode());
+    } else {
+      this.currentProjectType = text;
+      this.showDownloadPanel(this.communityPanelNode());
+      this.filterBar.setSearchPrompt("搜索 " + text + "...");
+      this.filterBar.setSuppressSearch(true);
+      try {
+        this.filterBar.sourceCombo().setValue("全部");
+        this.filterBar.tagCombo().setValue("全部");
+        this.filterBar.sortCombo().setValue("默认");
+        this.filterBar.loaderCombo().setValue(text.equals("数据包") ? "DataPack" : "任意");
+      } finally {
+        this.filterBar.setSuppressSearch(false);
+      }
+      this.performSearch();
     }
-    sidebar.getChildren().add(navScroll);
-    VBox.setVgrow(navScroll, Priority.ALWAYS);
-    this.downloadContentArea = new StackPane();
-    this.downloadContentArea.setPadding(new Insets(18.0));
-    this.downloadContentArea.setStyle("-fx-background-color: transparent;");
-    HBox.setHgrow(this.downloadContentArea, Priority.ALWAYS);
-    VBox.setVgrow(this.downloadContentArea, Priority.ALWAYS);
-    this.communityPanel = this.createCommunityPanel();
-    this.minecraftPanel = this.createMinecraftPanel();
-    this.minecraftPanel.setVisible(false);
-    this.worldsNoticePanel = this.createWorldsNoticePanel();
-    this.worldsNoticePanel.setVisible(false);
-    this.favoritesPanel = this.createFavoritesPanel();
-    this.favoritesPanel.setVisible(false);
-    this.downloadContentArea
-        .getChildren()
-        .addAll(
-            this.communityPanel, this.minecraftPanel, this.worldsNoticePanel, this.favoritesPanel);
-    ModuleHeader downloadHeader =
-        new ModuleHeader(
-            "02 / LIBRARY",
-            "下载中心",
-            "Minecraft · 模组 · 整合包 · 资源",
-            "download",
-            ModuleHeader.Badge.SQUARE,
-            "Minecraft Java Edition");
-    VBox.setMargin(downloadHeader, new Insets(12.0, 18.0, 0.0, 18.0));
-    VBox downloadRight = new VBox(14.0, downloadHeader, this.downloadContentArea);
-    downloadRight.setMinWidth(0);
-    downloadRight.setPrefWidth(0);
-    this.downloadContentArea.setMinWidth(0);
-    VBox.setVgrow(this.downloadContentArea, Priority.ALWAYS);
-    HBox.setHgrow(downloadRight, Priority.ALWAYS);
-    panel.getChildren().addAll(sidebar, downloadRight);
-    return panel;
   }
 
   private void showDownloadPanel(Node target) {
-    if (target == null) {
-      return;
+    if (target != null && this.downloadPage != null) {
+      this.downloadPage.show(target);
     }
-    // 同一时间只保留一个子节点：StackPane 会按「最宽的子节点」撑开自己，
-    // 把一堆隐藏的面板同时留在里面会让整个下载区被撑到超出窗口。
-    if (this.downloadContentArea.getChildren().size() != 1
-        || this.downloadContentArea.getChildren().get(0) != target) {
-      this.downloadContentArea.getChildren().setAll(target);
-    }
-    target.setVisible(true);
-    Motion.pageIn(target);
-  }
-
-  private DownloadNavItem createDownloadNavItem(String text) {
-    DownloadNavItem navItem = new DownloadNavItem(text);
-    navItem.setOnMouseClicked(
-        e -> {
-          this.downloadNavIndicator.setHeight(Math.max(24.0, navItem.getHeight() - 8.0));
-          double targetY = this.centeredIndicatorY(navItem);
-          Timeline timeline =
-              new Timeline(
-                  new KeyFrame(
-                      Duration.millis(250.0),
-                      new KeyValue(
-                          this.downloadNavIndicator.translateYProperty(),
-                          targetY,
-                          SMOOTH_INTERPOLATOR)));
-          timeline.play();
-          for (Node n : this.downloadNavBox.getChildren()) {
-            if (n instanceof DownloadNavItem item) {
-              item.setActive(false);
-            }
-          }
-          navItem.setActive(true);
-          boolean installer =
-              text.equals("Fabric")
-                  || text.equals("Quilt")
-                  || text.equals("Forge")
-                  || text.equals("NeoForge")
-                  || text.equals("OptiFine");
-          if (installer) {
-            if (text.equals("OptiFine")) {
-              this.openBrowser("https://optifine.net/downloads");
-              Toast.info("OptiFine 官网安装器需要手动运行");
-              return;
-            }
-            if (this.installerPanel == null) {
-              this.installerPanel = this.createInstallerPanel();
-              this.downloadContentArea.getChildren().add(this.installerPanel);
-            }
-            this.showDownloadPanel(this.installerPanel);
-            this.showInstaller(text);
-            return;
-          }
-          if (text.equals("Minecraft")) {
-            this.showDownloadPanel(this.minecraftPanel);
-            this.loadMinecraftVersions();
-          } else if (text.equals("世界")) {
-            this.showDownloadPanel(this.worldsNoticePanel);
-          } else if (text.equals("收藏夹")) {
-            this.refreshFavoritesPanel();
-            this.showDownloadPanel(this.favoritesPanel);
-          } else {
-            this.currentProjectType = text;
-            this.showDownloadPanel(this.communityPanel);
-            this.filterBar.setSearchPrompt("搜索 " + text + "...");
-            // 切换分类时把「来源 / 标签 / 排序」复位，避免上一个分类的筛选条件带到新分类
-            this.filterBar.setSuppressSearch(true);
-            try {
-              this.filterBar.sourceCombo().setValue("全部");
-              this.filterBar.tagCombo().setValue("全部");
-              this.filterBar.sortCombo().setValue("默认");
-              this.filterBar.loaderCombo().setValue(text.equals("数据包") ? "DataPack" : "任意");
-            } finally {
-              this.filterBar.setSuppressSearch(false);
-            }
-            this.performSearch();
-          }
-        });
-    return navItem;
   }
 
   private void configureVersionLoaderFilters() {
@@ -3415,7 +3340,7 @@ public class HelloApplication extends Application {
       this.versionDetailPanel = new VBox(12.0);
       this.versionDetailPanel.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
       this.versionDetailPanel.setAlignment(Pos.TOP_LEFT);
-      this.downloadContentArea.getChildren().add(this.versionDetailPanel);
+      this.downloadContentArea().getChildren().add(this.versionDetailPanel);
     }
     this.versionDetailPanel.getChildren().setAll(this.buildVersionDetail(version));
     this.showDownloadPanel(this.versionDetailPanel);
@@ -3540,7 +3465,7 @@ public class HelloApplication extends Application {
   private void openVersionInstaller(MinecraftVersion version, String loader) {
     if (this.installerPanel == null) {
       this.installerPanel = this.createInstallerPanel();
-      this.downloadContentArea.getChildren().add(this.installerPanel);
+      this.downloadContentArea().getChildren().add(this.installerPanel);
     }
     this.showDownloadPanel(this.installerPanel);
     this.fillInstallerPublicVersions(version);
@@ -4664,7 +4589,7 @@ public class HelloApplication extends Application {
     page.getStyleClass().add("version-page");
     // 页面宽度跟随下载区，避免被内部长文本撑宽
 
-    this.downloadContentArea.getChildren().removeIf(n -> n.getStyleClass().contains("version-page"));
+    this.downloadContentArea().getChildren().removeIf(n -> n.getStyleClass().contains("version-page"));
 
     Runnable goBack =
         () -> {
@@ -4724,7 +4649,7 @@ public class HelloApplication extends Application {
       this.modDetailPanel = new VBox(10.0);
       this.modDetailPanel.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
       this.modDetailPanel.setAlignment(Pos.TOP_LEFT);
-      this.downloadContentArea.getChildren().add(this.modDetailPanel);
+      this.downloadContentArea().getChildren().add(this.modDetailPanel);
     }
     Instance instance = Instance.of(new File(this.config.getGameDir()), id);
     VBox page = this.buildModPageShell(project, instance);
@@ -5023,7 +4948,7 @@ public class HelloApplication extends Application {
     page.setPadding(new Insets(6, 10, 6, 6));
     page.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
     page.getStyleClass().add("version-page");
-    this.downloadContentArea.getChildren().removeIf(n -> n.getStyleClass().contains("version-page"));
+    this.downloadContentArea().getChildren().removeIf(n -> n.getStyleClass().contains("version-page"));
     back.setOnAction(e -> this.showDownloadPanel(this.communityPanel));
     this.showDownloadPanel(page);
   }

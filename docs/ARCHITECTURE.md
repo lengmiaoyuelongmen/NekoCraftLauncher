@@ -546,6 +546,24 @@ powershell -ExecutionPolicy Bypass -File scripts\smoke-test.ps1 -SkipBuild
 - 不用 PowerShell `Get-Content`/`Set-Content` 改源码。
 - 每次改动后：0 告警 + 单测 + 冒烟，缺一不可。
 
+## 9. 下载页外壳独立（Phase 5d）
+
+主类的第一块「页面级」代码搬进了 `ui.page.DownloadPage`：
+
+| 归属 | 内容 |
+|---|---|
+| `DownloadPage` | 左侧分类导航（分组标题 / 滑动指示器 / 高亮）、内容区、切换动画、`alignIndicator()` |
+| `HelloApplication` | 只提供四个内容面板（懒创建）与 `onDownloadSelect(text)` 的业务分发 |
+
+拆完后主类 **8,251 → 8,180 行**，下载页的导航结构可以独立阅读。
+
+**实机验证**（ui.ps1 点击 + 截图）：
+
+- 进入下载页：侧栏 / 标题 / 筛选 / 列表与重构前一致
+- 点「Minecraft」：版本页正常（最新 26.3 / 正式版 103 / 快照 758 / 远古版 61）
+- 点「模组」：搜索框提示变为「搜索 模组…」，列表为 Fabric API / Sodium / Iris Shaders…
+- 点安装包分类：安装器页正常打开（加载器版本列表可见）
+
 ## 9. 新增代码放哪里
 
 | 想做的事 | 放哪 | 注意 |
