@@ -151,7 +151,9 @@ import javafx.util.Duration;
 import javafx.util.StringConverter;
 import javax.imageio.ImageIO;
 
-import com.example.demo.core.launch.LaunchCommand;
+import com.example.demo.core.launch.LaunchPlan;
+import com.example.demo.core.launch.LaunchPlanner;
+import com.example.demo.core.launch.NativeExtractor;
 import com.example.demo.core.meta.VersionManager;
 import com.example.demo.core.meta.VersionProfile;
 import com.example.demo.core.model.AssetIndex;
@@ -7190,7 +7192,14 @@ public class HelloApplication extends Application {
     this.ensureAssets(profile, gameDir, log);
     long assetMs = (System.nanoTime() - tAssets) / 1_000_000L;
     long tNatives = System.nanoTime();
-    this.extractNatives(profile, new File(gameDir, "libraries"), gameDir);
+    int dllCount =
+        NativeExtractor.extract(
+            profile,
+            new File(gameDir, "libraries"),
+            InstanceDirs.natives(gameDir, profile.getId(), this.config.isIsolation()));
+    if (dllCount > 0) {
+      log.accept("[natives] 解压出 " + dllCount + " 个 dll");
+    }
     long nativeMs = (System.nanoTime() - tNatives) / 1_000_000L;
     log.accept(
         "⏱ 准备耗时：依赖库 " + libMs + " ms / 资源 " + assetMs + " ms / 原生库 " + nativeMs + " ms");
@@ -7228,7 +7237,7 @@ public class HelloApplication extends Application {
               VersionProfile.librarySize(lib)));
     }
     for (JsonObject lib : profile.nativeLibraries()) {
-      String[] artifact = this.nativeArtifact(lib);
+      String[] artifact = NativeExtractor.nativeArtifact(lib);
       if (artifact == null) continue;
       tasks.add(new DownloadManager.Task(artifact[0], new File(libsDir, artifact[1]), null, -1L));
     }
@@ -7250,38 +7259,6 @@ public class HelloApplication extends Application {
       }
       throw new Exception("有 " + stats.failed + " 个依赖库没下载成功，请检查网络后重试（已下载的会保留）");
     }
-  }
-
-  private String[] nativeArtifact(JsonObject lib) {
-    try {
-      JsonObject downloads = lib.getAsJsonObject("downloads");
-      if (lib.has("natives")
-          && lib.get("natives").isJsonObject()
-          && downloads != null
-          && downloads.has("classifiers")) {
-        String key;
-        JsonObject natives = lib.getAsJsonObject("natives");
-        String string = key = natives.has("windows") ? natives.get("windows").getAsString() : null;
-        if (key == null) {
-          return null;
-        }
-        key = key.replace("${arch}", "64");
-        JsonObject classifiers = downloads.getAsJsonObject("classifiers");
-        if (!classifiers.has(key)) {
-          return null;
-        }
-        JsonObject artifact = classifiers.getAsJsonObject(key);
-        return new String[] {artifact.get("url").getAsString(), artifact.get("path").getAsString()};
-      }
-      String path = VersionProfile.libraryPath(lib);
-      String url = VersionProfile.libraryUrl(lib);
-      if (path != null && url != null && path.endsWith("-natives-windows.jar")) {
-        return new String[] {url, path};
-      }
-    } catch (Exception exception) {
-      // empty catch block
-    }
-    return null;
   }
 
   private void ensureAssets(VersionProfile profile, File gameDir, Consumer<String> log)
@@ -7367,82 +7344,6 @@ public class HelloApplication extends Application {
         // 写不了 stamp 只是下次还会再校验一遍，不影响启动
       }
     }
-  }
-
-  private void extractNatives(VersionProfile profile, File libsDir, File gameDir) {
-    this.extractNatives(
-        profile,
-        libsDir,
-        gameDir,
-        InstanceDirs.natives(gameDir, profile.getId(), this.config.isIsolation()));
-  }
-
-  private void extractNatives(VersionProfile profile, File libsDir, File gameDir, File nativesDir) {
-    if (!nativesDir.exists()) {
-      nativesDir.mkdirs();
-    }
-    int extracted = 0;
-    for (JsonObject lib : profile.nativeLibraries()) {
-      File jarFile;
-      String[] artifact = this.nativeArtifact(lib);
-      if (artifact == null || !(jarFile = new File(libsDir, artifact[1])).isFile()) continue;
-      File target = this.nativesSubDir(nativesDir, artifact[1]);
-      if (!target.exists()) {
-        target.mkdirs();
-      }
-      extracted += this.extractDlls(jarFile, target);
-      if (target.equals(nativesDir)) continue;
-      extracted += this.extractDlls(jarFile, nativesDir);
-    }
-    if (extracted > 0) {
-      System.out.println(
-          "[natives] 解压出 " + extracted + " 个 dll -> " + nativesDir.getAbsolutePath());
-    }
-  }
-
-  private File nativesSubDir(File nativesDir, String libraryPath) {
-    String lower = libraryPath.toLowerCase();
-    if (lower.contains("lwjgl")) {
-      return new File(nativesDir, "lwjgl");
-    }
-    if (lower.contains("jna")) {
-      return new File(nativesDir, "jna");
-    }
-    if (lower.contains("netty")) {
-      return new File(nativesDir, "netty");
-    }
-    return new File(nativesDir, "java");
-  }
-
-  private int extractDlls(File jarFile, File nativesDir) {
-    int count = 0;
-    // 用 ZipFile 只解压真正的 .dll：ZipInputStream 需要把每个 entry 都解压一遍才能跳过，
-    // 光扫描 LWJGL 的 jar 就要几百毫秒，而这里通常本来就什么都不用做。
-    try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(jarFile)) {
-      java.util.Enumeration<? extends ZipEntry> entries = zip.entries();
-      while (entries.hasMoreElements()) {
-        ZipEntry entry = entries.nextElement();
-        String entryName = entry.getName().replace('\\', '/');
-        int slash = entryName.lastIndexOf('/');
-        String fileName = slash >= 0 ? entryName.substring(slash + 1) : entryName;
-        if (!fileName.toLowerCase().endsWith(".dll")) continue;
-        File outFile = new File(nativesDir, fileName);
-        if (!outFile.toPath().normalize().startsWith(nativesDir.toPath())) continue;
-        // 大小一致就认为已解压过。不用比较 mtime：压缩包重新下载后 mtime 会变新，
-        // 会导致每次都重解压一遍。
-        if (outFile.isFile() && (entry.getSize() < 0 || outFile.length() == entry.getSize())) {
-          continue;
-        }
-        try (java.io.InputStream in = zip.getInputStream(entry);
-             FileOutputStream fos = new FileOutputStream(outFile)) {
-          in.transferTo(fos);
-        }
-        ++count;
-      }
-    } catch (Exception exception) {
-      // 解压失败不影响启动，游戏会自己报缺 dll
-    }
-    return count;
   }
 
   private void updateProgress(int done, int total, long bytes) {
@@ -7941,8 +7842,8 @@ public class HelloApplication extends Application {
                         File instanceDir =
                             InstanceDirs.root(gameDir, profile.getId(), this.config.isIsolation());
                         this.ensureChineseLanguage(instanceDir);
-                        List<String> command =
-                            LaunchCommand.build(
+                        LaunchPlan plan =
+                            LaunchPlanner.plan(
                                 profile,
                                 this.currentSession,
                                 launchConfig,
@@ -7972,14 +7873,11 @@ public class HelloApplication extends Application {
                               // empty catch block
                             }
                           }
-                          command.add("--server");
-                          command.add(host);
-                          command.add("--port");
-                          command.add(String.valueOf(port));
+                          plan = plan.append("--server", host, "--port", String.valueOf(port));
                         }
                         this.gameInstanceId = profile.getId();
                         this.gameStartAt = System.currentTimeMillis();
-                        this.startProcess(command, instanceDir);
+                        this.startProcess(plan);
                       } catch (Exception e) {
                         this.logArea.appendText("❌ 启动失败: " + e.getMessage() + "\n");
                         this.showLaunchFailureHint("启动失败: " + e.getMessage());
@@ -8044,26 +7942,17 @@ public class HelloApplication extends Application {
         });
   }
 
-  private void startProcess(List<String> command, File gameDir) throws Exception {
+  private void startProcess(LaunchPlan plan) throws Exception {
     if (this.isGameProcessAlive()) {
       throw new IllegalStateException("已有游戏进程在运行，已阻止重复启动");
     }
-    Process process;
-    ArrayList<String> masked = new ArrayList<String>(command);
-    for (int i = 0; i < masked.size(); ++i) {
-      if (!"--accessToken".equals(masked.get(i)) || i + 1 >= masked.size()) continue;
-      masked.set(i + 1, "******");
-    }
-    String joined = String.join((CharSequence) " ", masked);
-    this.logArea.appendText(
-        "🚀 " + (joined.length() > 4000 ? joined.substring(0, 4000) + " ..." : joined) + "\n");
+    File gameDir = plan.workingDirectory();
+    this.logArea.appendText("🚀 " + plan.maskedCommand() + "\n");
     this.lastLaunchLogStart = this.logArea.getLength();
-    ProcessBuilder pb = new ProcessBuilder(command);
-    pb.directory(gameDir);
-    pb.redirectErrorStream(true);
     // 真正 spawn 之前最后确认一次用户有没有在准备阶段点过取消
     this.checkLaunchCancelled();
-    this.gameProcess = process = pb.start();
+    Process process = plan.start();
+    this.gameProcess = process;
     this.gameRunning = true;
     this.setGameStatus(true);
     // 游戏已起来：主按钮保持「正在运行」，停止按钮收起（进程已在跑，不能靠它取消）
@@ -8347,15 +8236,16 @@ public class HelloApplication extends Application {
                   .getAbsolutePath()
               : this.config.getJavaPath();
       List<String> command =
-          LaunchCommand.build(
-              profile,
-              this.currentSession,
-              this.config,
-              gameDir,
-              instanceDir,
-              java,
-              InstanceDirs.natives(gameDir, id, this.config.isIsolation()),
-              null);
+          LaunchPlanner.plan(
+                  profile,
+                  this.currentSession,
+                  this.config,
+                  gameDir,
+                  instanceDir,
+                  java,
+                  InstanceDirs.natives(gameDir, id, this.config.isIsolation()),
+                  null)
+              .command();
       StringBuilder script = new StringBuilder("@echo off\r\n");
       script.append("cd /d \"").append(instanceDir.getAbsolutePath()).append("\"\r\n");
       script.append("rem 由 Neko Craft Launcher 导出，用于排查启动问题\r\n");

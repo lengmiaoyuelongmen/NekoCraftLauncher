@@ -1,46 +1,54 @@
 package com.example.demo.core.launch;
 
+import com.example.demo.core.app.LauncherConfig;
+import com.example.demo.core.meta.VersionProfile;
+import com.example.demo.core.model.InstanceDirs;
+import com.example.demo.core.model.UserSession;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.StringJoiner;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.example.demo.core.meta.VersionProfile;
-import com.example.demo.core.model.InstanceDirs;
-import com.example.demo.core.model.UserSession;
-import com.example.demo.core.app.LauncherConfig;
 /**
- * 按版本 JSON 里的 arguments / rules / 占位符拼出完整的 java 启动命令。
- * 这样原版 1.19+、Fabric、Forge 的启动参数都能正确处理，而不是硬拼旧参数。
+ * 把「版本档案 + 账号 + 启动设置」翻译成一条可执行的 {@link LaunchPlan}。
+ *
+ * <p>规则全部来自版本 JSON，而不是硬编码参数：
+ * <ul>
+ *   <li>{@code arguments.jvm} / {@code arguments.game} 里的占位符（${auth_player_name} 等）
+ *   <li>带 {@code rules} 的条件参数（demo / 自定义分辨率 / quickPlay）
+ *   <li>继承版本：Forge 1.20+ 用 {@code net.minecraft:client:srg} 提供游戏类，此时不能再把
+ *       原始 client jar 塞进 classpath，否则两个模块导出同一个包，JVM 直接崩
+ * </ul>
+ *
+ * <p>这里只做「算出命令」，不决定什么时候启动、不碰 UI，因此可以单测。
  */
-public final class LaunchCommand {
+public final class LaunchPlanner {
 
-    private LaunchCommand() {
+    private LaunchPlanner() {
     }
 
-    public static List<String> build(VersionProfile profile, UserSession session, LauncherConfig config,
-                                     File gameDir, String javaPath, File nativesDir, File injector) throws Exception {
-        return build(profile, session, config, gameDir, gameDir, javaPath, nativesDir, injector);
+    public static LaunchPlan plan(VersionProfile profile, UserSession session, LauncherConfig config,
+                                  File gameDir, String javaPath, File nativesDir, File injector)
+            throws Exception {
+        return plan(profile, session, config, gameDir, gameDir, javaPath, nativesDir, injector);
     }
 
     /**
      * @param gameDir     基础游戏目录（libraries / assets 在这里）
      * @param instanceDir 该实例的 gameDir（版本隔离时是 versions/&lt;id&gt;）
      */
-    public static List<String> build(VersionProfile profile, UserSession session, LauncherConfig config,
-                                     File gameDir, File instanceDir, String javaPath, File nativesDir,
-                                     File injector) throws Exception {
+    public static LaunchPlan plan(VersionProfile profile, UserSession session, LauncherConfig config,
+                                  File gameDir, File instanceDir, String javaPath, File nativesDir,
+                                  File injector) throws Exception {
 
         if (profile.getMainClass() == null || profile.getMainClass().isBlank()) {
-            throw new Exception("版本 JSON 缺少 mainClass");
+            throw new IllegalArgumentException("版本 JSON 缺少 mainClass");
         }
-
         File libsDir = new File(gameDir, "libraries");
         File rootDir = new File(new File(gameDir, "versions"), profile.getRootId());
         File rootJar = new File(rootDir, profile.getRootId() + ".jar");
@@ -60,22 +68,24 @@ public final class LaunchCommand {
             }
         }
         if (!clientFromLibraries && (!clientJar.isFile() || clientJar.length() == 0)) {
-            throw new Exception("客户端 jar 不存在，请先安装原版 " + profile.getRootId());
+            throw new IllegalStateException("客户端 jar 不存在，请先安装原版 " + profile.getRootId());
         }
 
         StringBuilder classpath = new StringBuilder();
-        int libCount = 0;
         if (!clientFromLibraries) {
             classpath.append(clientJar.getAbsolutePath());
         }
         for (JsonObject lib : profile.classpathLibraries()) {
             String path = VersionProfile.libraryPath(lib);
-            if (path == null) continue;
+            if (path == null) {
+                continue;
+            }
             File jar = new File(libsDir, path);
             if (jar.isFile() && jar.length() > 0) {
-                if (classpath.length() > 0) classpath.append(File.pathSeparator);
+                if (classpath.length() > 0) {
+                    classpath.append(File.pathSeparator);
+                }
                 classpath.append(jar.getAbsolutePath());
-                libCount++;
             }
         }
 
@@ -122,12 +132,14 @@ public final class LaunchCommand {
         String extra = config.getJvmArgs() == null ? "" : config.getJvmArgs().trim();
         if (!extra.isEmpty()) {
             for (String arg : extra.split("\\s+")) {
-                if (!arg.isBlank()) command.add(arg);
+                if (!arg.isBlank()) {
+                    command.add(arg);
+                }
             }
         }
 
         JsonArray jvm = profile.jvmArguments();
-        if (jvm != null && jvm.size() > 0) {
+        if (jvm != null && !jvm.isEmpty()) {
             expand(jvm, vars, features, command);
         } else {
             command.add("-Djava.library.path=" + nativesPath);
@@ -143,22 +155,23 @@ public final class LaunchCommand {
         command.add(profile.getMainClass());
 
         JsonArray game = profile.gameArguments();
-        if (game != null && game.size() > 0) {
+        if (game != null && !game.isEmpty()) {
             expand(game, vars, features, command);
         } else if (profile.legacyMinecraftArguments() != null) {
             for (String token : profile.legacyMinecraftArguments().split(" ")) {
-                if (!token.isBlank()) command.add(substitute(token, vars));
+                if (!token.isBlank()) {
+                    command.add(substitute(token, vars));
+                }
             }
         } else {
-            throw new Exception("版本 JSON 既没有 arguments.game 也没有 minecraftArguments");
+            throw new IllegalStateException("版本 JSON 既没有 arguments.game 也没有 minecraftArguments");
         }
 
-        System.out.println("[launch] " + profile.getId() + " 类路径库数量=" + libCount);
         if (!command.contains("--lang")) {
             command.add("--lang");
             command.add("zh_CN");
         }
-        return command;
+        return LaunchPlan.of(instanceDir, command);
     }
 
     private static void expand(JsonArray array, Map<String, String> vars,
@@ -168,9 +181,13 @@ public final class LaunchCommand {
                 out.add(substitute(el.getAsString(), vars));
             } else if (el.isJsonObject()) {
                 JsonObject obj = el.getAsJsonObject();
-                if (!VersionProfile.allowed(obj, features)) continue;
+                if (!VersionProfile.allowed(obj, features)) {
+                    continue;
+                }
                 JsonElement value = obj.get("value");
-                if (value == null) continue;
+                if (value == null) {
+                    continue;
+                }
                 if (value.isJsonPrimitive()) {
                     out.add(substitute(value.getAsString(), vars));
                 } else if (value.isJsonArray()) {
@@ -193,6 +210,4 @@ public final class LaunchCommand {
     private static String nvl(String s) {
         return s == null ? "" : s;
     }
-
-
 }

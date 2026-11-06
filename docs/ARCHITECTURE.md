@@ -29,7 +29,7 @@ src/main/java/com/example/demo/
     ├── auth/       6   AuthManager, AccountStore, MicrosoftAuth, AuthlibInjectorManager, SessionStore, SecretStore
     ├── download/   8   DownloadManager, Downloader, Aria2Downloader, Integrity, SourcePinger, CurseForgeClient, IconProxy, ZipUtil
     ├── game/      10   JavaManager, JavaScanner, LoaderInstaller, ModpackImport/Exporter, PortableExporter, ServerPackExporter, ModDependencyScanner, ModConflictChecker, CrashAnalyzer
-    ├── launch/     3   LaunchCommand, LaunchCancelledException, GameCommandSender
+    ├── launch/     5   LaunchPlan, LaunchPlanner, NativeExtractor, LaunchCancelledException, GameCommandSender
     ├── meta/       2   VersionProfile, VersionManager
     ├── model/     16   Instance, InstanceDirs, InstanceMeta, InstanceOverrides, MinecraftVersion, VersionDetails, VersionManifest, AssetIndex, Library, Modpack, ModpackProject, UserSession, LoginCardData, Favorites, Playtime, LaunchHistory
     ├── runtime/    6   HardwareInfo, SystemMetrics, PerformanceOptimizer, PerformanceTuner, MemoryAdvisor, NetworkBoost
@@ -53,9 +53,11 @@ src/main/java/com/example/demo/
 - **game**：加载器安装、整合包导入导出、依赖扫描、崩溃分析。
 - **runtime**：硬件探测、性能建议、系统指标，纯计算。
 
-## 4. Phase 1 实测（2026-11-06）
+## 4. 进度记录（2026-11-06）
 
-| 指标 | 重构前 | 现在 |
+### Phase 1：core / UI 分层
+
+| 指标 | 重构前 | Phase 1 后 |
 |---|---|---|
 | `com.example.demo` 直接持有的类 | 118 | 58（全是 UI + 入口） |
 | `core` 包类数 | 0 | **60** |
@@ -63,8 +65,23 @@ src/main/java/com/example/demo/
 | `-Xlint:all` 告警 | 0 | **0** |
 | 单元测试 | 13 通过 | **13 通过** |
 | 冒烟测试（5 页切换 + stderr） | PASS | **PASS** |
-| jar 体积 | 51.8 MB | 51.8 MB |
 | 行为变化 | — | **无**（纯包迁移 + 1 处可见性） |
+
+### Phase 2：启动管线对象化
+
+`HelloApplication` 里 400 行的「拼命令 + 解压 natives + 起进程」拆成三个可测对象：
+
+| 新类 | 职责 | 测试 |
+|---|---|---|
+| `LaunchPlan` | 不可变的「工作目录 + 参数表」；`append()` 返回新实例、`maskedCommand()` 脱敏、`start()` 起进程 | 5 个 |
+| `LaunchPlanner` | 版本 JSON（含 inheritsFrom / rules / 占位符）→ `LaunchPlan` | 2 个 |
+| `NativeExtractor` | 原生库解压：只取 dll、按 lwjgl/jna/netty 分目录、已存在跳过 | 3 个 |
+
+验证：
+
+- **真实实例全量**：用 14 个已装实例（1.7.10 → 26.3，含 Forge / Fabric）跑 `LaunchPlanner`，全部生成合法命令（mainClass 在、classpath 非空、无 `${}` 残留）
+- **真实启动**：实机点「启动游戏」→ `✅ 游戏进程已启动 (pid …)` → 游戏日志出现 `Setting user`、`Created: 1024x512 textures-atlas`（1.18.2 进到标题界面）
+- 单测 13 → **21 通过**；`-Xlint:all` 仍 **0 告警**；冒烟 PASS
 
 ## 5. 迁移手法
 
@@ -79,7 +96,8 @@ src/main/java/com/example/demo/
 
 | 阶段 | 内容 | 验收 |
 |---|---|---|
-| **Phase 2** | 启动管线任务化：`LaunchPlan`（不可变值对象）+ `LaunchTask` 链（检查 Java → 校验文件 → 解压 natives → 拼命令 → 起进程），从 `HelloApplication.startGame` 抽离 | 新增 6+ 单测；启动页实测能进游戏 |
+| ~~**Phase 2**~~ ✅ | 启动管线对象化：`LaunchPlan` + `LaunchPlanner` + `NativeExtractor` 已落地 | 8 个新单测；14 实例全量生成命令；实机进游戏 |
+| **Phase 2b** | 把 `startGame` 的编排（检查 Java → 校验 → 下载 → 解压 → 起进程）抽成 `LaunchTask` 链 + `LaunchPipeline`，UI 只订阅进度 | 主类再减 ~300 行；断点续跑可测 |
 | **Phase 3** | 实例一等公民：`InstanceSettings`（内存 / JVM 参数 / Java 路径 / 是否隔离 / 游戏目录）落到 `versions/<id>/instance.json`；实例设置页读写 | 两个实例用不同内存启动成功 |
 | **Phase 4** | 下载引擎统一：`DownloadEngine` 统一入口，所有下载带 SHA1 校验、并发上限、失败重试与镜像回退；`DownloadManager` 退化为其实现 | 强制断网/坏源测试通过 |
 | **Phase 5** | UI 拆分：`HelloApplication` → `ui.shell`（窗口/导航/主题）+ `ui.page.*`（启动/下载/实例/设置/工具）+ `ui.component.*` | 主类 ≤ 800 行；页面可单独实例化 |

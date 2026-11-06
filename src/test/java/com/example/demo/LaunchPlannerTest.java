@@ -9,7 +9,8 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 
-import com.example.demo.core.launch.LaunchCommand;
+import com.example.demo.core.launch.LaunchPlan;
+import com.example.demo.core.launch.LaunchPlanner;
 import com.example.demo.core.meta.VersionProfile;
 import com.example.demo.core.model.UserSession;
 import com.example.demo.core.app.LauncherConfig;
@@ -18,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** 启动命令生成：占位符替换、rules 过滤、窗口参数。 */
-class LaunchCommandTest {
+class LaunchPlannerTest {
 
     private VersionProfile profile(Path temp) throws Exception {
         File gameDir = temp.toFile();
@@ -45,7 +46,7 @@ class LaunchCommandTest {
                   }
                 }
                 """);
-        // 客户端 jar 必须存在且非空，否则 LaunchCommand 会拒绝
+        // 客户端 jar 必须存在且非空，否则 LaunchPlanner 会拒绝
         Files.write(versionDir.resolve("1.20.4.jar"), new byte[]{1, 2, 3, 4});
         return VersionProfile.load(gameDir, "1.20.4");
     }
@@ -68,8 +69,9 @@ class LaunchCommandTest {
         config.setWindowWidth(1280);
         config.setWindowHeight(720);
 
-        List<String> command = LaunchCommand.build(profile, session(), config, temp.toFile(),
+        LaunchPlan plan = LaunchPlanner.plan(profile, session(), config, temp.toFile(),
                 "java", temp.resolve("natives").toFile(), null);
+        List<String> command = plan.command();
 
         assertTrue(command.contains("-Xmx4096M"), "内存参数应来自配置");
         assertTrue(command.contains("Steve"), "username 占位符应被替换");
@@ -97,8 +99,9 @@ class LaunchCommandTest {
         Files.write(versionDir.resolve("1.7.10.jar"), new byte[]{1});
         VersionProfile profile = VersionProfile.load(gameDir, "1.7.10");
 
-        List<String> command = LaunchCommand.build(profile, session(), new LauncherConfig(), gameDir,
+        LaunchPlan plan = LaunchPlanner.plan(profile, session(), new LauncherConfig(), gameDir,
                 "java", temp.resolve("natives").toFile(), null);
+        List<String> command = plan.command();
 
         assertTrue(command.contains("Steve"), "旧版 minecraftArguments 也要替换占位符");
         assertTrue(command.contains("--gameDir"));
