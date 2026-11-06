@@ -523,3 +523,24 @@ powershell -ExecutionPolicy Bypass -File scripts\smoke-test.ps1 -SkipBuild
 - 源码 UTF-8 **无 BOM**；只有 `scripts/smoke-test.ps1` 带 BOM。
 - 不用 PowerShell `Get-Content`/`Set-Content` 改源码。
 - 每次改动后：0 告警 + 单测 + 冒烟，缺一不可。
+
+## 9. 新增代码放哪里
+
+| 想做的事 | 放哪 | 注意 |
+|---|---|---|
+| 解析版本清单 / 版本 JSON / 继承链 / rules | `core/meta` | 只处理 JSON，不碰文件系统 |
+| 拼启动命令、加一步启动准备 | `core/launch` | 新步骤实现 `LaunchTask`，注册进 `LaunchPipeline` |
+| 下载、校验、镜像、失败分类 | `core/download` | 下载用 `DownloadManager.Task`（带 sha1/size），修复要 `verifySha1=true` |
+| 账号 / 微软登录 / 外置认证 | `core/auth` | 协议解析与 HTTP 分开写，便于单测 |
+| 模组 / 整合包 / 资源类型 | `core/mod` | 解压走 `ZipUtil`，路径走 `InstanceFiles` |
+| 实例目录、实例设置 | `core/model` | 设置写 `versions/<id>/instance.json` |
+| Java 运行时 | `core/game` | 新下载源实现「查询 → 选包」两段，参考 `JavaRuntimeIndex` |
+| 页面 / 大块面板 | `ui/page` | 只能依赖 core |
+| 控件 / 对话框 / 单元格 | `ui/component` | 通过 Host 接口拿宿主能力，别直接引用主类 |
+| 窗口、主题、动画、全局对话框 | `ui/shell` | 主类只做装配，具体能力下沉 |
+
+**测试**：放 `src/test/java/com/example/demo/`，命名 `<被测类>Test`。纯解析 / 规则 / 路径计算优先补测试。
+
+**守卫**：`scripts/check-architecture.ps1` 会拦下 `core` 里出现 JavaFX、`ui.*`、入口类的引用。
+
+**每次改动的最低门槛**：`mvnw -o -q package`（0 告警）→ 单测全绿 → `smoke-test.ps1` PASS。

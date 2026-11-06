@@ -20,6 +20,17 @@
 - 共产红 / 为爱发电主题
 - GitHub Releases 更新检查与安装包下载
 
+## 架构
+
+代码分三层，依赖方向只有一条：`Launcher → ui → core`。
+
+- `core/`：纯 Java 逻辑，**0 处 JavaFX**（版本元数据、启动计划、下载校验、账号、模组、Java 运行时）
+- `ui/`：JavaFX 界面（`shell` 窗口与主题 / `page` 页面 / `component` 控件）
+- `Launcher`：进程入口
+
+新增代码放哪个包、测试怎么写、架构守卫怎么跑，见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
+本地最低门槛：`mvnw.cmd -o -q package`（0 告警）+ 单测全绿 + `scripts\smoke-test.ps1` PASS。
+
 ## 环境
 
 - Windows 10 / 11 x64
