@@ -136,7 +136,14 @@ public final class CurseForgeClient {
         if (type > 0) url.append("&modLoaderType=").append(type);
 
         JsonObject root = getJson(url.toString());
-        if (root == null || !root.has("data")) return new MirrorPage(List.of(), 0);
+        return parseMirrorPage(root);
+    }
+
+    /** 解析 MCIM 搜索响应（纯解析，便于单测）。 */
+    public static MirrorPage parseMirrorPage(JsonObject root) {
+        if (root == null || !root.has("data") || !root.get("data").isJsonArray()) {
+            return new MirrorPage(List.of(), 0);
+        }
         List<Hit> hits = new ArrayList<>();
         for (JsonElement element : root.getAsJsonArray("data")) {
             JsonObject obj = element.getAsJsonObject();
@@ -178,7 +185,12 @@ public final class CurseForgeClient {
         if (type > 0) url.append("&modLoaderType=").append(type);
 
         JsonObject root = getJson(url.toString());
-        if (root == null || !root.has("data")) return List.of();
+        return parseMirrorFiles(root);
+    }
+
+    /** 解析文件列表响应：只要 jar，release > beta > alpha，同类型新文件在前。 */
+    public static List<MirrorFile> parseMirrorFiles(JsonObject root) {
+        if (root == null || !root.has("data") || !root.get("data").isJsonArray()) return List.of();
         List<MirrorFile> files = new ArrayList<>();
         for (JsonElement element : root.getAsJsonArray("data")) {
             JsonObject obj = element.getAsJsonObject();

@@ -355,6 +355,23 @@ IDLE --beginPrepare()--> PREPARING --markRunning()--> RUNNING --finish()--> IDLE
 
 主类 8,265 → **8,270 行**（多了几行转发，功能在 core）。
 
+### Phase 5c：CurseForge 协议可测化
+
+第二条资源来源（CurseForge / MCIM 镜像）之前完全没有测试，解析逻辑和 HTTP 混在一起。
+这轮把纯解析拆出来：
+
+| 新 API | 职责 |
+|---|---|
+| `CurseForgeClient.parseMirrorPage(root)` | 搜索响应 → Hit 列表 + 总数（logo 缩略图回退、authors 取第一个） |
+| `CurseForgeClient.parseMirrorFiles(root)` | 文件列表 → 只要 `.jar`，release > beta > alpha，同类型新文件在前 |
+| `matching(project, version, loader)` | 已有方法，补上测试（版本过滤、forge 不吞 neoforge、release 优先） |
+| `FileEntry.urls()` / `MirrorFile.urls()` | 补上测试：文件 id 拆 `/1234/567/`、文件名 URL 编码、镜像兜底 |
+
+单测 89 → **94 通过**。
+
+> 顺带记录一个已知局限（用测试固定下来）：指定加载器时，文件名里没带 `fabric/forge/neoforge`
+  的通用包会被过滤掉——这是现有启发式策略，改成“未知加载器也放行”需要更细的元数据，留待后续。
+
 > 这一轮没有动 UI 结构：桌面控制服务不可用（`CONTROL_UNAVAILABLE`），无法在真实界面里验证
 > 大块 UI 抽取，因此只做可单测的 core 迁移，避免把没验证过的 UI 改动交出去。
 
