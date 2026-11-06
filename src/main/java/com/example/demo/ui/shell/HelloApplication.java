@@ -276,7 +276,6 @@ public class HelloApplication extends Application {
   private ComboBox<MinecraftVersion> versionComboBox;
   private TextArea logArea;
   private VBox downloadBarPanel;
-  private volatile long downloadExpectedBytes = -1L;
   private int lastLaunchLogStart;
   private long gameStartAt;
   private long launchPrepareStart;
@@ -296,6 +295,8 @@ public class HelloApplication extends Application {
   private StackPane dialogLayer;
   /** 启动准备是否正在进行 / 是否被用户要求停止。 */
   private final LaunchState launchState = new LaunchState();
+  /** 启动页底部下载条（文件名 / 进度 / 速度）。 */
+  private DownloadBarView downloadBarView;
 
   /** 启动前完整性检查的最近结果：同一实例 5 分钟内复用，避免每次启动都全量扫描。 */
   private Integrity.Report lastIntegrityReport;
@@ -386,10 +387,8 @@ public class HelloApplication extends Application {
       new ConcurrentHashMap<String, List<ModpackProject>>();
   private final Set<String> prewarmStarted = ConcurrentHashMap.newKeySet();
   private final CompletableFuture<Void> communityPrewarmDone = new CompletableFuture<>();
-  private long downloadLastBytes = -1L;
   private volatile boolean importCancelled;
   private Button importCancelButton;
-  private long downloadLastChangeAt;
   private int communityPrewarmDoneCount;
   private static final Semaphore ICON_SLOTS = new Semaphore(12);
   private final Map<String, Image> iconMemoryCache =
@@ -1636,6 +1635,9 @@ public class HelloApplication extends Application {
     downloadBar.setStyle(
         "-fx-background-color: rgba(255,255,255,0.03); -fx-background-radius: 10; -fx-border-color:"
             + " rgba(255,255,255,0.06); -fx-border-radius: 10; -fx-padding: 5 8;");
+    this.downloadBarView =
+        new DownloadBarView(
+            this.downloadProgress, this.downloadFileLabel, this.downloadStatsLabel, this.downloadBarPanel);
     Button refreshFab = new Button();
     refreshFab.setGraphic(Icons.node("refresh", 16.0, "#9ca3af"));
     refreshFab.setStyle(
@@ -5029,7 +5031,7 @@ public class HelloApplication extends Application {
           mods.mkdirs();
         }
         File save = new File(mods, fileName);
-        this.downloadExpectedBytes = target.has("size") ? target.get("size").getAsLong() : -1L;
+        this.downloadBarView.setExpectedBytes(target.has("size") ? target.get("size").getAsLong() : -1L);
         this.logArea.appendText("📥 下载 " + title + " → " + fileName + "\n");
         this.downloadFileAsync(
             url,
@@ -7121,82 +7123,11 @@ public class HelloApplication extends Application {
   }
 
   private void updateProgress(int done, int total, long bytes) {
-    Platform.runLater(
-        () ->
-            this.updateDownloadBar(
-                new DownloadManager.Status(
-                    done,
-                    total,
-                    bytes,
-                    0L,
-                    this.downloadFileLabel == null ? "" : this.downloadFileLabel.getText(),
-                    0L)));
+    this.downloadBarView.progress(done, total, bytes);
   }
 
   private void updateDownloadBar(DownloadManager.Status status) {
-    if (this.downloadProgress == null || this.downloadFileLabel == null) {
-      return;
-    }
-    if (this.downloadBarPanel != null) {
-      this.downloadBarPanel.setVisible(true);
-      this.downloadBarPanel.setManaged(true);
-    }
-    if (status.total() <= 0 || status.done() >= status.total()) {
-      this.downloadFileLabel.setText("空闲");
-      this.downloadFileLabel.setVisible(true);
-      this.downloadFileLabel.setManaged(true);
-      this.downloadStatsLabel.setVisible(false);
-      this.downloadStatsLabel.setManaged(false);
-      this.downloadProgress.setVisible(false);
-      this.downloadProgress.setManaged(false);
-      this.downloadProgress.setProgress(0.0);
-      return;
-    }
-    long now = System.currentTimeMillis();
-    if (status.bytes() != this.downloadLastBytes) {
-      this.downloadLastBytes = status.bytes();
-      this.downloadLastChangeAt = now;
-    } else if (this.downloadLastChangeAt > 0L && now - this.downloadLastChangeAt > 30000L) {
-      this.downloadProgress.setVisible(false);
-      this.downloadProgress.setManaged(false);
-      this.downloadStatsLabel.setVisible(false);
-      this.downloadStatsLabel.setManaged(false);
-      this.downloadFileLabel.setText("下载已停滞，请重新开始下载");
-      return;
-    }
-    this.downloadStatsLabel.setVisible(true);
-    this.downloadStatsLabel.setManaged(true);
-    this.downloadProgress.setVisible(true);
-    this.downloadProgress.setManaged(true);
-    long expected = this.downloadExpectedBytes;
-    boolean multiFile = status.total() > 1;
-    double ratio =
-        !multiFile && expected > 0L
-            ? Math.min(1.0, (double) status.bytes() / (double) expected)
-            : Math.min(1.0, (double) status.done() / (double) Math.max(1, status.total()));
-    this.downloadProgress.setProgress(multiFile ? -1.0 : ratio);
-    this.downloadFileLabel.setText(
-        (status.file() == null || status.file().isBlank() ? "正在下载…" : "正在下载：" + status.file()));
-    double mb = (double) status.bytes() / 1048576.0;
-    long bps = status.speedBps();
-    String speed =
-        bps <= 0L
-            ? "—"
-            : (bps >= 0x100000L
-                ? String.format(Locale.ROOT, "%.1f MB/s", (double) bps / 1048576.0)
-                : bps / 1024L + " KB/s");
-    int percent = (int) Math.round(ratio * 100.0);
-    this.downloadStatsLabel.setText(
-        status.done()
-            + "/"
-            + status.total()
-            + " 个文件 · "
-            + String.format(Locale.ROOT, "%.1f MB", mb)
-            + " · "
-            + speed
-            + " · "
-            + percent
-            + "%");
+    this.downloadBarView.update(status);
   }
 
   private void preflight(VersionProfile profile, Consumer<String> log) throws Exception {
@@ -8326,7 +8257,7 @@ if (files != null && files.size() > 0) {
   String downloadUrl = targetFile.get("url").getAsString();
   String fileName = targetFile.get("filename").getAsString();
   long fileSize = targetFile.get("size").getAsLong() / 1024L;
-  this.downloadExpectedBytes = targetFile.get("size").getAsLong();
+  this.downloadBarView.setExpectedBytes(targetFile.get("size").getAsLong());
   this.logArea.appendText(
       "🎯 找到适配版本: v"
           + versionName

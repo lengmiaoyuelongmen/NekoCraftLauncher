@@ -35,8 +35,8 @@ src/main/java/com/example/demo/
 │   ├── model/     18   Instance, InstanceDirs, InstanceMeta, InstanceSettings, MinecraftVersion, VersionDetails, VersionManifest, AssetIndex, Library, Modpack, ModpackProject, UserSession, LoginCardData, Favorites, Playtime, LaunchHistory, LanguageConfig, GameDirDetector
 │   ├── plugin/     3   PluginManager, PluginContext, NekoPlugin
 │   └── runtime/    6   HardwareInfo, SystemMetrics, PerformanceOptimizer, PerformanceTuner, MemoryAdvisor, NetworkBoost
-└── ui/                      # 54 个类，只能单向依赖 core
-    ├── shell/     16   HelloApplication（应用外壳）, WindowChrome, Theme, Motion, Dialogs, InAppDialog, Icons, Toast, UiFit, ModuleHeader, BootScreen, PrewarmOverlay, AmbientBackground, LauncherLog, CommandCompleter, HelloController
+└── ui/                      # 55 个类，只能单向依赖 core
+    ├── shell/     17   HelloApplication（应用外壳）, WindowChrome, DownloadBarView, Theme, Motion, Dialogs, InAppDialog, Icons, Toast, UiFit, ModuleHeader, BootScreen, PrewarmOverlay, AmbientBackground, LauncherLog, CommandCompleter, HelloController
     ├── page/      11   InstancesPanel, InstanceSettingsPanel, SettingsPanel, ToolsPanel, LogsPanel, WorldsPanel, FirstRunPanel, InstallWindow, InstallProgressPage, ModsPanel, InstanceFileManager
     └── component/ 27   启动页/登录/下载/皮肤/世界等可复用控件与对话框
 ```
@@ -295,6 +295,15 @@ IDLE --beginPrepare()--> PREPARING --markRunning()--> RUNNING --finish()--> IDLE
 新增 `LaunchStateTest` 5 个（单次启动、取消只在准备阶段、运行态、finish 复位、停止请求）；
 单测 70 → **75 通过**。主类维持 8,428 行（布尔量换状态机，行数几乎不变，但状态不再散落）。
 
+### Phase 5b-6：下载条组件化 + 原生库纳入校验
+
+| 改动 | 说明 |
+|---|---|
+| `ui.shell.DownloadBarView` | 文件名 / 进度 / 速度 / 停滞提示的渲染逻辑（原 `updateDownloadBar` 65 行 + 3 个状态字段）收进组件；主类只剩两行委托 |
+| `Integrity` 增加原生库检查 | 之前只查 classpath 库、客户端 jar、资源索引；现在 `downloads.classifiers` 里的 natives jar 也查（缺了游戏起不来），失败提示显示「原生库」 |
+
+主类 **8,428 → 8,359 行**；单测 75 → **76 通过**（新增「缺失原生库必须报出来」）。
+
 ## 5. 迁移手法
 
 1. 脚本按「域 → 新包」映射移动文件，改 `package` 行。
@@ -319,6 +328,7 @@ IDLE --beginPrepare()--> PREPARING --markRunning()--> RUNNING --finish()--> IDLE
 | ~~**Java 运行时**~~ ✅ | 双下载源（Zulu → Adoptium）+ SHA-256 校验 + 健壮解压 | 9 个新单测；真实 API 实跑验证 |
 | ~~**Phase 5b-4**~~ ✅ | 启动前逻辑外迁：`LanguageConfig` / `GameDirDetector` / `JavaVersionProbe` / `LaunchPreflight` | 8 个新单测；实机启动验证 |
 | ~~**Phase 5b-5**~~ ✅ | 启动状态机 `LaunchState` 取代 4 个布尔量 | 5 个新单测；实机跑通「启动→崩溃→再启动」 |
+| ~~**Phase 5b-6**~~ ✅ | `DownloadBarView` 组件化；`Integrity` 纳入原生库 | 1 个新单测；主类 -69 行 |
 | **Phase 2b** | 把 `startGame` 的编排（检查 Java → 校验 → 下载 → 解压 → 起进程）抽成 `LaunchTask` 链 + `LaunchPipeline`，UI 只订阅进度 | 主类再减 ~300 行；断点续跑可测 |
 | **Phase 3** | 实例一等公民：`InstanceSettings`（内存 / JVM 参数 / Java 路径 / 是否隔离 / 游戏目录）落到 `versions/<id>/instance.json`；实例设置页读写 | 两个实例用不同内存启动成功 |
 | **Phase 4** | 下载引擎统一：`DownloadEngine` 统一入口，所有下载带 SHA1 校验、并发上限、失败重试与镜像回退；`DownloadManager` 退化为其实现 | 强制断网/坏源测试通过 |

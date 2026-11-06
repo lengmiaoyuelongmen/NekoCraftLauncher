@@ -113,4 +113,34 @@ class IntegrityTest {
         assertEquals(1, issues.size());
         assertEquals(Integrity.Reason.MISSING, issues.get(0).reason(), "0 字节视为缺失");
     }
+
+    @Test
+    void missingNativeLibraryIsReported(@TempDir Path temp) throws Exception {
+        Path versionDir = Files.createDirectories(temp.resolve("versions").resolve("1.20.1"));
+        Files.writeString(versionDir.resolve("1.20.1.json"), """
+                {
+                  "id": "1.20.1",
+                  "type": "release",
+                  "mainClass": "net.minecraft.client.main.Main",
+                  "libraries": [
+                    {"name": "org.lwjgl:lwjgl:3.2.2",
+                     "natives": {"windows": "natives-windows-${arch}"},
+                     "downloads": {"classifiers": {"natives-windows-64": {
+                        "url": "https://example.com/lwjgl-natives.jar",
+                        "path": "org/lwjgl/lwjgl/3.2.2/lwjgl-3.2.2-natives-windows.jar",
+                        "sha1": "0000000000000000000000000000000000000000",
+                        "size": 5}}}}
+                  ]
+                }
+                """, StandardCharsets.UTF_8);
+
+        Integrity.Report report = Integrity.check(temp.toFile(), "1.20.1", 0, false);
+
+        List<Integrity.Issue> natives = report.issues().stream()
+                .filter(i -> i.kind() == Integrity.Kind.NATIVE)
+                .toList();
+        assertEquals(1, natives.size(), "缺失的原生库必须报出来");
+        assertEquals("原生库", natives.get(0).label());
+        assertEquals("org/lwjgl/lwjgl/3.2.2/lwjgl-3.2.2-natives-windows.jar", natives.get(0).path());
+    }
 }

@@ -1,5 +1,7 @@
 package com.example.demo.core.download;
 
+import com.example.demo.core.launch.NativeExtractor;
+
 import com.example.demo.core.meta.VersionProfile;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -26,6 +28,7 @@ public final class Integrity {
     public enum Kind {
         LIBRARY,
         CLIENT_JAR,
+        NATIVE,
         ASSET_INDEX,
         ASSET_OBJECT
     }
@@ -46,6 +49,7 @@ public final class Integrity {
         public String label() {
             String base = switch (kind) {
                 case CLIENT_JAR -> "客户端 jar";
+                case NATIVE -> "原生库";
                 case ASSET_INDEX -> "资源索引";
                 case ASSET_OBJECT -> "资源对象";
                 default -> "库文件";
@@ -138,6 +142,24 @@ public final class Integrity {
             Reason reason = verify(local, sha1, size, verifySha1, hashCache);
             if (reason != null) {
                 issues.add(new Issue(id, path, url, sha1, size, Kind.LIBRARY, reason));
+            }
+        }
+
+        // 原生库 jar：缺了游戏会因为找不到 lwjgl/jna 的 dll 起不来
+        for (JsonObject library : profile.nativeLibraries()) {
+            NativeExtractor.NativeArtifact nativeLib = NativeExtractor.nativeArtifact(library);
+            if (nativeLib == null) {
+                continue;
+            }
+            checked++;
+            File local = new File(new File(gameDir, "libraries"),
+                    nativeLib.path().replace('/', File.separatorChar));
+            String url = nativeLib.url() == null || nativeLib.url().isBlank()
+                    ? defaultUrl(nativeLib.path()) : nativeLib.url();
+            Reason reason = verify(local, nativeLib.sha1(), nativeLib.size(), verifySha1, hashCache);
+            if (reason != null) {
+                issues.add(new Issue(id, nativeLib.path(), url, nativeLib.sha1(), nativeLib.size(),
+                        Kind.NATIVE, reason));
             }
         }
 
