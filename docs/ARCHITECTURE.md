@@ -546,6 +546,22 @@ powershell -ExecutionPolicy Bypass -File scripts\smoke-test.ps1 -SkipBuild
 - 不用 PowerShell `Get-Content`/`Set-Content` 改源码。
 - 每次改动后：0 告警 + 单测 + 冒烟，缺一不可。
 
+## 10. 版本详情页独立（Phase 5e）
+
+| 归属 | 内容 |
+|---|---|
+| `ui.page.VersionDetailPage` | 版本详情页：图标 / 版本号 / 徽标 / 已安装状态 / 元信息表 / 「直接安装加载器」五个 chip |
+| `core.meta.ReleaseTime` | 发布时间格式化（ISO → 本地 `yyyy/MM/dd HH:mm`），列表与详情共用、可单测 |
+| `HelloApplication` | 只保留「创建一个 `versionDetailPanel` 容器 + 提供三个回调」 |
+
+拆完主类 **8,152 → 8,062 行**。
+
+**实机验证**（UIA 按名字点击 + 截图）：
+
+- 下载 → Minecraft → 点「详情」：版本详情页正常（26.3 / 正式版 / 发布于 2026/09/15 19:23 / 已安装 / 实例目录 / 5 个加载器 chip）
+- 点「返回列表」：回到版本列表，列表里的发布时间格式化正常
+- 点详情页的「Fabric」chip：直接进入该版本的安装器页且 Fabric 行展开
+
 ## 9. 下载页外壳独立（Phase 5d）
 
 主类的第一块「页面级」代码搬进了 `ui.page.DownloadPage`：

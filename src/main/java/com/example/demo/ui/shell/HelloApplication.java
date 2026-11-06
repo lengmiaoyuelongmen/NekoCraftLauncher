@@ -239,6 +239,8 @@ import com.example.demo.core.model.InstanceId;
 import com.example.demo.core.launch.ServerAddress;
 import com.example.demo.ui.page.DownloadPage;
 import com.example.demo.ui.component.DownloadTasksDialog;
+import com.example.demo.core.meta.ReleaseTime;
+import com.example.demo.ui.page.VersionDetailPage;
 public class HelloApplication extends Application {
   private static final Set<String> CLONE_DATA_DIRS =
       Set.of(
@@ -270,6 +272,7 @@ public class HelloApplication extends Application {
   private boolean testMode;
   private WindowChrome windowChrome;
   private DownloadPage downloadPage;
+  private VersionDetailPage versionDetailPage;
   private Stage stageRef;
   private volatile boolean testSuccess;
   private Rectangle navIndicator;
@@ -2836,7 +2839,7 @@ public class HelloApplication extends Application {
     Label title = new Label(version.getId());
     title.setStyle("-fx-text-fill: -app-text-strong; -fx-font-size: 16px; -fx-font-weight: bold;");
     String typeStr = "release".equals(version.getType()) ? "最新正式版" : "最新预览版";
-    String time = this.formatReleaseTime(version.getReleaseTime());
+    String time = ReleaseTime.format(version.getReleaseTime());
     Label subtitle = new Label(typeStr + (time.isEmpty() ? "" : " · 发布于 " + time));
     subtitle.setStyle("-fx-text-fill: -app-text-muted-3; -fx-font-size: 11.5px;");
     info.getChildren().addAll(title, subtitle);
@@ -2850,19 +2853,6 @@ public class HelloApplication extends Application {
     row.setOnMouseClicked(e -> this.openVersionDetail(version));
     row.getChildren().addAll(icon, info, installBtn);
     return row;
-  }
-
-  private String formatReleaseTime(String iso) {
-    if (iso == null || iso.isBlank()) {
-      return "";
-    }
-    try {
-      return Instant.parse(iso)
-          .atZone(ZoneId.systemDefault())
-          .format(DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm"));
-    } catch (Exception e) {
-      return iso.length() >= 10 ? iso.substring(0, 10).replace('-', '/') : iso;
-    }
   }
 
   private void setInstallerProgress(boolean running) {
@@ -3343,120 +3333,39 @@ public class HelloApplication extends Application {
       this.versionDetailPanel.setAlignment(Pos.TOP_LEFT);
       this.downloadContentArea().getChildren().add(this.versionDetailPanel);
     }
-    this.versionDetailPanel.getChildren().setAll(this.buildVersionDetail(version));
-    this.showDownloadPanel(this.versionDetailPanel);
-  }
+    if (this.versionDetailPage == null) {
+      this.versionDetailPage =
+          new VersionDetailPage(
+              new VersionDetailPage.Host() {
+                @Override
+                public String gameDir() {
+                  return HelloApplication.this.config.getGameDir();
+                }
 
-  private VBox buildVersionDetail(MinecraftVersion version) {
-    File gameDir = new File(this.config.getGameDir());
-    boolean installed = VersionProfile.isInstalled(gameDir, version.getId());
-    Button back = new Button("返回列表");
-    back.setGraphic(Icons.node("back", 13.0, "#9ca3af"));
-    back.setGraphicTextGap(4.0);
-    back.setStyle(
-        "-fx-background-color: transparent; -fx-text-fill: -app-text-dim; -fx-font-size: 12px;"
-            + " -fx-cursor: hand; -fx-padding: 2 4;");
-    back.setOnAction(e -> this.showDownloadPanel(this.minecraftPanel));
-    Label heading = new Label("版本详情");
-    heading.setStyle("-fx-text-fill: -app-text; -fx-font-size: 18px; -fx-font-weight: bold;");
-    Region topSpacer = new Region();
-    HBox.setHgrow(topSpacer, Priority.ALWAYS);
-    HBox top = new HBox(10.0, back, heading, topSpacer);
-    top.setAlignment(Pos.CENTER_LEFT);
-    StackPane icon = BlockIcons.create(version.getType());
-    icon.setPrefSize(64.0, 64.0);
-    icon.setMinSize(64.0, 64.0);
-    icon.setMaxSize(64.0, 64.0);
-    Label title = new Label(version.getId());
-    title.setStyle("-fx-text-fill: -app-text-strong; -fx-font-size: 24px; -fx-font-weight: bold;");
-    Label badge = new Label("release".equals(version.getType()) ? "正式版" : "预览版");
-    badge.setStyle(
-        "-fx-text-fill: "
-            + ("release".equals(version.getType()) ? "#4CAF50" : "#FF9800")
-            + "; -fx-font-size: 11px; -fx-font-weight: bold; -fx-background-color:"
-            + " rgba(255,255,255,0.06); -fx-padding: 3 9; -fx-background-radius: 6;");
-    HBox titleRow = new HBox(10.0, title, badge);
-    titleRow.setAlignment(Pos.CENTER_LEFT);
-    String time = this.formatReleaseTime(version.getReleaseTime());
-    Label subtitle =
-        new Label(
-            (time.isEmpty() ? "Minecraft " + version.getId() : "发布于 " + time)
-                + " · "
-                + (installed ? "已安装" : "未安装"));
-    subtitle.setStyle("-fx-text-fill: -app-text-dim-2; -fx-font-size: 12px;");
-    VBox heroInfo = new VBox(5.0, titleRow, subtitle);
-    heroInfo.setAlignment(Pos.CENTER_LEFT);
-    Button install = new Button(installed ? "重新安装" : "安装此版本");
-    install.setStyle(
-        "-fx-background-color: linear-gradient(to bottom right, #d1d5db, #9ca3af); -fx-text-fill:"
-            + " #111827; -fx-font-weight: bold; -fx-background-radius: 9; -fx-padding: 8 18;"
-            + " -fx-cursor: hand;");
-    install.setOnAction(e -> this.openVersionInstaller(version));
-    Button launch = new Button("启动此版本");
-    launch.setStyle(
-        "-fx-background-color: transparent; -fx-text-fill: -app-text-2; -fx-border-color:"
-            + " -app-border-3; -fx-border-radius: 9; -fx-background-radius: 9; -fx-padding: 8 18;"
-            + " -fx-cursor: hand;");
-    launch.setDisable(!installed);
-    launch.setOnAction(
-        e -> {
-          this.addInstalledToCombo(version.getId());
-          this.switchPage("launch");
-          Toast.ok("已切换到 " + version.getId());
-        });
-    HBox actions = new HBox(10.0, install, launch);
-    actions.setAlignment(Pos.CENTER_RIGHT);
-    HBox.setHgrow(heroInfo, Priority.ALWAYS);
-    HBox hero = new HBox(18.0, icon, heroInfo, actions);
-    hero.setAlignment(Pos.CENTER_LEFT);
-    hero.setPadding(new Insets(18.0));
-    hero.setStyle(
-        "-fx-background-color: -app-card; -fx-background-radius: 16; -fx-border-color:"
-            + " -app-border-2; -fx-border-radius: 14;");
-    VBox meta =
-        new VBox(
-            8.0,
-            this.detailRow("版本 ID", version.getId()),
-            this.detailRow("类型", "release".equals(version.getType()) ? "正式版" : "快照 / 预览版"),
-            this.detailRow("发布时间", time.isEmpty() ? "未知" : time),
-            this.detailRow("安装状态", installed ? "已安装" : "未安装"),
-            this.detailRow(
-                "实例目录",
-                new File(new File(gameDir, "versions"), version.getId()).getAbsolutePath()));
-    meta.setPadding(new Insets(16.0));
-    meta.setStyle(
-        "-fx-background-color: -app-card-alt; -fx-background-radius: 12; -fx-border-color:"
-            + " -app-border-2; -fx-border-radius: 12;");
-    Label loaderTitle = new Label("直接安装加载器");
-    loaderTitle.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 12px; -fx-font-weight: bold;");
-    HBox loaderChips = new HBox(8.0);
-    for (String loader : new String[] {"Fabric", "Forge", "NeoForge", "Quilt", "原版"}) {
-      Button chip = new Button(loader);
-      chip.setStyle(
-          "-fx-background-color: -app-row; -fx-text-fill: -app-text-2; -fx-background-radius: 8;"
-              + " -fx-border-color: -app-border-soft; -fx-border-radius: 8; -fx-padding: 6 12;"
-              + " -fx-font-size: 11.5px; -fx-cursor: hand;");
-      chip.setOnAction(e -> this.openVersionInstaller(version, loader));
-      loaderChips.getChildren().add(chip);
+                @Override
+                public void backToList() {
+                  HelloApplication.this.showDownloadPanel(HelloApplication.this.minecraftPanelNode());
+                }
+
+                @Override
+                public void openInstaller(MinecraftVersion version, String loader) {
+                  if (loader == null) {
+                    HelloApplication.this.openVersionInstaller(version);
+                  } else {
+                    HelloApplication.this.openVersionInstaller(version, loader);
+                  }
+                }
+
+                @Override
+                public void launchVersion(String versionId) {
+                  HelloApplication.this.addInstalledToCombo(versionId);
+                  HelloApplication.this.switchPage("launch");
+                  Toast.ok("已切换到 " + versionId);
+                }
+              });
     }
-    VBox loaderCard = new VBox(10.0, loaderTitle, loaderChips);
-    loaderCard.setPadding(new Insets(14.0));
-    loaderCard.setStyle(
-        "-fx-background-color: -app-card; -fx-background-radius: 12; -fx-border-color:"
-            + " -app-border-2; -fx-border-radius: 12;");
-    return new VBox(10.0, top, hero, meta, loaderCard);
-  }
-
-  private HBox detailRow(String label, String value) {
-    Label key = new Label(label);
-    key.setMinWidth(74.0);
-    key.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
-    Label val = new Label(value);
-    val.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 12px;");
-    val.setWrapText(true);
-    HBox row = new HBox(12.0, key, val);
-    row.setAlignment(Pos.CENTER_LEFT);
-    return row;
+    this.versionDetailPanel.getChildren().setAll(this.versionDetailPage.build(version));
+    this.showDownloadPanel(this.versionDetailPanel);
   }
 
   private void openVersionInstaller(MinecraftVersion version) {
