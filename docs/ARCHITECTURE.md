@@ -322,6 +322,21 @@ IDLE --beginPrepare()--> PREPARING --markRunning()--> RUNNING --finish()--> IDLE
 - **真实 API 实跑**：query=sodium + 1.20.1 + Fabric + 按下载量 → HTTP 200、40 条、解析 40 个项目，
   Top3 是 Sodium / Sodium Extra / Reese's Sodium Options
 
+### Phase 5b-8：列表显示逻辑进 core
+
+三个纯函数从主类搬进 core（都带测试）：
+
+| 新 API | 职责 |
+|---|---|
+| `core.model.InstanceId.mcVersion(id)` | 从 `1.20.1-forge-47.2.0` / `fabric-loader-0.20.1-26.3` / `quilt-loader-…` / `26.4-snapshot-5` 里还原原版版本号（顺带补上 Quilt，原来不认） |
+| `core.mod.ProjectFormat.typeLabel(type)` | `mod / resourcepack / shader / datapack / world` → 中文 |
+| `core.mod.ProjectFormat.count(n)` | 下载量显示「万 / 亿」 |
+
+主类 **8,359 → 8,265 行**；单测 84 → **87 通过**。
+
+> 这一轮没有动 UI 结构：桌面控制服务不可用（`CONTROL_UNAVAILABLE`），无法在真实界面里验证
+> 大块 UI 抽取，因此只做可单测的 core 迁移，避免把没验证过的 UI 改动交出去。
+
 
 ## 5. 迁移手法
 

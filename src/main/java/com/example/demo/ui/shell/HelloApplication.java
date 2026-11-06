@@ -234,6 +234,8 @@ import com.example.demo.core.model.GameDirDetector;
 import com.example.demo.core.model.LanguageConfig;
 import com.example.demo.core.launch.LaunchState;
 import com.example.demo.core.download.ModrinthSearch;
+import com.example.demo.core.mod.ProjectFormat;
+import com.example.demo.core.model.InstanceId;
 public class HelloApplication extends Application {
   private static final Set<String> CLONE_DATA_DIRS =
       Set.of(
@@ -2741,23 +2743,7 @@ public class HelloApplication extends Application {
   }
 
   private String extractMcVersion(String id) {
-    Matcher matcher;
-    if (id == null) {
-      return null;
-    }
-    String value = id;
-    int forge = value.indexOf("-forge-");
-    if (forge > 0) {
-      value = value.substring(0, forge);
-    }
-    if (value.startsWith("fabric-loader-")) {
-      value = value.substring(value.lastIndexOf(45) + 1);
-    }
-    return (matcher =
-                Pattern.compile("^(1\\.\\d+(?:\\.\\d+)?|\\d+\\.\\d+(?:\\.\\d+)?)").matcher(value))
-            .find()
-        ? matcher.group(1)
-        : null;
+    return InstanceId.mcVersion(id);
   }
 
   private VBox createCommunityPanel() {
@@ -3880,27 +3866,11 @@ public class HelloApplication extends Application {
   }
 
   private String typeLabel(String type) {
-    if (type == null) {
-      return "资源";
-    }
-    return switch (type) {
-      case "mod" -> "模组";
-      case "resourcepack" -> "资源包";
-      case "shader" -> "光影包";
-      case "datapack" -> "数据包";
-      case "world" -> "世界";
-      default -> "整合包";
-    };
+    return ProjectFormat.typeLabel(type);
   }
 
   private static String formatCount(long count) {
-    if (count >= 100000000L) {
-      return count / 100000000L + " 亿";
-    }
-    if (count >= 10000L) {
-      return count / 10000L + " 万";
-    }
-    return String.valueOf(count);
+    return ProjectFormat.count(count);
   }
 
   private void showInstaller(String loader) {
