@@ -41,6 +41,8 @@ public final class DownloadManager {
     public final File target;
     public final String sha1;
     public final long size;
+    /** 最近一次失败原因（成功时为 null），供 UI 汇总展示。 */
+    public volatile String failureReason;
 
     public Task(String url, File target, String sha1, long size) {
       this.url = url;
@@ -126,6 +128,9 @@ public final class DownloadManager {
     public long bytes;
     public final java.util.List<String> failures =
         java.util.Collections.synchronizedList(new ArrayList<>());
+    /** 失败 URL → 原因（中文），给「下载失败」明细用。 */
+    public final java.util.Map<String, String> failureReasons =
+        java.util.Collections.synchronizedMap(new java.util.LinkedHashMap<>());
   }
 
   /** 并发下载一批任务；已存在且大小一致的直接跳过。 */
@@ -203,6 +208,8 @@ public final class DownloadManager {
                   } else {
                     stats.failed++;
                     stats.failures.add(task.url);
+                    stats.failureReasons.put(task.url,
+                        task.failureReason == null ? "未知原因" : task.failureReason);
                   }
                 }
                 int finished = done.incrementAndGet();
@@ -349,6 +356,8 @@ public final class DownloadManager {
               report("⚠ 该文件的 CDN 源站暂时不可用（Modrinth 返回 "
                   + response.statusCode() + "），正在尝试镜像源…");
             } else if (response.statusCode() >= 400) {
+              task.failureReason = DownloadFailure.describe(
+                  DownloadFailure.classify(response.statusCode()));
               report("⚠ 下载源返回 HTTP " + response.statusCode() + "，尝试下一个源");
             }
           } catch (Exception ignored) {
@@ -363,6 +372,7 @@ public final class DownloadManager {
           String actual = sha1(part);
           if (!actual.equalsIgnoreCase(task.sha1)) {
             // 校验失败：删掉重下一次
+            task.failureReason = DownloadFailure.describe(DownloadFailure.Kind.CHECKSUM);
             part.delete();
             if (existing > 0) {
               existing = 0;
@@ -377,10 +387,12 @@ public final class DownloadManager {
         // 用户取消不是「下载失败」，直接向上抛，别计入 failed
         throw cancelled;
       } catch (java.io.IOException networkError) {
+        task.failureReason = DownloadFailure.describe(DownloadFailure.classify(networkError));
         // 只有网络/IO 类失败才把镜像标记为不可用
         if (isMirror) mirrorDisabled = true;
       } catch (Exception other) {
         // 其它异常（磁盘、权限）不要连累镜像，也不要冒充成功
+        task.failureReason = DownloadFailure.describe(DownloadFailure.classify(other));
         if (isMirror && other instanceof java.net.SocketException) mirrorDisabled = true;
       }
     }

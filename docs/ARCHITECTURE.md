@@ -369,6 +369,26 @@ IDLE --beginPrepare()--> PREPARING --markRunning()--> RUNNING --finish()--> IDLE
 
 单测 89 → **94 通过**。
 
+### Phase 4b：下载失败可解释
+
+以前下载失败只会列出 URL，用户看不出是资源没了、被限流还是硬盘满。现在：
+
+| 改动 | 说明 |
+|---|---|
+| `core.download.DownloadFailure` | HTTP 状态 + 异常类型 → `NOT_FOUND / FORBIDDEN / SERVER / TIMEOUT / NETWORK / CHECKSUM / DISK / UNKNOWN`，并给中文说明 |
+| `DownloadManager.Task.failureReason` | 每个任务记录最近一次失败原因（HTTP 码、IO 异常、校验不符） |
+| `DownloadManager.Stats.failureReasons` | URL → 原因，随结果一起返回 |
+| 日志 | 依赖库补齐失败时输出 `✗ <url>（资源不存在（404）…）` |
+
+验证：
+
+- 单测 94 → **97 通过**（HTTP 404/403/5xx、超时异常、磁盘异常、说明文案）
+- **真实网络验证**：正常文件下载成功（version_manifest_v2.json，278 KB）；
+  不存在的文件返回 `failed=1`，明细为
+  `…neko.json -> 资源不存在（404），可能是版本/文件已被删除`
+
+> 控制服务仍不可用，这轮继续只做不依赖界面的可验证改动。
+
 > 顺带记录一个已知局限（用测试固定下来）：指定加载器时，文件名里没带 `fabric/forge/neoforge`
   的通用包会被过滤掉——这是现有启发式策略，改成“未知加载器也放行”需要更细的元数据，留待后续。
 

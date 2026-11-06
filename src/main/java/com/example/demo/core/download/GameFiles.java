@@ -107,7 +107,8 @@ public final class GameFiles {
                 failures = new ArrayList<>(stats.failures);
             }
             for (String failedUrl : failures) {
-                log.accept("   ✗ " + failedUrl);
+                String reason = stats.failureReasons.get(failedUrl);
+                log.accept("   ✗ " + failedUrl + (reason == null || reason.isBlank() ? "" : "（" + reason + "）"));
             }
             throw new IllegalStateException(
                     "有 " + stats.failed + " 个依赖库没下载成功，请检查网络后重试（已下载的会保留）");
