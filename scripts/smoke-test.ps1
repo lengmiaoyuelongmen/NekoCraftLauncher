@@ -58,16 +58,19 @@ public class SmokeWin {
 '@ -ErrorAction SilentlyContinue
 
     function Focus-Launcher {
-        $h = [SmokeWin]::Find($Title)
-        if ($h -eq [IntPtr]::Zero) { return $false }
-        [SmokeWin]::ShowWindow($h, 9) | Out-Null   # SW_RESTORE
-        # Windows 会拦住后台进程抢前台：先点一下 ALT 解锁，否则 SendKeys 会打到别的窗口上
-        [SmokeWin]::keybd_event(0x12, 0, 0, [IntPtr]::Zero)
-        Start-Sleep -Milliseconds 40
-        [SmokeWin]::SetForegroundWindow($h) | Out-Null
-        [SmokeWin]::keybd_event(0x12, 0, 2, [IntPtr]::Zero)
-        Start-Sleep -Milliseconds 300
-        return ([SmokeWin]::GetForegroundWindow() -eq $h)
+        for ($attempt = 1; $attempt -le 5; $attempt++) {
+            $h = [SmokeWin]::Find($Title)
+            if ($h -eq [IntPtr]::Zero) { return $false }
+            [SmokeWin]::ShowWindow($h, 9) | Out-Null   # SW_RESTORE
+            # Windows 会拦住后台进程抢前台：先点一下 ALT 解锁，否则 SendKeys 会打到别的窗口上
+            [SmokeWin]::keybd_event(0x12, 0, 0, [IntPtr]::Zero)
+            Start-Sleep -Milliseconds 40
+            [SmokeWin]::SetForegroundWindow($h) | Out-Null
+            [SmokeWin]::keybd_event(0x12, 0, 2, [IntPtr]::Zero)
+            Start-Sleep -Milliseconds 400
+            if ([SmokeWin]::GetForegroundWindow() -eq $h) { return $true }
+        }
+        return $false
     }
 
     function Wait-Launcher([int]$timeoutSec) {
