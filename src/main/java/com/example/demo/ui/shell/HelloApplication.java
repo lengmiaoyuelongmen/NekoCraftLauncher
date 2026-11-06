@@ -227,6 +227,9 @@ import com.example.demo.core.launch.LaunchContext;
 import com.example.demo.core.launch.LaunchPipeline;
 import com.example.demo.core.launch.LibrariesTask;
 import com.example.demo.core.launch.NativesTask;
+import com.example.demo.core.auth.LoginCardParser;
+import com.example.demo.core.game.ImportErrors;
+import com.example.demo.core.launch.LaunchScriptExporter;
 public class HelloApplication extends Application {
   private static final Set<String> CLONE_DATA_DIRS =
       Set.of(
@@ -5887,34 +5890,12 @@ public class HelloApplication extends Application {
 
   /** 取最内层异常的消息，避免只显示 "RuntimeException: ..." 这种壳。 */
   private static String rootMessage(Throwable error) {
-    Throwable current = error;
-    String message = error.getMessage();
-    while (current.getCause() != null && current.getCause() != current) {
-      current = current.getCause();
-      if (current.getMessage() != null && !current.getMessage().isBlank()) {
-        message = current.getMessage();
-      }
-    }
-    return message == null || message.isBlank() ? error.getClass().getSimpleName() : message;
+    return ImportErrors.rootMessage(error);
   }
 
   /** 按异常类型给出可操作提示。 */
   private static String importFailureHint(String message) {
-    String lower = message == null ? "" : message.toLowerCase(Locale.ROOT);
-    if (lower.contains("java")) {
-      return "内置运行时缺失或不可用，可在 设置 → 启动 → Java 路径 指定 java.exe";
-    }
-    if (lower.contains("timed out") || lower.contains("connect") || lower.contains("http")
-        || lower.contains("下载源") || lower.contains("unreachable")) {
-      return "网络不稳定，可在 设置 → 下载源 选「镜像优先」后重试";
-    }
-    if (lower.contains("space") || lower.contains("空间")) {
-      return "磁盘空间不足，清理后再试";
-    }
-    if (lower.contains("access") || lower.contains("权限") || lower.contains("denied")) {
-      return "目录没有写权限，换个目录或以管理员身份运行";
-    }
-    return "";
+    return ImportErrors.hint(message);
   }
 
   /** 递归复制目录内容（覆盖同名文件）。 */
@@ -6322,69 +6303,7 @@ public class HelloApplication extends Application {
   }
 
   private LoginCardData parseLoginCard(String text) {
-    Matcher m;
-    if (text == null || text.isBlank()) {
-      return null;
-    }
-    String server = "";
-    String username = "";
-    String password = "";
-    try {
-      JsonObject json = JsonParser.parseString(text).getAsJsonObject();
-      server =
-          this.firstJsonString(
-              json,
-              "server",
-              "apiRoot",
-              "api_root",
-              "authlibInjector",
-              "authlib_injector",
-              "yggdrasil",
-              "url",
-              "host");
-      username = this.firstJsonString(json, "username", "email", "account", "name");
-      password = this.firstJsonString(json, "password", "passwd", "pwd");
-      if (json.has("auth") && json.get("auth").isJsonObject()) {
-        JsonObject auth = json.getAsJsonObject("auth");
-        if (server.isBlank()) {
-          server = this.firstJsonString(auth, "server", "apiRoot", "url");
-        }
-        if (username.isBlank()) {
-          username = this.firstJsonString(auth, "username", "email");
-        }
-        if (password.isBlank()) {
-          password = this.firstJsonString(auth, "password", "passwd");
-        }
-      }
-    } catch (Exception json) {
-      // empty catch block
-    }
-    if (server.isBlank()
-        && (m =
-                Pattern.compile(
-                        "(?im)^\\s*(?:服务器|地址|server|apiRoot|api_root|url)\\s*[:=]\\s*(\\S+)")
-                    .matcher(text))
-            .find()) {
-      server = m.group(1).trim();
-    }
-    if (username.isBlank()
-        && (m =
-                Pattern.compile("(?im)^\\s*(?:邮箱|账号|用户名|username|email|account)\\s*[:=]\\s*(\\S+)")
-                    .matcher(text))
-            .find()) {
-      username = m.group(1).trim();
-    }
-    if (password.isBlank()
-        && (m =
-                Pattern.compile("(?im)^\\s*(?:密码|password|passwd|pwd)\\s*[:=]\\s*(\\S+)")
-                    .matcher(text))
-            .find()) {
-      password = m.group(1).trim();
-    }
-    if (username.isBlank() && password.isBlank()) {
-      return null;
-    }
-    return new LoginCardData(server, username, password);
+    return LoginCardParser.parse(text);
   }
 
   private String firstJsonString(JsonObject object, String... keys) {
@@ -6397,18 +6316,7 @@ public class HelloApplication extends Application {
   }
 
   private String normalizeLittleSkinServer(String server) {
-    if (server == null || server.isBlank()) {
-      return "";
-    }
-    String value = server.trim();
-    if (!value.startsWith("http://") && !value.startsWith("https://")) {
-      value = "https://" + value;
-    }
-    value = value.replaceAll("/+$", "");
-    if (value.contains("littleskin.cn") && !value.contains("/api/yggdrasil")) {
-      value = value + "/api/yggdrasil";
-    }
-    return value;
+    return LoginCardParser.normalizeServer(server);
   }
 
   private void showHealthCheck() {
@@ -8116,39 +8024,20 @@ public class HelloApplication extends Application {
     try {
       File gameDir = new File(this.config.getGameDir());
       VersionProfile profile = VersionProfile.load(gameDir, id);
-      File instanceDir = InstanceDirs.root(gameDir, id, this.isIsolated(id));
       String java =
           this.config.getJavaPath() == null || this.config.getJavaPath().isBlank()
-              ? new File(
-                      new File(gameDir, "java"),
-                      "zulu" + profile.getJavaMajorVersion() + "/bin/java.exe")
-                  .getAbsolutePath()
+              ? new File(new File(gameDir, "java"),
+                      "zulu" + profile.getJavaMajorVersion() + "/bin/java.exe").getAbsolutePath()
               : this.config.getJavaPath();
-      List<String> command =
-          LaunchPlanner.plan(
-                  profile,
-                  this.currentSession,
-                  this.config,
-                  gameDir,
-                  instanceDir,
-                  java,
-                  InstanceDirs.natives(gameDir, id, this.isIsolated(id)),
-                  null)
-              .command();
-      StringBuilder script = new StringBuilder("@echo off\r\n");
-      script.append("cd /d \"").append(instanceDir.getAbsolutePath()).append("\"\r\n");
-      script.append("rem 由 Neko Craft Launcher 导出，用于排查启动问题\r\n");
-      for (String arg : command) {
-        script.append(arg.contains(" ") ? "\"" + arg + "\"" : arg).append(" ");
-      }
-      script.append("\r\npause\r\n");
-      instanceDir.mkdirs();
-      File out = new File(instanceDir, "launch-" + id + ".bat");
-      Files.writeString(
-          out.toPath(),
-          (CharSequence) script.toString(),
-          StandardCharsets.UTF_8,
-          new OpenOption[0]);
+      File out =
+          LaunchScriptExporter.export(
+              profile,
+              this.currentSession,
+              this.config,
+              gameDir,
+              InstanceDirs.root(gameDir, id, this.isIsolated(id)),
+              java,
+              InstanceDirs.natives(gameDir, id, this.isIsolated(id)));
       this.logMessage("📜 启动脚本已导出: " + out.getAbsolutePath());
     } catch (Exception e) {
       this.logMessage("❌ 导出失败: " + e.getMessage());
