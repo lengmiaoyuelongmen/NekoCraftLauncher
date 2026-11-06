@@ -238,6 +238,7 @@ import com.example.demo.core.model.GameDirDetector;
 import com.example.demo.core.model.LanguageConfig;
 import com.example.demo.core.launch.AutoRepair;
 import com.example.demo.core.launch.IntegrityCachePolicy;
+import com.example.demo.core.launch.GameExit;
 import com.example.demo.core.launch.LaunchGuards;
 import com.example.demo.core.launch.LaunchState;
 import com.example.demo.core.download.ModrinthSearch;
@@ -6448,13 +6449,9 @@ private static void setFlexible(Node node, boolean on) {
                       this.setLaunchingUi(false);
                       this.setGameStatus(false);
                       if (this.stageRef != null && !this.stageRef.isShowing()) {
-                        String trayMessage =
-                            forcedStop
-                                ? "Game stopped by launcher."
-                                : (exited.exitValue() == 0
-                                    ? "Game exited normally."
-                                    : "Game crashed - check the crash report.");
-                        this.chrome().notifyTray(trayMessage, !forcedStop && exited.exitValue() != 0);
+                        GameExit.Kind trayKind = GameExit.kind(forcedStop, exited.exitValue());
+                        this.chrome().notifyTray(GameExit.trayMessage(trayKind),
+                            trayKind == GameExit.Kind.CRASH);
                       }
                       if (this.minimizedForGame && this.stageRef != null) {
                         this.minimizedForGame = false;
@@ -6475,7 +6472,7 @@ private static void setFlexible(Node node, boolean on) {
                       long sessionSeconds = 0L;
                       if (this.gameStartAt > 0L && this.gameInstanceId != null) {
                         sessionSeconds =
-                            Math.max(1L, (System.currentTimeMillis() - this.gameStartAt) / 1000L);
+                            GameExit.sessionSeconds(this.gameStartAt, System.currentTimeMillis());
                         File base = new File(this.config.getGameDir());
                         Playtime.add(base, this.gameInstanceId, sessionSeconds);
                         this.logArea.appendText(
@@ -6486,7 +6483,8 @@ private static void setFlexible(Node node, boolean on) {
                                 + "）\n");
                         this.gameStartAt = 0L;
                       }
-                      boolean crashLike = !forcedStop && exited.exitValue() != 0;
+                      boolean crashLike =
+                          GameExit.crashLike(forcedStop, exited.exitValue());
                       LaunchHistory.record(
                           new File(this.config.getGameDir()),
                           new LaunchHistory.Entry(
@@ -6501,11 +6499,8 @@ private static void setFlexible(Node node, boolean on) {
                         this.launchInsightBar.refresh();
                       }
                       this.logArea.appendText(
-                          (forcedStop
-                              ? "🛑 游戏已被启动器主动结束。\n"
-                              : (crashLike
-                                  ? "⚠ 游戏异常退出（退出码 " + exited.exitValue() + "）\n"
-                                  : "🏁 游戏已正常退出（退出码 " + exited.exitValue() + "）\n")));
+                          GameExit.logMessage(
+                              GameExit.kind(forcedStop, exited.exitValue()), exited.exitValue()));
                       this.launchBtn.setDisable(false);
                       if (crashLike) {
                         File crashDir = new File(gameDir, "crash-reports");
