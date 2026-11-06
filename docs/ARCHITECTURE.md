@@ -22,13 +22,14 @@
 ```
 src/main/java/com/example/demo/
 ├── Launcher.java            # 进程入口（唯一留在默认包的类）
-├── core/                    # 66 个类，0 处 import javafx / 0 处 import ui.*
+├── core/                    # 79 个类，0 处 import javafx / 0 处 import ui.*
 │   ├── ai/         2   DeepSeekClient, LocalAiAssistant
 │   ├── app/        8   AppPaths, AppVersion, LauncherConfig, SingleInstance, ConfigHistory, UpdateChecker, SupportBundle, Bootstrap
-│   ├── auth/       6   AuthManager, AccountStore, MicrosoftAuth, AuthlibInjectorManager, SessionStore, SecretStore
+│   ├── auth/       7   AuthManager, AccountStore, MicrosoftAuth, AuthlibInjectorManager, SessionStore, SecretStore, LoginCardParser
 │   ├── download/   9   DownloadManager, GameFiles, Downloader, Aria2Downloader, Integrity, SourcePinger, CurseForgeClient, IconProxy, ZipUtil
-│   ├── game/       5   JavaManager, JavaScanner, LoaderInstaller, PortableExporter, CrashAnalyzer
-│   ├── launch/    12   LaunchPlan, LaunchPlanner, LaunchContext, LaunchTask, LaunchPipeline, ClientJarTask, LibrariesTask, AssetsTask, NativesTask, NativeExtractor, LaunchCancelledException, GameCommandSender
+│   ├── game/       6   JavaManager, JavaScanner, LoaderInstaller, PortableExporter, CrashAnalyzer, ImportErrors
+│   ├── instance/   2   InstanceFiles, InstanceCloner
+│   ├── launch/    13   LaunchPlan, LaunchPlanner, LaunchContext, LaunchTask, LaunchPipeline, ClientJarTask, LibrariesTask, AssetsTask, NativesTask, NativeExtractor, LaunchScriptExporter, LaunchCancelledException, GameCommandSender
 │   ├── meta/       2   VersionProfile, VersionManager
 │   ├── mod/        5   ModDependencyScanner, ModConflictChecker, ModpackImport, ModpackExporter, ServerPackExporter
 │   ├── model/     16   Instance, InstanceDirs, InstanceMeta, InstanceSettings, MinecraftVersion, VersionDetails, VersionManifest, AssetIndex, Library, Modpack, ModpackProject, UserSession, LoginCardData, Favorites, Playtime, LaunchHistory
@@ -195,6 +196,19 @@ new LaunchPipeline()
 
 单测 36 → **45 通过**；0 告警；冒烟 PASS。
 
+### Phase 5b-2：实例管理里的文件操作外迁
+
+「克隆实例 / 删除实例」是主类里最容易写错的两段文件操作（递归删除、带过滤复制、改版本 JSON 的 id），
+先搬到 core 并补测试：
+
+| 新类 | 职责 | 测试 |
+|---|---|---|
+| `core.instance.InstanceFiles` | `deleteTree`（递归删、失败返回 false）、`copyTree`（可跳过顶层目录） | 3 个 |
+| `core.instance.InstanceCloner` | 克隆实例：自动选 `-copy`/`-copy2`、复制版本、按需带 mods/saves、改写 JSON 里的 id | 3 个 |
+
+主类对应方法缩短为 20 行左右的 UI 壳（只负责刷列表 / Toast / 日志）。主类 **8,667 → 8,609 行**，
+单测 **45 → 51 通过**。
+
 ## 5. 迁移手法
 
 1. 脚本按「域 → 新包」映射移动文件，改 `package` 行。
@@ -214,6 +228,7 @@ new LaunchPipeline()
 | ~~**Phase 3a**~~ ✅ | `InstanceSettings`：`versions/<id>/instance.json` + 旧表迁移 + 隔离覆盖 | 5 个单测；实机命令行带实例内存/JVM 参数 |
 | ~~**Phase 4a**~~ ✅ | `Integrity` 支持 SHA1 深度校验 + 修复后复核 | 5 个单测；14 实例全量深度校验 |
 | ~~**Phase 5b-1**~~ ✅ | 主类纯逻辑外迁：`LoginCardParser` / `LaunchScriptExporter` / `ImportErrors` | 9 个新单测；主类 -303 行 |
+| ~~**Phase 5b-2**~~ ✅ | 实例文件操作外迁：`InstanceFiles` / `InstanceCloner` | 6 个新单测；主类 -58 行 |
 | **Phase 2b** | 把 `startGame` 的编排（检查 Java → 校验 → 下载 → 解压 → 起进程）抽成 `LaunchTask` 链 + `LaunchPipeline`，UI 只订阅进度 | 主类再减 ~300 行；断点续跑可测 |
 | **Phase 3** | 实例一等公民：`InstanceSettings`（内存 / JVM 参数 / Java 路径 / 是否隔离 / 游戏目录）落到 `versions/<id>/instance.json`；实例设置页读写 | 两个实例用不同内存启动成功 |
 | **Phase 4** | 下载引擎统一：`DownloadEngine` 统一入口，所有下载带 SHA1 校验、并发上限、失败重试与镜像回退；`DownloadManager` 退化为其实现 | 强制断网/坏源测试通过 |

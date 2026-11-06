@@ -230,6 +230,8 @@ import com.example.demo.core.launch.NativesTask;
 import com.example.demo.core.auth.LoginCardParser;
 import com.example.demo.core.game.ImportErrors;
 import com.example.demo.core.launch.LaunchScriptExporter;
+import com.example.demo.core.instance.InstanceCloner;
+import com.example.demo.core.instance.InstanceFiles;
 public class HelloApplication extends Application {
   private static final Set<String> CLONE_DATA_DIRS =
       Set.of(
@@ -5924,16 +5926,7 @@ public class HelloApplication extends Application {
 
   /** 静默删除临时目录。 */
   private static void deleteTree(File dir) {
-    if (dir == null || !dir.exists()) {
-      return;
-    }
-    try (java.util.stream.Stream<java.nio.file.Path> walk = java.nio.file.Files.walk(dir.toPath())) {
-      for (java.nio.file.Path path : walk.sorted(java.util.Comparator.reverseOrder()).toList()) {
-        java.nio.file.Files.deleteIfExists(path);
-      }
-    } catch (Exception ignored) {
-      // 清理失败不影响主流程
-    }
+    InstanceFiles.deleteTree(dir);
   }
 
   /** 失败时把这次安装新建的实例和版本目录清掉，避免留下半成品实例。 */
@@ -8119,65 +8112,23 @@ public class HelloApplication extends Application {
 
   private void cloneInstance(String id, boolean copyData) {
     File versions = new File(this.config.getGameDir(), "versions");
-    File source = new File(versions, id);
-    if (!source.isDirectory()) {
-      this.logMessage("⚠️ 实例目录不存在: " + source.getAbsolutePath());
+    if (!new File(versions, id).isDirectory()) {
+      this.logMessage("⚠️ 实例目录不存在: " + new File(versions, id).getAbsolutePath());
       return;
     }
-    String candidate = id + "-copy";
-    int index = 2;
-    while (new File(versions, candidate).exists()) {
-      candidate = id + "-copy" + index++;
-    }
-    String newId = candidate;
-    File target = new File(versions, newId);
-    boolean withData = copyData;
-    this.logMessage("📄 正在克隆实例 " + id + " → " + newId + (withData ? "（含数据）" : "（仅版本）"));
+    this.logMessage("📄 正在克隆实例 " + id + (copyData ? "（含数据）" : "（仅版本）"));
     CompletableFuture.runAsync(
         () -> {
           try {
-            Path src = source.toPath();
-            Path dst = target.toPath();
-            try (Stream<Path> stream = Files.walk(src, new FileVisitOption[0]); ) {
-              stream.forEach(
-                  path -> {
-                    try {
-                      Path rel = src.relativize(path);
-                      if (!withData
-                          && rel.getNameCount() > 0
-                          && CLONE_DATA_DIRS.contains(rel.getName(0).toString())) {
-                        return;
-                      }
-                      Path to = dst.resolve(rel);
-                      if (Files.isDirectory(path, new LinkOption[0])) {
-                        Files.createDirectories(to, new FileAttribute<?>[0]);
-                      } else {
-                        Files.copy(path, to, StandardCopyOption.REPLACE_EXISTING);
-                      }
-                    } catch (Exception exception) {
-                      // empty catch block
-                    }
-                  });
-            }
-            File json = new File(target, id + ".json");
-            if (json.isFile()) {
-              JsonObject object =
-                  JsonParser.parseString(Files.readString(json.toPath())).getAsJsonObject();
-              object.addProperty("id", newId);
-              Files.writeString(
-                  json.toPath(),
-                  (CharSequence) new GsonBuilder().setPrettyPrinting().create().toJson(object),
-                  new OpenOption[0]);
-              json.renameTo(new File(target, newId + ".json"));
-            }
+            File target = InstanceCloner.duplicate(new File(this.config.getGameDir()), id, copyData);
             Platform.runLater(
                 () -> {
                   this.refreshInstalledVersions();
                   if (this.instancesPanel != null) {
                     this.instancesPanel.setSelectedId(this.currentInstanceId());
                   }
-                  Toast.ok("已克隆实例 → " + newId);
-                  this.logMessage("✅ 已克隆实例 " + id + " → " + newId);
+                  Toast.ok("已克隆实例 → " + target.getName());
+                  this.logMessage("✅ 已克隆实例 " + id + " → " + target.getName());
                 });
           } catch (Exception e) {
             Platform.runLater(() -> this.logMessage("❌ 克隆失败: " + e.getMessage()));
@@ -8241,14 +8192,7 @@ public class HelloApplication extends Application {
   }
 
   private boolean deleteRecursively(File file) {
-    File[] children = file.listFiles();
-    if (children != null) {
-      for (File child : children) {
-        if (this.deleteRecursively(child)) continue;
-        return false;
-      }
-    }
-    return file.delete();
+    return InstanceFiles.deleteTree(file);
   }
 
   private void openInstanceSettings(String tab) {
