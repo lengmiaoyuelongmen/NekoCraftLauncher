@@ -83,20 +83,46 @@ public class SmokeWin {
         return $false
     }
 
+    function Count-ScreenColors([System.Drawing.Bitmap]$bmp) {
+        $set = New-Object System.Collections.Generic.HashSet[int]
+        for ($y = 0; $y -lt $bmp.Height; $y += 20) {
+            for ($x = 0; $x -lt $bmp.Width; $x += 26) { [void]$set.Add($bmp.GetPixel($x, $y).ToArgb()) }
+        }
+        return $set.Count
+    }
+
     function Capture-Window([string]$name) {
-        $h = [SmokeWin]::Find($Title)
-        if ($h -eq [IntPtr]::Zero) { return }
-        $r = New-Object SmokeWin+RECT
-        [SmokeWin]::GetWindowRect($h, [ref]$r) | Out-Null
-        $w = $r.Right - $r.Left
-        $ht = $r.Bottom - $r.Top
-        if ($w -le 0 -or $ht -le 0) { return }
         Add-Type -AssemblyName System.Drawing
-        $bmp = New-Object System.Drawing.Bitmap($w, $ht)
-        $g = [System.Drawing.Graphics]::FromImage($bmp)
-        $g.CopyFromScreen($r.Left, $r.Top, 0, 0, (New-Object System.Drawing.Size($w, $ht)))
-        $bmp.Save((Join-Path $outDir "$name.png"), [System.Drawing.Imaging.ImageFormat]::Png)
-        $g.Dispose(); $bmp.Dispose()
+        $path = Join-Path $outDir "$name.png"
+        # 机器慢的时候窗口会出现「已创建但还没画第一帧」的状态，拍到就是纯底色。
+        # 这里循环重拍直到画面有内容（颜色数 > 60），最多等 15 秒。
+        $deadline = (Get-Date).AddSeconds(15)
+        $colors = 0
+        while ($true) {
+            $h = [SmokeWin]::Find($Title)
+            if ($h -eq [IntPtr]::Zero) { return }
+            $r = New-Object SmokeWin+RECT
+            [SmokeWin]::GetWindowRect($h, [ref]$r) | Out-Null
+            $w = $r.Right - $r.Left
+            $ht = $r.Bottom - $r.Top
+            if ($w -le 0 -or $ht -le 0) { return }
+            $bmp = New-Object System.Drawing.Bitmap($w, $ht)
+            $g = [System.Drawing.Graphics]::FromImage($bmp)
+            $g.CopyFromScreen($r.Left, $r.Top, 0, 0, (New-Object System.Drawing.Size($w, $ht)))
+            $g.Dispose()
+            $colors = Count-ScreenColors $bmp
+            if ($colors -gt 60) {
+                $bmp.Save($path, [System.Drawing.Imaging.ImageFormat]::Png)
+                $bmp.Dispose()
+                return
+            }
+            $bmp.Dispose()
+            if ((Get-Date) -gt $deadline) {
+                Write-Host ("  ! {0} 15 秒内没有画出来（{1} 种颜色）" -f $name, $colors) -ForegroundColor Yellow
+                return
+            }
+            Start-Sleep -Milliseconds 500
+        }
     }
 
     # ---------- 构建 ----------
