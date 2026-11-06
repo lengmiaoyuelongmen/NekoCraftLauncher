@@ -11,10 +11,6 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.awt.Color;
 import java.awt.Desktop;
-import java.awt.Graphics2D;
-import java.awt.PopupMenu;
-import java.awt.SystemTray;
-import java.awt.TrayIcon;
 import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
@@ -261,6 +257,7 @@ public class HelloApplication extends Application {
   private SettingsPanel settingsPanel;
   private String navHighlight;
   private boolean testMode;
+  private WindowChrome windowChrome;
   private Stage stageRef;
   private volatile boolean testSuccess;
   private Rectangle navIndicator;
@@ -301,9 +298,7 @@ public class HelloApplication extends Application {
   private String lastIntegrityProfile;
   private boolean minimizedForGame;
   private boolean gameRunning;
-  private boolean trayInstalled;
   private boolean quitting;
-  private TrayIcon trayIcon;
   private Label geekTelemetry;
   private final long appStartedAt = System.currentTimeMillis();
   private AmbientBackground ambientBackground;
@@ -7277,130 +7272,19 @@ public class HelloApplication extends Application {
   }
 
   private void requestClose() {
-    if (this.quitting) {
-      return;
-    }
-    String action = this.config.getCloseAction();
-    if ("tray".equals(action) && this.installTray()) {
-      this.hideToTray();
-      return;
-    }
-    if ("exit".equals(action)) {
-      this.quitLauncher();
-      return;
-    }
-    this.showCloseChoice();
-  }
-
-  private void showCloseChoice() {
-    if (this.stageRef == null) {
-      this.quitLauncher();
-      return;
-    }
-    boolean canTray = SystemTray.isSupported();
-    CheckBox remember = new CheckBox("记住我的选择");
-    remember.setStyle("-fx-text-fill: -app-text-2;");
-    Label note =
-        new Label(
-            this.gameRunning
-                ? "游戏正在运行。最小化到托盘后，启动器会继续在后台守护进程。"
-                : "最小化到托盘后，启动器仍会在后台运行。");
-    note.setWrapText(true);
-    note.setStyle("-fx-text-fill: -app-text-dim; -fx-font-size: 12px;");
-    VBox content = new VBox(10.0, note, remember);
-
-    List<InAppDialog.Action> actions = new ArrayList<>();
-    actions.add(
-        InAppDialog.Action.danger(
-            "退出启动器",
-            () -> {
-              if (remember.isSelected()) {
-                this.config.setCloseAction("exit");
-                this.config.save();
-              }
-              this.quitLauncher();
-            }));
-    if (canTray) {
-      actions.add(
-          InAppDialog.Action.cyan(
-              "最小化到托盘",
-              () -> {
-                if (remember.isSelected()) {
-                  this.config.setCloseAction("tray");
-                  this.config.save();
-                }
-                if (this.installTray()) {
-                  this.hideToTray();
-                }
-              }));
-    }
-    actions.add(InAppDialog.Action.secondary("取消", null));
-    InAppDialog.custom(this.dialogLayer, "终止启动器？", content, actions, null);
+    this.chrome().requestClose();
   }
 
   private boolean installTray() {
-    if (this.trayInstalled) {
-      return true;
-    }
-    if (!SystemTray.isSupported()) {
-      return false;
-    }
-    try {
-      BufferedImage image = null;
-      try (InputStream in = HelloApplication.class.getResourceAsStream("/icon.png"); ) {
-        if (in != null) {
-          image = ImageIO.read(in);
-        }
-      }
-      if (image == null) {
-        BufferedImage fallback = new BufferedImage(16, 16, 2);
-        Graphics2D g = fallback.createGraphics();
-        g.setColor(new Color(225, 29, 46));
-        g.fillOval(1, 1, 14, 14);
-        g.setColor(new Color(255, 207, 106));
-        g.fillOval(6, 6, 4, 4);
-        g.dispose();
-        image = fallback;
-      }
-      PopupMenu menu = new PopupMenu();
-      java.awt.MenuItem show = new java.awt.MenuItem("Show Neko Launcher");
-      show.addActionListener(e -> Platform.runLater(this::restoreFromTray));
-      java.awt.MenuItem quit = new java.awt.MenuItem("Quit");
-      quit.addActionListener(e -> Platform.runLater(this::quitLauncher));
-      menu.add(show);
-      menu.addSeparator();
-      menu.add(quit);
-      this.trayIcon = new TrayIcon(image, "Neko Craft Launcher", menu);
-      this.trayIcon.setImageAutoSize(true);
-      this.trayIcon.addActionListener(e -> Platform.runLater(this::restoreFromTray));
-      SystemTray.getSystemTray().add(this.trayIcon);
-      this.trayInstalled = true;
-      return true;
-    } catch (Exception ex) {
-      this.logArea.appendText("⚠ 系统托盘不可用: " + ex.getMessage() + "\n");
-      return false;
-    }
+    return this.chrome().installTray();
   }
 
   private void hideToTray() {
-    if (this.stageRef == null || this.trayIcon == null) {
-      return;
-    }
-    this.stageRef.hide();
-    this.trayIcon.displayMessage(
-        "Neko Craft Launcher",
-        this.gameRunning ? "Minimized to tray; game is still running." : "Minimized to tray.",
-        TrayIcon.MessageType.INFO);
+    this.chrome().hideToTray();
   }
 
   private void restoreFromTray() {
-    if (this.stageRef == null) {
-      return;
-    }
-    this.stageRef.show();
-    this.stageRef.setIconified(false);
-    this.stageRef.toFront();
-    this.stageRef.requestFocus();
+    this.chrome().restoreFromTray();
   }
 
   private void quitLauncher() {
@@ -7413,17 +7297,50 @@ public class HelloApplication extends Application {
       this.gameProcess.descendants().forEach(ProcessHandle::destroyForcibly);
       this.gameProcess.destroyForcibly();
     }
-    if (this.trayIcon != null) {
-      try {
-        SystemTray.getSystemTray().remove(this.trayIcon);
-      } catch (Exception exception) {
-        // empty catch block
-      }
-      this.trayIcon = null;
-    }
+    this.chrome().removeTray();
     SingleInstance.release();
     Platform.exit();
     System.exit(0);
+  }
+
+  /** 窗口收尾（关闭行为 / 托盘）延迟创建：stage 还没建好时也能调用。 */
+  private WindowChrome chrome() {
+    if (this.windowChrome == null) {
+      this.windowChrome =
+          new WindowChrome(
+              new WindowChrome.Host() {
+                @Override
+                public LauncherConfig config() {
+                  return HelloApplication.this.config;
+                }
+
+                @Override
+                public Stage stage() {
+                  return HelloApplication.this.stageRef;
+                }
+
+                @Override
+                public StackPane dialogLayer() {
+                  return HelloApplication.this.dialogLayer;
+                }
+
+                @Override
+                public boolean gameRunning() {
+                  return HelloApplication.this.gameRunning;
+                }
+
+                @Override
+                public void log(String message) {
+                  HelloApplication.this.logArea.appendText(message + "\n");
+                }
+
+                @Override
+                public void quit() {
+                  HelloApplication.this.quitLauncher();
+                }
+              });
+    }
+    return this.windowChrome;
   }
 
   private void maybeOfferPerformanceOptimization() {
@@ -7783,21 +7700,14 @@ public class HelloApplication extends Application {
                       this.launching = false;
                       this.setLaunchingUi(false);
                       this.setGameStatus(false);
-                      if (this.stageRef != null
-                          && !this.stageRef.isShowing()
-                          && this.trayIcon != null) {
+                      if (this.stageRef != null && !this.stageRef.isShowing()) {
                         String trayMessage =
                             forcedStop
                                 ? "Game stopped by launcher."
                                 : (exited.exitValue() == 0
                                     ? "Game exited normally."
                                     : "Game crashed - check the crash report.");
-                        this.trayIcon.displayMessage(
-                            "Neko Craft Launcher",
-                            trayMessage,
-                            forcedStop || exited.exitValue() == 0
-                                ? TrayIcon.MessageType.INFO
-                                : TrayIcon.MessageType.WARNING);
+                        this.chrome().notifyTray(trayMessage, !forcedStop && exited.exitValue() != 0);
                       }
                       if (this.minimizedForGame && this.stageRef != null) {
                         this.minimizedForGame = false;

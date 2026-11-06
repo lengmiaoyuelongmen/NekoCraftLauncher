@@ -35,8 +35,8 @@ src/main/java/com/example/demo/
 │   ├── model/     16   Instance, InstanceDirs, InstanceMeta, InstanceSettings, MinecraftVersion, VersionDetails, VersionManifest, AssetIndex, Library, Modpack, ModpackProject, UserSession, LoginCardData, Favorites, Playtime, LaunchHistory
 │   ├── plugin/     3   PluginManager, PluginContext, NekoPlugin
 │   └── runtime/    6   HardwareInfo, SystemMetrics, PerformanceOptimizer, PerformanceTuner, MemoryAdvisor, NetworkBoost
-└── ui/                      # 53 个类，只能单向依赖 core
-    ├── shell/     15   HelloApplication（应用外壳）, Theme, Motion, Dialogs, InAppDialog, Icons, Toast, UiFit, ModuleHeader, BootScreen, PrewarmOverlay, AmbientBackground, LauncherLog, CommandCompleter, HelloController
+└── ui/                      # 54 个类，只能单向依赖 core
+    ├── shell/     16   HelloApplication（应用外壳）, WindowChrome, Theme, Motion, Dialogs, InAppDialog, Icons, Toast, UiFit, ModuleHeader, BootScreen, PrewarmOverlay, AmbientBackground, LauncherLog, CommandCompleter, HelloController
     ├── page/      11   InstancesPanel, InstanceSettingsPanel, SettingsPanel, ToolsPanel, LogsPanel, WorldsPanel, FirstRunPanel, InstallWindow, InstallProgressPage, ModsPanel, InstanceFileManager
     └── component/ 27   启动页/登录/下载/皮肤/世界等可复用控件与对话框
 ```
@@ -209,6 +209,24 @@ new LaunchPipeline()
 主类对应方法缩短为 20 行左右的 UI 壳（只负责刷列表 / Toast / 日志）。主类 **8,667 → 8,609 行**，
 单测 **45 → 51 通过**。
 
+### Phase 5b-3：窗口 / 托盘生命周期独立
+
+关闭行为、系统托盘、托盘通知从主类搬到 `ui.shell.WindowChrome`，主类通过一个 6 方法的 `Host`
+接口提供窗口、配置、对话框层、游戏状态、日志和「真正退出」：
+
+```java
+new WindowChrome(new WindowChrome.Host() {
+    LauncherConfig config(); Stage stage(); StackPane dialogLayer();
+    boolean gameRunning(); void log(String message); void quit();
+});
+```
+
+主类只保留 `quitLauncher()`（杀游戏进程、移除托盘、释放单例锁、`Platform.exit`），
+窗口代码里不再混着业务逻辑。顺带删掉 4 个已不用的 AWT import。
+
+主类 **8,609 → 8,520 行**；面板/守卫/冒烟全绿；新增 `WindowChromeTest` 2 个
+（`closeAction=exit` 直接退出、没有窗口时也直接退出而不是留僵尸进程）。
+
 ## 5. 迁移手法
 
 1. 脚本按「域 → 新包」映射移动文件，改 `package` 行。
@@ -229,6 +247,7 @@ new LaunchPipeline()
 | ~~**Phase 4a**~~ ✅ | `Integrity` 支持 SHA1 深度校验 + 修复后复核 | 5 个单测；14 实例全量深度校验 |
 | ~~**Phase 5b-1**~~ ✅ | 主类纯逻辑外迁：`LoginCardParser` / `LaunchScriptExporter` / `ImportErrors` | 9 个新单测；主类 -303 行 |
 | ~~**Phase 5b-2**~~ ✅ | 实例文件操作外迁：`InstanceFiles` / `InstanceCloner` | 6 个新单测；主类 -58 行 |
+| ~~**Phase 5b-3**~~ ✅ | 窗口/托盘生命周期外迁：`WindowChrome` + 6 方法 Host | 2 个新单测；主类 -89 行 |
 | **Phase 2b** | 把 `startGame` 的编排（检查 Java → 校验 → 下载 → 解压 → 起进程）抽成 `LaunchTask` 链 + `LaunchPipeline`，UI 只订阅进度 | 主类再减 ~300 行；断点续跑可测 |
 | **Phase 3** | 实例一等公民：`InstanceSettings`（内存 / JVM 参数 / Java 路径 / 是否隔离 / 游戏目录）落到 `versions/<id>/instance.json`；实例设置页读写 | 两个实例用不同内存启动成功 |
 | **Phase 4** | 下载引擎统一：`DownloadEngine` 统一入口，所有下载带 SHA1 校验、并发上限、失败重试与镜像回退；`DownloadManager` 退化为其实现 | 强制断网/坏源测试通过 |
