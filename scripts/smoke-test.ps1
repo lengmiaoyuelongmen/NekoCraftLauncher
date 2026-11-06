@@ -156,6 +156,8 @@ public class SmokeWin {
     }
     if (-not (Wait-Ready 90)) { throw "界面在 90 秒内没有准备好（找不到顶部导航按钮）" }
     if (-not (Focus-Launcher)) { Write-Host "  （抢不到前台，不影响后续 UIA 操作）" -ForegroundColor DarkGray }
+    # 顶部导航可点 ≠ 启动页画完：等一帧稳定再截，否则会拍到只有底色的空页
+    Start-Sleep -Seconds 2
     Capture-Window "01-launch"
 
     # ---------- 逐页 ----------
