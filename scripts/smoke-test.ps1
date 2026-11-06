@@ -210,18 +210,23 @@ public class SmokeWin {
                 [System.Windows.Automation.ControlType]::Button)))
         $el = $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $cond)
         if (-not $el) { throw "找不到导航按钮：$($p.nav)" }
-        $el.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
-        # 等页面真的换掉：截图哈希和上一页不同才算切换成功，最多等 10 秒
-        $pageDeadline = (Get-Date).AddSeconds(10)
-        while ($true) {
-            Capture-Window $p.name
-            $pageHash = (Get-FileHash (Join-Path $outDir "$($p.name).png") -Algorithm SHA256).Hash
-            if (-not $prevHash -or $pageHash -ne $prevHash) { break }
-            if ((Get-Date) -gt $pageDeadline) {
-                Write-Host ("  ! {0} 没有切换到新页面" -f $p.name) -ForegroundColor Yellow
-                break
+        # 点击 + 等页面真的换掉；偶尔 UIA 的 Invoke 会被丢掉，所以最多重试两次
+        $pageHash = $prevHash
+        for ($attempt = 1; $attempt -le 3; $attempt++) {
+            $el.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+            $pageDeadline = (Get-Date).AddSeconds(10)
+            while ($true) {
+                Capture-Window $p.name
+                $pageHash = (Get-FileHash (Join-Path $outDir "$($p.name).png") -Algorithm SHA256).Hash
+                if (-not $prevHash -or $pageHash -ne $prevHash) { break }
+                if ((Get-Date) -gt $pageDeadline) { break }
+                Start-Sleep -Milliseconds 400
             }
-            Start-Sleep -Milliseconds 400
+            if (-not $prevHash -or $pageHash -ne $prevHash) { break }
+            Write-Host ("  · {0} 第 {1} 次点击没有生效，重试" -f $p.name, $attempt) -ForegroundColor DarkYellow
+        }
+        if ($prevHash -and $pageHash -eq $prevHash) {
+            Write-Host ("  ! {0} 没有切换到新页面" -f $p.name) -ForegroundColor Yellow
         }
         $prevHash = $pageHash
         Write-Host ("  · {0}（{1}）" -f $p.name, $p.nav) -ForegroundColor DarkGray
