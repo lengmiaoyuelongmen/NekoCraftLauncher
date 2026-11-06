@@ -42,6 +42,7 @@ public class SmokeWin {
   [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
   [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, IntPtr extra);
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
+  [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint msg, IntPtr wParam, IntPtr lParam);
   public static IntPtr Find(string title) {
     IntPtr found = IntPtr.Zero;
     EnumWindows((h, l) => {
@@ -130,24 +131,61 @@ public class SmokeWin {
     if (-not (Wait-Launcher ([Math]::Max(90, $StartupWaitSec + 20)))) {
         throw "启动器窗口没有出现（$Title，等待 $([Math]::Max(90, $StartupWaitSec + 20)) 秒）"
     }
-    if (-not (Focus-Launcher)) { throw "无法把启动器窗口切到前台（$Title）" }
+    # 窗口出现 ≠ 界面搭好：预热遮罩期间顶部导航还不存在，等到「下载」按钮可点为止
+    Add-Type -AssemblyName UIAutomationClient
+    Add-Type -AssemblyName UIAutomationTypes
+    function Wait-Ready([int]$timeoutSec) {
+        $deadline = (Get-Date).AddSeconds($timeoutSec)
+        while ((Get-Date) -lt $deadline) {
+            $h = [SmokeWin]::Find($Title)
+            if ($h -ne [IntPtr]::Zero) {
+                try {
+                    $root = [System.Windows.Automation.AutomationElement]::FromHandle($h)
+                    $cond = New-Object System.Windows.Automation.AndCondition(
+                        (New-Object System.Windows.Automation.PropertyCondition(
+                            [System.Windows.Automation.AutomationElement]::NameProperty, "下载")),
+                        (New-Object System.Windows.Automation.PropertyCondition(
+                            [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                            [System.Windows.Automation.ControlType]::Button)))
+                    if ($root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $cond)) { return $true }
+                } catch { }
+            }
+            Start-Sleep -Milliseconds 500
+        }
+        return $false
+    }
+    if (-not (Wait-Ready 90)) { throw "界面在 90 秒内没有准备好（找不到顶部导航按钮）" }
+    if (-not (Focus-Launcher)) { Write-Host "  （抢不到前台，不影响后续 UIA 操作）" -ForegroundColor DarkGray }
     Capture-Window "01-launch"
 
     # ---------- 逐页 ----------
     Write-Host "[3/4] 逐页切换..." -ForegroundColor Cyan
     Add-Type -AssemblyName System.Windows.Forms
     $pages = @(
-        @{ key = "{F5}"; name = "02-download" },
-        @{ key = "{F6}"; name = "03-settings" },
-        @{ key = "{F7}"; name = "04-tools"  },
-        @{ key = "{F1}"; name = "05-back-launch" }
+        @{ nav = "下载"; name = "02-download" },
+        @{ nav = "设置"; name = "03-settings" },
+        @{ nav = "工具"; name = "04-tools" },
+        @{ nav = "启动"; name = "05-back-launch" }
     )
+    Add-Type -AssemblyName UIAutomationClient
+    Add-Type -AssemblyName UIAutomationTypes
     foreach ($p in $pages) {
-        if (-not (Focus-Launcher)) { throw "切换到 $($p.name) 时找不到窗口" }
-        [System.Windows.Forms.SendKeys]::SendWait($p.key)
+        # 用 UI Automation 直接触发顶部导航按钮：不依赖前台焦点，也不会打到别的窗口
+        $h = [SmokeWin]::Find($Title)
+        if ($h -eq [IntPtr]::Zero) { throw "切换到 $($p.name) 时找不到窗口" }
+        $root = [System.Windows.Automation.AutomationElement]::FromHandle($h)
+        $cond = New-Object System.Windows.Automation.AndCondition(
+            (New-Object System.Windows.Automation.PropertyCondition(
+                [System.Windows.Automation.AutomationElement]::NameProperty, $p.nav)),
+            (New-Object System.Windows.Automation.PropertyCondition(
+                [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                [System.Windows.Automation.ControlType]::Button)))
+        $el = $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $cond)
+        if (-not $el) { throw "找不到导航按钮：$($p.nav)" }
+        $el.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
         Start-Sleep -Milliseconds 2500
         Capture-Window $p.name
-        Write-Host ("  · {0}" -f $p.name) -ForegroundColor DarkGray
+        Write-Host ("  · {0}（{1}）" -f $p.name, $p.nav) -ForegroundColor DarkGray
     }
 
     # ---------- 检查 ----------
@@ -160,6 +198,13 @@ public class SmokeWin {
     }
 
     $shots = Get-ChildItem $outDir -Filter *.png | Select-Object -ExpandProperty Name
+    $hashes = @(Get-ChildItem $outDir -Filter *.png | ForEach-Object { (Get-FileHash $_.FullName -Algorithm SHA256).Hash })
+    $unique = @($hashes | Sort-Object -Unique).Count
+    # 01（启动页）与 05（切回启动页）本来就该一样，所以要求至少 4 张不同
+    if ($hashes.Count -ne 5 -or $unique -lt 4) {
+        Write-Host ("FAIL: 页面没有真正切换（截图 {0} 张，不同的 {1} 张）" -f $hashes.Count, $unique) -ForegroundColor Red
+        exit 1
+    }
     Write-Host ""
     Write-Host "截图: $($shots -join ', ')" -ForegroundColor DarkGray
     if ($exceptions.Count -gt 0) {
