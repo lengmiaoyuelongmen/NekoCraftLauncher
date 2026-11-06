@@ -27,7 +27,7 @@ src/main/java/com/example/demo/
 │   ├── app/        8   AppPaths, AppVersion, LauncherConfig, SingleInstance, ConfigHistory, UpdateChecker, SupportBundle, Bootstrap
 │   ├── auth/       7   AuthManager, AccountStore, MicrosoftAuth, AuthlibInjectorManager, SessionStore, SecretStore, LoginCardParser
 │   ├── download/   9   DownloadManager, GameFiles, Downloader, Aria2Downloader, Integrity, SourcePinger, CurseForgeClient, IconProxy, ZipUtil
-│   ├── game/       6   JavaManager, JavaScanner, LoaderInstaller, PortableExporter, CrashAnalyzer, ImportErrors
+│   ├── game/       8   JavaManager, JavaRuntimeIndex, JavaRuntimeInstaller, JavaScanner, LoaderInstaller, PortableExporter, CrashAnalyzer, ImportErrors
 │   ├── instance/   2   InstanceFiles, InstanceCloner
 │   ├── launch/    13   LaunchPlan, LaunchPlanner, LaunchContext, LaunchTask, LaunchPipeline, ClientJarTask, LibrariesTask, AssetsTask, NativesTask, NativeExtractor, LaunchScriptExporter, LaunchCancelledException, GameCommandSender
 │   ├── meta/       2   VersionProfile, VersionManager
@@ -227,6 +227,26 @@ new WindowChrome(new WindowChrome.Host() {
 主类 **8,609 → 8,520 行**；面板/守卫/冒烟全绿；新增 `WindowChromeTest` 2 个
 （`closeAction=exit` 直接退出、没有窗口时也直接退出而不是留僵尸进程）。
 
+### Java 运行时管理：双下载源 + 校验
+
+原来只会从 Azul 的接口拿包，在国内网络下 Azul 一慢就整条启动链卡死；解压逻辑也依赖「解压出来的
+目录名恰好等于 zip 文件名」。
+
+| 之前 | 现在 |
+|---|---|
+| 只查 Azul | Azul → **Adoptium Temurin 自动回退**（两个源都查，一个失败换另一个） |
+| 选包只看「不是 CRaC」 | 还要求是 **.zip**，并**优先非 JavaFX 构建**（体积小一半） |
+| 下载后直接解压 | Adoptium 提供 **SHA-256 校验**，不符就删包重来 |
+| 依赖解压目录名 | 自动剥掉 JDK 压缩包的顶层目录，并做 zip-slip 防护；解压后必须找到 `bin/java.exe` |
+
+代码拆成三个可测单元：`JavaRuntimeIndex`（查询 + 选包）、`JavaRuntimeInstaller`（解压 + 规范化 +
+sha256）、`JavaManager`（编排：本地检测 → 查询 → 下载 → 校验 → 安装 → 失败换源）。
+
+验证：
+
+- 单元测试 53 → **62 通过**（选包规则 5 个、安装/校验 4 个）
+- 真实 API 实跑（只查询不下载）：Java 8 / 21 两个大版本都能在 Azul 与 Adoptium 拿到正确的 zip 与 sha256
+
 ## 5. 迁移手法
 
 1. 脚本按「域 → 新包」映射移动文件，改 `package` 行。
@@ -248,6 +268,7 @@ new WindowChrome(new WindowChrome.Host() {
 | ~~**Phase 5b-1**~~ ✅ | 主类纯逻辑外迁：`LoginCardParser` / `LaunchScriptExporter` / `ImportErrors` | 9 个新单测；主类 -303 行 |
 | ~~**Phase 5b-2**~~ ✅ | 实例文件操作外迁：`InstanceFiles` / `InstanceCloner` | 6 个新单测；主类 -58 行 |
 | ~~**Phase 5b-3**~~ ✅ | 窗口/托盘生命周期外迁：`WindowChrome` + 6 方法 Host | 2 个新单测；主类 -89 行 |
+| ~~**Java 运行时**~~ ✅ | 双下载源（Zulu → Adoptium）+ SHA-256 校验 + 健壮解压 | 9 个新单测；真实 API 实跑验证 |
 | **Phase 2b** | 把 `startGame` 的编排（检查 Java → 校验 → 下载 → 解压 → 起进程）抽成 `LaunchTask` 链 + `LaunchPipeline`，UI 只订阅进度 | 主类再减 ~300 行；断点续跑可测 |
 | **Phase 3** | 实例一等公民：`InstanceSettings`（内存 / JVM 参数 / Java 路径 / 是否隔离 / 游戏目录）落到 `versions/<id>/instance.json`；实例设置页读写 | 两个实例用不同内存启动成功 |
 | **Phase 4** | 下载引擎统一：`DownloadEngine` 统一入口，所有下载带 SHA1 校验、并发上限、失败重试与镜像回退；`DownloadManager` 退化为其实现 | 强制断网/坏源测试通过 |
