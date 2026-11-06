@@ -201,6 +201,7 @@ import com.example.demo.ui.component.CommandBar;
 import com.example.demo.ui.component.CrashReportDialog;
 import com.example.demo.ui.component.DownloadFilterBar;
 import com.example.demo.ui.component.DownloadNavItem;
+import com.example.demo.ui.component.DownloadStatusBar;
 import com.example.demo.ui.component.DownloadResultView;
 import com.example.demo.ui.component.LaunchAccountColumn;
 import com.example.demo.ui.component.LaunchAdvisorBar;
@@ -1564,59 +1565,17 @@ public class HelloApplication extends Application {
             + " -fx-border-radius: 10;");
     this.aiChatArea.setVisible(false);
     this.aiChatArea.setManaged(false);
-    Label downloadTitle = new Label("下载任务");
-    downloadTitle.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
-    this.downloadFileLabel = new Label("空闲");
-    this.downloadFileLabel.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 12px;");
-    this.downloadStatsLabel = new Label("—");
-    this.downloadStatsLabel.setStyle("-fx-text-fill: -app-text-dim-2; -fx-font-size: 11px;");
-    this.downloadProgress = new ProgressBar(0.0);
-    this.downloadProgress.setMaxWidth(Double.MAX_VALUE);
-    this.downloadProgress.setPrefHeight(7.0);
-    this.downloadProgress.setMinHeight(7.0);
-    this.downloadProgress.setStyle("-fx-accent: #14b8a6; -fx-background-color: #cfe8dc;");
-    this.downloadProgress.setVisible(false);
-    this.downloadProgress.setManaged(false);
-    this.downloadStatsLabel.setVisible(false);
-    this.downloadStatsLabel.setManaged(false);
-    this.geekTelemetry = new Label("[SYS] INIT");
-    this.geekTelemetry.setStyle(
-        "-fx-text-fill: #ff8a72; -fx-font-size: 8.5px; -fx-font-family: 'Cascadia Mono',"
-            + " 'Consolas', monospace;");
-    Region telemetrySpacer = new Region();
-    HBox.setHgrow(telemetrySpacer, Priority.ALWAYS);
-    this.importCancelButton = new Button("取消导入");
-    this.importCancelButton.setStyle(
-        "-fx-background-color: rgba(248,113,113,0.16); -fx-text-fill: #fecaca; -fx-border-color:"
-            + " rgba(248,113,113,0.5); -fx-background-radius: 7; -fx-border-radius: 7;"
-            + " -fx-font-size: 10px; -fx-padding: 2 8; -fx-cursor: hand;");
-    this.importCancelButton.setVisible(false);
-    this.importCancelButton.setManaged(false);
-    this.importCancelButton.setOnAction(
-        e -> {
-          this.importCancelled = true;
-          DownloadManager.cancelAll();
-          this.importCancelButton.setDisable(true);
-          this.importCancelButton.setText("正在取消…");
-          this.logMessage("⏹ 已请求取消整合包导入");
-        });
-    HBox downloadHeader =
-        new HBox(
-            8.0,
-            downloadTitle,
-            this.downloadFileLabel,
-            telemetrySpacer,
-            this.importCancelButton,
-            this.geekTelemetry);
-    downloadHeader.setAlignment(Pos.CENTER_LEFT);
-    this.downloadBarPanel =
-        downloadBar = new VBox(4.0, downloadHeader, this.downloadProgress, this.downloadStatsLabel);
-    downloadBar.setStyle(
-        "-fx-background-color: rgba(255,255,255,0.03); -fx-background-radius: 10; -fx-border-color:"
-            + " rgba(255,255,255,0.06); -fx-border-radius: 10; -fx-padding: 5 8;");
+    DownloadStatusBar downloadStatusBar = new DownloadStatusBar(this::cancelImport);
+    this.downloadFileLabel = downloadStatusBar.fileLabel();
+    this.downloadStatsLabel = downloadStatusBar.statsLabel();
+    this.downloadProgress = downloadStatusBar.progress();
+    this.geekTelemetry = downloadStatusBar.telemetry();
+    this.importCancelButton = downloadStatusBar.cancelButton();
+    this.downloadBarPanel = downloadBar = downloadStatusBar.node();
     this.downloadBarView =
         new DownloadBarView(
-            this.downloadProgress, this.downloadFileLabel, this.downloadStatsLabel, this.downloadBarPanel);
+            this.downloadProgress, this.downloadFileLabel, this.downloadStatsLabel,
+            this.downloadBarPanel);
     Button refreshFab = new Button();
     refreshFab.setGraphic(Icons.node("refresh", 16.0, "#9ca3af"));
     refreshFab.setStyle(
@@ -5670,6 +5629,17 @@ public class HelloApplication extends Application {
     } catch (Exception e) {
       this.logMessage("❌ 打开浏览器失败: " + e.getMessage());
     }
+  }
+
+  /** 取消整合包导入：停下载、复位按钮、记一条日志。 */
+  private void cancelImport() {
+    this.importCancelled = true;
+    DownloadManager.cancelAll();
+    if (this.importCancelButton != null) {
+      this.importCancelButton.setDisable(true);
+      this.importCancelButton.setText("正在取消…");
+    }
+    this.logMessage("⏹ 已请求取消整合包导入");
   }
 
   private void showDownloadTasks() {
