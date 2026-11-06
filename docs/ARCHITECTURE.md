@@ -389,6 +389,34 @@ IDLE --beginPrepare()--> PREPARING --markRunning()--> RUNNING --finish()--> IDLE
 
 > 控制服务仍不可用，这轮继续只做不依赖界面的可验证改动。
 
+### Phase 4c：微软登录协议可测化
+
+登录是最容易坏、又最难查的链路（设备码 → 轮询 → Xbox Live → XSTS → Minecraft → 档案），
+之前全挤在一个方法里、零测试。现在拆成：
+
+| 层 | 内容 |
+|---|---|
+| `core.auth.MicrosoftAuthProtocol` | 纯协议：表单体拼装、设备码解析、轮询结果判定、XBL/XSTS/Minecraft 报文、档案与 UUID 格式化、XErr 错误码翻译 |
+| `core.auth.MicrosoftAuth` | 只负责 HTTP 与串流程，行为与原来一致 |
+
+单测 97 → **106 通过**（9 个用例：设备码缺字段、`authorization_pending` 与真失败、
+XBL 缺 UHS、三个 XErr 码、未购买游戏、UUID 格式化）。
+
+> 没有真实微软账号，整条登录成功无法自动化验证；但每一步的报文与错误分支现在都有测试。
+
+### Phase 4d：zip 解包安全统一
+
+zip-slip（压缩包里带 `../` 条目把文件写到目标目录外）在两处各写了一遍。现在统一成：
+
+- `ZipUtil.unzip(zip, targetDir)` / `unzip(zip, targetDir, filter)`：规范化后必须仍在目标目录内，
+  否则跳过；返回实际写出的文件数
+- `JavaRuntimeInstaller` 删除私有 `unzip`，改用共享实现
+- `ZipUtil.zipDirectory` 改成流式拷贝
+
+单测 106 → **111 通过**：嵌套目录、`../`、`..\\`、`dir/../../` 三种穿越写法、过滤只解 jar、
+缺失压缩包报错、打包→解包往返。
+
+
 > 顺带记录一个已知局限（用测试固定下来）：指定加载器时，文件名里没带 `fabric/forge/neoforge`
   的通用包会被过滤掉——这是现有启发式策略，改成“未知加载器也放行”需要更细的元数据，留待后续。
 
