@@ -665,6 +665,64 @@ Platform.runLater(() -> { if (expandedLoader == null) expand("Fabric"); });
 - 点「模组」：搜索框提示变为「搜索 模组…」，列表为 Fabric API / Sodium / Iris Shaders…
 - 点安装包分类：安装器页正常打开（加载器版本列表可见）
 
+## 16. 启动页拆分完成（2026-11-07 01:50）
+
+### 启动页现在的组成
+
+| 类 | 职责 |
+|---|---|
+| `ui.page.LaunchPage` | 两列布局：黄金比例分栏（38.2%，300~420）、滚动包装、模块标题、入场动画 |
+| `ui.component.LaunchAccountColumn` | 账户卡 / 登录表单 / 启动按钮（早前拆出） |
+| `ui.component.LaunchOverviewPane` | 启动概览：统计、最近一次、记录列表、当前实例、快捷操作 |
+| `ui.component.ConsoleContainer` | 右栏容器 + 展开日志 / AI 模式的高度与可见性规则 |
+| `ui.component.ConsoleToolbar` | 展开收起、清空、复制、日志目录、快捷键、标语 |
+| `ui.component.DownloadStatusBar` | 下载任务行：进度、统计、遥测、取消导入 |
+| `ui.component.CommandBar` | 命令输入与 AI 开关（早前拆出） |
+
+主类里启动页只剩「组装 + 业务回调」。
+
+### 启动业务进 core 的部分（都带测试）
+
+| 类 | 内容 |
+|---|---|
+| `core.launch.LaunchGuards` | 启动拦截原因（游戏在跑优先于正在启动）与文案 |
+| `core.launch.IntegrityCachePolicy` | 完整性检查 5 分钟同实例复用规则（含时钟倒退保护） |
+| `core.launch.AutoRepair` | 自动补全的结果核算与两条日志文案 |
+| `core.launch.GameExit` | 退出判定（主动结束 / 正常 / 崩溃）、两套文案、会话时长 |
+| `core.model.LaunchFormat` | 耗时与会话时长格式化 |
+| `core.model.LaunchHistory` | 启动记录（新增 `stopped` 标记与 `outcomeLabel`） |
+
+### 这一轮修掉的两个真 bug
+
+1. **启动概览退出后不刷新**：`onExit` 写了记录却没刷新概览面板，数字停留在上一局。
+2. **主动结束被当成正常退出**：现在记录里带 `stopped`，概览显示「主动结束」、记录行显示灰色「主动」。
+
+### 为什么 `LaunchPage` 前三次都失败
+
+前三次抽取后页面空白，根因是 `createLaunchPanel` 最后仍然 `return panel;`
+（那个旧的空 `VBox`），新页面从未被挂到场景上。窥探日志显示
+`launchPanel.getScene() == null`、两列 `opacity=0`（节点不在场景里，动画自然不跑）。
+教训：搬迁返回值这类改动，编译通过不代表接上了，必须截图确认。
+
+### 最终回归（2026-11-07 01:50）
+
+```
+clean package     0 告警
+单测              164 通过，0 失败
+冒烟              PASS（5 页截图，逐页等到真实绘制后比较哈希）
+架构守卫          PASS（含编码守卫）
+14 实例启动计划    ok=14 failed=0
+14 实例深度校验    issues=0
+主类              8,970 → 7,154 行（-20.3%）
+```
+
+### 还没拆的（按收益排序）
+
+1. **社区搜索流水线**（`performSearch` / `loadSearchPage` 系列约 300 行）：网络 + 分页状态 + UI 回调交织，
+   分页规则已进 `core.download.SearchSession`，剩下的多是回调编排，拆起来收益中等、风险偏高。
+2. **实例管理相关操作**（导入/导出/克隆/删除）：多数已委托给 `core.instance`，主类只做对话框与刷新。
+3. **设置/工具/世界页**：已经是「一行 `new` 组件」，没有可拆的装配代码。
+
 ## 15. 暂停点（2026-11-06 22:30）
 
 ### 状态：可运行、可验证
