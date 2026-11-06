@@ -232,6 +232,7 @@ import com.example.demo.core.game.JavaVersionProbe;
 import com.example.demo.core.launch.LaunchPreflight;
 import com.example.demo.core.model.GameDirDetector;
 import com.example.demo.core.model.LanguageConfig;
+import com.example.demo.core.launch.LaunchState;
 public class HelloApplication extends Application {
   private static final Set<String> CLONE_DATA_DIRS =
       Set.of(
@@ -294,14 +295,14 @@ public class HelloApplication extends Application {
   /** 集成式弹窗宿主层。 */
   private StackPane dialogLayer;
   /** 启动准备是否正在进行 / 是否被用户要求停止。 */
-  private boolean launching;
-  private volatile boolean launchCancelled;
+  private final LaunchState launchState = new LaunchState();
+
   /** 启动前完整性检查的最近结果：同一实例 5 分钟内复用，避免每次启动都全量扫描。 */
   private Integrity.Report lastIntegrityReport;
   private long lastIntegrityAt;
   private String lastIntegrityProfile;
   private boolean minimizedForGame;
-  private boolean gameRunning;
+
   private boolean quitting;
   private Label geekTelemetry;
   private final long appStartedAt = System.currentTimeMillis();
@@ -341,7 +342,7 @@ public class HelloApplication extends Application {
   private Node currentPageNode;
   private String pendingJoinAddress;
   private Process gameProcess;
-  private volatile boolean gameStopRequested;
+
   private ProgressBar downloadProgress;
   private Label downloadFileLabel;
   private Label downloadStatsLabel;
@@ -761,7 +762,7 @@ public class HelloApplication extends Application {
             (obs, was, iconified) -> {
               if (iconified.booleanValue()) {
                 ambient.stop();
-              } else if (!this.gameRunning || !this.config.isPauseVisualsInGame()) {
+              } else if (!this.launchState.isRunning() || !this.config.isPauseVisualsInGame()) {
                 ambient.start();
               }
             });
@@ -2542,10 +2543,9 @@ public class HelloApplication extends Application {
       return;
     }
     long pid = this.gameProcess.pid();
-    this.gameStopRequested = true;
+    this.launchState.requestStop();
     this.gameProcess.descendants().forEach(ProcessHandle::destroyForcibly);
     this.gameProcess.destroyForcibly();
-    this.gameRunning = false;
     this.setGameStatus(false);
     this.logArea.appendText("🛑 已结束游戏进程 (pid " + pid + ")\n");
   }
@@ -6871,10 +6871,10 @@ public class HelloApplication extends Application {
 
   /** 运行中「■ 停止」按钮：取消启动或结束本次运行状态。 */
   private void stopLaunch() {
-    if (!this.launching) {
+    if (!this.launchState.isLaunching()) {
       return;
     }
-    this.launchCancelled = true;
+    this.launchState.cancel();
     this.logLine("⏹ 正在停止…");
     // 先收起顶栏的取消按钮，等取消真正生效时再由 finishLaunching 恢复主按钮
     if (this.cancelLaunchButton != null) {
@@ -6890,7 +6890,7 @@ public class HelloApplication extends Application {
     }
     if (this.cancelLaunchButton != null) {
       // 只在「启动准备中」显示；游戏进程已经起来后就没有可取消的准备了
-      boolean showCancel = launching && !this.gameRunning;
+      boolean showCancel = launching && !this.launchState.isRunning();
       this.cancelLaunchButton.setVisible(showCancel);
       this.cancelLaunchButton.setManaged(showCancel);
     }
@@ -6898,7 +6898,7 @@ public class HelloApplication extends Application {
 
   /** 当前是否已经有游戏进程在跑（用于阻止重复启动）。 */
   private boolean isGameProcessAlive() {
-    return this.gameRunning && this.gameProcess != null && this.gameProcess.isAlive();
+    return this.launchState.isRunning() && this.gameProcess != null && this.gameProcess.isAlive();
   }
 
   /** 启动入口的统一检查：已经在启动或已有游戏在跑时，给出提示并拦下。 */
@@ -6908,7 +6908,7 @@ public class HelloApplication extends Application {
       Toast.info("已有游戏在运行，请先结束当前游戏");
       return true;
     }
-    if (this.launching) {
+    if (this.launchState.isLaunching()) {
       this.logLine("🎮 游戏正在运行中，如需中止请点顶栏的「取消启动」");
       return true;
     }
@@ -6928,8 +6928,7 @@ public class HelloApplication extends Application {
     String id = selectedVersion.getId();
     String jsonUrl = selectedVersion.getUrl();
     File gameDir = new File(this.config.getGameDir());
-    this.launching = true;
-    this.launchCancelled = false;
+    this.launchState.beginPrepare();
     // 记录本次会话开始时间：崩溃诊断只认这之后生成的 crash-report
     CrashAnalyzer.markSessionStart(System.currentTimeMillis());
     this.setLaunchingUi(true);
@@ -7002,7 +7001,7 @@ public class HelloApplication extends Application {
             this.checkLaunchCancelled();
             log.accept("⏳ 等待所有下载任务完成后再启动游戏…");
             if (!this.awaitDownloadsStoppable(1800000L)) {
-              if (this.launchCancelled) {
+              if (this.launchState.isCancelRequested()) {
                 throw new LaunchCancelledException();
               }
               log.accept("⚠ 仍有下载任务未完成，已取消本次启动；请等待下载完成后重试。");
@@ -7030,7 +7029,7 @@ public class HelloApplication extends Application {
 
   /** 启动准备阶段的中断点。 */
   private void checkLaunchCancelled() {
-    if (this.launchCancelled) {
+    if (this.launchState.isCancelRequested()) {
       throw new LaunchCancelledException();
     }
   }
@@ -7039,7 +7038,7 @@ public class HelloApplication extends Application {
   private boolean awaitDownloadsStoppable(long timeoutMs) {
     long deadline = System.currentTimeMillis() + timeoutMs;
     while (System.currentTimeMillis() < deadline) {
-      if (this.launchCancelled) {
+      if (this.launchState.isCancelRequested()) {
         return false;
       }
       if (DownloadManager.awaitIdle(1000L)) {
@@ -7051,8 +7050,7 @@ public class HelloApplication extends Application {
 
   /** 结束「启动准备」状态，恢复按钮。 */
   private void finishLaunching() {
-    this.launching = false;
-    this.launchCancelled = false;
+    this.launchState.finish();
     // 调用点有的在后台线程（下载/准备回调），界面更新必须切回 FX 线程
     Runnable uiUpdate =
         () -> {
@@ -7095,7 +7093,7 @@ public class HelloApplication extends Application {
             instanceDir,
             log,
             (done, total, bytes) -> this.updateProgress(done, total, bytes),
-            () -> this.launchCancelled);
+            () -> this.launchState.isCancelRequested());
     // 启动准备管线：客户端 jar → 依赖库 → 资源 → 原生库（每一步都会打耗时）
     new LaunchPipeline()
         .add(new ClientJarTask(this.config.getDownloadSource()))
@@ -7261,7 +7259,7 @@ public class HelloApplication extends Application {
     }
     this.quitting = true;
     if (this.gameProcess != null && this.gameProcess.isAlive()) {
-      this.gameStopRequested = true;
+      this.launchState.requestStop();
       this.gameProcess.descendants().forEach(ProcessHandle::destroyForcibly);
       this.gameProcess.destroyForcibly();
     }
@@ -7294,7 +7292,7 @@ public class HelloApplication extends Application {
 
                 @Override
                 public boolean gameRunning() {
-                  return HelloApplication.this.gameRunning;
+                  return HelloApplication.this.launchState.isRunning();
                 }
 
                 @Override
@@ -7595,10 +7593,9 @@ public class HelloApplication extends Application {
     this.checkLaunchCancelled();
     Process process = plan.start();
     this.gameProcess = process;
-    this.gameRunning = true;
+    this.launchState.markRunning();
     this.setGameStatus(true);
     // 游戏已起来：主按钮保持「正在运行」，停止按钮收起（进程已在跑，不能靠它取消）
-    this.launching = true;
     this.setLaunchingUi(true);
     if (this.cancelLaunchButton != null) {
       this.cancelLaunchButton.setVisible(false);
@@ -7640,10 +7637,9 @@ public class HelloApplication extends Application {
             exited ->
                 Platform.runLater(
                     () -> {
-                      boolean forcedStop = this.gameStopRequested;
-                      this.gameStopRequested = false;
-                      this.gameRunning = false;
-                      this.launching = false;
+                      boolean forcedStop = this.launchState.isStopRequested();
+                      this.launchState.clearStop();
+                      this.launchState.finish();
                       this.setLaunchingUi(false);
                       this.setGameStatus(false);
                       if (this.stageRef != null && !this.stageRef.isShowing()) {

@@ -266,6 +266,35 @@ sha256）、`JavaManager`（编排：本地检测 → 查询 → 下载 → 校�
 [Game] Created: 1024x512 textures-atlas / OpenAL initialized
 ```
 
+### Phase 5b-5：启动状态机
+
+主类原来用 4 个布尔量描述启动状态（`launching` / `gameRunning` / `launchCancelled` /
+`gameStopRequested`），组合起来有十几种非法状态，而且准备线程和 FX 线程都在读写。
+
+现在换成 `core.launch.LaunchState`：
+
+```
+IDLE --beginPrepare()--> PREPARING --markRunning()--> RUNNING --finish()--> IDLE
+  ^                          |                           |
+  +---------- finish() ------+------------ finish() ------+
+```
+
+- `beginPrepare()` 返回 false 表示已经在启动/运行中（重复点击天然被拦）
+- `cancel()` 只在 PREPARING 生效（进程起来后「取消」按钮本来就会隐藏）
+- `requestStop()` 与阶段解耦，`quitLauncher` / 结束游戏都用它
+- 字段 `volatile` + 迁移方法 `synchronized`，后台准备线程与 FX 线程可安全读写
+
+主类里的 24 处布尔量读写全部换成语义清晰的 `launchState.*()` 调用。
+
+**实机验证（完整状态回环）**：
+
+1. 点「启动游戏」→ 1.18.2 启动成功（`游戏进程已启动`）
+2. 强杀游戏进程 → `⚠ 游戏异常退出（退出码 -1）` → 崩溃诊断 → 按钮恢复「★ 启动游戏」
+3. 再点「启动游戏」→ 新进程起来（重进 1.12.2，688MB），证明状态确实回到 IDLE
+
+新增 `LaunchStateTest` 5 个（单次启动、取消只在准备阶段、运行态、finish 复位、停止请求）；
+单测 70 → **75 通过**。主类维持 8,428 行（布尔量换状态机，行数几乎不变，但状态不再散落）。
+
 ## 5. 迁移手法
 
 1. 脚本按「域 → 新包」映射移动文件，改 `package` 行。
@@ -289,6 +318,7 @@ sha256）、`JavaManager`（编排：本地检测 → 查询 → 下载 → 校�
 | ~~**Phase 5b-3**~~ ✅ | 窗口/托盘生命周期外迁：`WindowChrome` + 6 方法 Host | 2 个新单测；主类 -89 行 |
 | ~~**Java 运行时**~~ ✅ | 双下载源（Zulu → Adoptium）+ SHA-256 校验 + 健壮解压 | 9 个新单测；真实 API 实跑验证 |
 | ~~**Phase 5b-4**~~ ✅ | 启动前逻辑外迁：`LanguageConfig` / `GameDirDetector` / `JavaVersionProbe` / `LaunchPreflight` | 8 个新单测；实机启动验证 |
+| ~~**Phase 5b-5**~~ ✅ | 启动状态机 `LaunchState` 取代 4 个布尔量 | 5 个新单测；实机跑通「启动→崩溃→再启动」 |
 | **Phase 2b** | 把 `startGame` 的编排（检查 Java → 校验 → 下载 → 解压 → 起进程）抽成 `LaunchTask` 链 + `LaunchPipeline`，UI 只订阅进度 | 主类再减 ~300 行；断点续跑可测 |
 | **Phase 3** | 实例一等公民：`InstanceSettings`（内存 / JVM 参数 / Java 路径 / 是否隔离 / 游戏目录）落到 `versions/<id>/instance.json`；实例设置页读写 | 两个实例用不同内存启动成功 |
 | **Phase 4** | 下载引擎统一：`DownloadEngine` 统一入口，所有下载带 SHA1 校验、并发上限、失败重试与镜像回退；`DownloadManager` 退化为其实现 | 强制断网/坏源测试通过 |
