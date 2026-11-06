@@ -1,0 +1,115 @@
+package com.example.demo.core.mod;
+
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.Locale;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
+
+import com.example.demo.core.model.Instance;
+import com.example.demo.core.model.InstanceDirs;
+/** 导出 PCL / Modrinth 可导入的 .mrpack 整合包。 */
+public final class ModpackExporter {
+
+    private ModpackExporter() {
+    }
+
+    public static void export(File gameDir, Instance instance, File output, boolean includeSaves) throws IOException {
+        export(gameDir, instance, output, includeSaves, null);
+    }
+
+    public static void export(File gameDir, Instance instance, File output, boolean includeSaves,
+                              java.util.function.DoubleConsumer progress) throws IOException {
+        JsonObject index = new JsonObject();
+        index.addProperty("formatVersion", 1);
+        index.addProperty("game", "minecraft");
+        index.addProperty("versionId", instance.id);
+        index.addProperty("name", instance.id);
+        index.addProperty("summary", "由 Neko Craft Launcher 导出的整合包");
+        index.add("files", new com.google.gson.JsonArray());
+        JsonObject deps = new JsonObject();
+        deps.addProperty("minecraft", instance.mcVersion);
+        String loaderKey = switch (instance.loader == null ? "" : instance.loader.toLowerCase(Locale.ROOT)) {
+            case "fabric" -> "fabric-loader";
+            case "quilt" -> "quilt-loader";
+            case "forge" -> "forge";
+            case "neoforge" -> "neoforge";
+            default -> "";
+        };
+        if (!loaderKey.isBlank() && instance.loaderVersion != null && !instance.loaderVersion.isBlank()) {
+            deps.addProperty(loaderKey, instance.loaderVersion);
+        }
+        index.add("dependencies", deps);
+
+        File source = InstanceDirs.root(gameDir, instance.id, true);
+        File[] roots = includeSaves
+                ? new File[]{new File(source, "mods"), new File(source, "config"),
+                    new File(source, "defaultconfigs"), new File(source, "resourcepacks"),
+                    new File(source, "shaderpacks"), new File(source, "saves"), new File(source, "options.txt")}
+                : new File[]{new File(source, "mods"), new File(source, "config"),
+                    new File(source, "defaultconfigs"), new File(source, "resourcepacks"),
+                    new File(source, "shaderpacks"), new File(source, "options.txt")};
+
+        long totalFiles = 0;
+        for (File root : roots) if (root != null && root.exists()) totalFiles += countFiles(root);
+        long[] done = {0};
+        try (ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(output))) {
+            if (progress != null) progress.accept(0.03);
+            zip.putNextEntry(new ZipEntry("modrinth.index.json"));
+            zip.write(new GsonBuilder().setPrettyPrinting().create().toJson(index)
+                    .getBytes(StandardCharsets.UTF_8));
+            zip.closeEntry();
+            for (File root : roots) {
+                if (root == null || !root.exists()) continue;
+                if (root.isFile()) {
+                    addFile(zip, root, "overrides/" + root.getName(), totalFiles, done, progress);
+                } else {
+                    addTree(zip, root, "overrides/" + root.getName(), totalFiles, done, progress);
+                }
+            }
+            if (progress != null) progress.accept(1.0);
+        }
+    }
+
+    private static long countFiles(File file) {
+        if (file == null) return 0;
+        if (file.isFile()) return 1;
+        File[] files = file.listFiles();
+        if (files == null) return 0;
+        long count = 0;
+        for (File child : files) count += countFiles(child);
+        return count;
+    }
+
+    private static void addTree(ZipOutputStream zip, File dir, String prefix,
+                                long total, long[] done, java.util.function.DoubleConsumer progress)
+            throws IOException {
+        File[] files = dir.listFiles();
+        if (files == null) return;
+        for (File file : files) {
+            String name = prefix + "/" + file.getName();
+            if (file.isDirectory()) addTree(zip, file, name, total, done, progress);
+            else addFile(zip, file, name, total, done, progress);
+        }
+    }
+
+    private static void addFile(ZipOutputStream zip, File file, String name,
+                                long total, long[] done, java.util.function.DoubleConsumer progress)
+            throws IOException {
+        zip.putNextEntry(new ZipEntry(name.replace('\\', '/')));
+        try (InputStream in = new FileInputStream(file)) {
+            in.transferTo(zip);
+        }
+        zip.closeEntry();
+        done[0]++;
+        if (progress != null) progress.accept(total > 0 ? 0.05 + 0.90 * done[0] / total : 0.5);
+    }
+}

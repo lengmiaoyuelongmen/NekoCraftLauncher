@@ -3,6 +3,7 @@ package com.example.demo;
 import javafx.application.Application;
 
 import com.example.demo.core.app.LauncherConfig;
+import com.example.demo.ui.shell.HelloApplication;
 public class Launcher {
     public static void main(String[] args) {
         // 这些属性必须在 JavaFX 工具包初始化之前设置，否则会被忽略。

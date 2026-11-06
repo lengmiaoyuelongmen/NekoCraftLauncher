@@ -17,28 +17,34 @@
 
 结论：**「最好的方案」不是换技术栈，而是 HMCL 的分层 + Prism 的实例化 + PCL2 的任务化**。UI 仍是 JavaFX（现有 53 个界面的资产不能丢）。
 
-## 2. 当前结构（Phase 1 完成）
+## 2. 当前结构（Phase 1 + 5a 完成）
 
 ```
 src/main/java/com/example/demo/
-├── Launcher.java            # 进程入口
-├── HelloApplication.java    # 8620 行 → 后续拆成 ui.shell + ui.page（Phase 5）
-├── ...（58 个 UI 类，仍是默认包）
-└── core/                    # 60 个类，0 处 import javafx
-    ├── app/        7   AppPaths, AppVersion, LauncherConfig, SingleInstance, ConfigHistory, UpdateChecker, SupportBundle
-    ├── auth/       6   AuthManager, AccountStore, MicrosoftAuth, AuthlibInjectorManager, SessionStore, SecretStore
-    ├── download/   8   DownloadManager, Downloader, Aria2Downloader, Integrity, SourcePinger, CurseForgeClient, IconProxy, ZipUtil
-    ├── game/      10   JavaManager, JavaScanner, LoaderInstaller, ModpackImport/Exporter, PortableExporter, ServerPackExporter, ModDependencyScanner, ModConflictChecker, CrashAnalyzer
-    ├── launch/     5   LaunchPlan, LaunchPlanner, NativeExtractor, LaunchCancelledException, GameCommandSender
-    ├── meta/       2   VersionProfile, VersionManager
-    ├── model/     16   Instance, InstanceDirs, InstanceMeta, InstanceOverrides, MinecraftVersion, VersionDetails, VersionManifest, AssetIndex, Library, Modpack, ModpackProject, UserSession, LoginCardData, Favorites, Playtime, LaunchHistory
-    ├── runtime/    6   HardwareInfo, SystemMetrics, PerformanceOptimizer, PerformanceTuner, MemoryAdvisor, NetworkBoost
-    └── ai/         2   DeepSeekClient, LocalAiAssistant
+├── Launcher.java            # 进程入口（唯一留在默认包的类）
+├── core/                    # 66 个类，0 处 import javafx / 0 处 import ui.*
+│   ├── ai/         2   DeepSeekClient, LocalAiAssistant
+│   ├── app/        8   AppPaths, AppVersion, LauncherConfig, SingleInstance, ConfigHistory, UpdateChecker, SupportBundle, Bootstrap
+│   ├── auth/       6   AuthManager, AccountStore, MicrosoftAuth, AuthlibInjectorManager, SessionStore, SecretStore
+│   ├── download/   8   DownloadManager, Downloader, Aria2Downloader, Integrity, SourcePinger, CurseForgeClient, IconProxy, ZipUtil
+│   ├── game/       5   JavaManager, JavaScanner, LoaderInstaller, PortableExporter, CrashAnalyzer
+│   ├── launch/     5   LaunchPlan, LaunchPlanner, NativeExtractor, LaunchCancelledException, GameCommandSender
+│   ├── meta/       2   VersionProfile, VersionManager
+│   ├── mod/        5   ModDependencyScanner, ModConflictChecker, ModpackImport, ModpackExporter, ServerPackExporter
+│   ├── model/     16   Instance, InstanceDirs, InstanceMeta, InstanceOverrides, MinecraftVersion, VersionDetails, VersionManifest, AssetIndex, Library, Modpack, ModpackProject, UserSession, LoginCardData, Favorites, Playtime, LaunchHistory
+│   ├── plugin/     3   PluginManager, PluginContext, NekoPlugin
+│   └── runtime/    6   HardwareInfo, SystemMetrics, PerformanceOptimizer, PerformanceTuner, MemoryAdvisor, NetworkBoost
+└── ui/                      # 53 个类，只能单向依赖 core
+    ├── shell/     15   HelloApplication（应用外壳）, Theme, Motion, Dialogs, InAppDialog, Icons, Toast, UiFit, ModuleHeader, BootScreen, PrewarmOverlay, AmbientBackground, LauncherLog, CommandCompleter, HelloController
+    ├── page/      11   InstancesPanel, InstanceSettingsPanel, SettingsPanel, ToolsPanel, LogsPanel, WorldsPanel, FirstRunPanel, InstallWindow, InstallProgressPage, ModsPanel, InstanceFileManager
+    └── component/ 27   启动页/登录/下载/皮肤/世界等可复用控件与对话框
 ```
+
+依赖方向只有一条：`ui → core`，`Launcher → ui`。`core` 不知道 UI 的存在。
 
 ### 分层规则（`scripts/check-architecture.ps1` 会强制检查）
 
-1. `core` 下任何类 **不许 import javafx.\***，也不许 import 默认包里的 UI 类。
+1. `core` 下任何类 **不许 import javafx.\***、`ui.*` 或入口类。
 2. UI 通过 `core` 的公开 API 和回调（`Consumer<String>` 日志、`Runnable` 进度）与核心通信。
 3. 网络、磁盘、进程调用集中在 core，便于替换与测试。
 
@@ -50,8 +56,11 @@ src/main/java/com/example/demo/
 - **launch**：把 VersionProfile + 账号 + 配置翻译成一条 java 命令。
 - **download**：所有 HTTP 下载都从这里走，天然带镜像/重试/校验。
 - **auth**：账号类型（离线 / 微软 / 外置登录）只在这里出现。
-- **game**：加载器安装、整合包导入导出、依赖扫描、崩溃分析。
+- **mod**：模组/整合包的导入导出与依赖检查（下一步把模组扫描也并进来）。
+- **game**：Java 运行时、加载器安装、实例打包、崩溃分析。
+- **plugin**：插件 ABI。
 - **runtime**：硬件探测、性能建议、系统指标，纯计算。
+
 
 ## 4. 进度记录（2026-11-06）
 
@@ -83,6 +92,24 @@ src/main/java/com/example/demo/
 - **真实启动**：实机点「启动游戏」→ `✅ 游戏进程已启动 (pid …)` → 游戏日志出现 `Setting user`、`Created: 1024x512 textures-atlas`（1.18.2 进到标题界面）
 - 单测 13 → **21 通过**；`-Xlint:all` 仍 **0 告警**；冒烟 PASS
 
+### Phase 5a：ui/* 落地（包结构闭环）
+
+目标结构里的 `ui/*` 与 `core/mod` 补齐，`com.example.demo` 只剩入口类：
+
+| 指标 | Phase 2 后 | Phase 5a 后 |
+|---|---|---|
+| 默认包里的类 | 58 | **1**（只剩 `Launcher`） |
+| `core` | 62 类 / 9 包 | **66 类 / 11 包**（新增 `mod`、`plugin`） |
+| `ui` | 0 | **53 类 / 3 包**（shell 15、page 11、component 27） |
+| 架构守卫 | core 不碰 javafx | 额外禁止 `core → ui.*`、`core → 入口类` |
+| 编译 / 单测 / 冒烟 | 0 告警 / 21 / PASS | **0 告警 / 21 / PASS** |
+
+迁移注意点（都已经踩过）：
+
+- 资源路径全部是绝对路径（`/icon.png`、`/com/example/demo/app.css`、`/engine/aria2c.exe`），换包不受影响
+- `hello-view.fxml` 里的 `fx:controller` 已同步改成 `com.example.demo.ui.shell.HelloController`
+- 插件 ABI（`NekoPlugin`）跟着挪进 `core.plugin`，`plugins/` 目录当前为空，无兼容负担
+
 ## 5. 迁移手法
 
 1. 脚本按「域 → 新包」映射移动文件，改 `package` 行。
@@ -97,10 +124,11 @@ src/main/java/com/example/demo/
 | 阶段 | 内容 | 验收 |
 |---|---|---|
 | ~~**Phase 2**~~ ✅ | 启动管线对象化：`LaunchPlan` + `LaunchPlanner` + `NativeExtractor` 已落地 | 8 个新单测；14 实例全量生成命令；实机进游戏 |
+| ~~**Phase 5a**~~ ✅ | `ui/*` + `core/mod` 包结构闭环，入口只剩 `Launcher` | 守卫 PASS；编译/单测/冒烟全绿 |
 | **Phase 2b** | 把 `startGame` 的编排（检查 Java → 校验 → 下载 → 解压 → 起进程）抽成 `LaunchTask` 链 + `LaunchPipeline`，UI 只订阅进度 | 主类再减 ~300 行；断点续跑可测 |
 | **Phase 3** | 实例一等公民：`InstanceSettings`（内存 / JVM 参数 / Java 路径 / 是否隔离 / 游戏目录）落到 `versions/<id>/instance.json`；实例设置页读写 | 两个实例用不同内存启动成功 |
 | **Phase 4** | 下载引擎统一：`DownloadEngine` 统一入口，所有下载带 SHA1 校验、并发上限、失败重试与镜像回退；`DownloadManager` 退化为其实现 | 强制断网/坏源测试通过 |
-| **Phase 5** | UI 拆分：`HelloApplication` → `ui.shell`（窗口/导航/主题）+ `ui.page.*`（启动/下载/实例/设置/工具）+ `ui.component.*` | 主类 ≤ 800 行；页面可单独实例化 |
+| **Phase 5b** | 把 8.5k 行的 `HelloApplication` 拆成 shell（窗口/导航/主题）+ 各页面类，页面可单独实例化 | 主类 ≤ 800 行 |
 | **Phase 6** | 可观测性：启动耗时分解、下载统计、崩溃报告归档 | 日志里能看出每一步耗时 |
 
 ## 7. 常用命令
