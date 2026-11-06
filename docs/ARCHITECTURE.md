@@ -442,6 +442,34 @@ return hasAllowRule ? allowed : true;
 回归验证：用真实安装的 **14 个实例**重跑启动计划，全部 `ok=14 failed=0`，
 classpath 长度与修改前一致（例如 1.20.1 仍是 8597 字符），说明没有误删库。
 
+### Phase 4f：修复「同尺寸损坏文件」修不动的问题
+
+回归时用启动器自己的修复逻辑去修之前发现的 1.20.1 损坏资源索引，结果 `repaired=0/1` —— 修了个寂寞。
+
+根因在 `DownloadManager.isUpToDate`：
+
+```java
+if (task.size > 0 && file.length() != task.size) return false;
+...
+return task.size > 0;   // 大小一致就当完整，SHA1 根本没看
+```
+
+同尺寸损坏的文件永远被判定为「已存在」，修复流程直接跳过。修复：
+
+- `Task` 新增 `verifySha1` 标记；为 true 时「已存在」判定改为比对 SHA1
+- `Integrity.repair` 创建任务时置 true（只有修文件时需要，日常下载仍只比大小，避免几千个资源逐个哈希）
+- 单测覆盖：同尺寸但 SHA1 不符 → 默认跳过、`verifySha1=true` 时重新下载
+
+**真实修复验证**：
+
+```
+修复前: 1.20.1 家族 4 个实例 issues=1（资源索引 SHA1 不符）
+repaired=1/1
+修复后: 全部 14 个实例 issues=0
+```
+
+单测 118 → **119 通过**；0 告警；冒烟 PASS。
+
 
 > 顺带记录一个已知局限（用测试固定下来）：指定加载器时，文件名里没带 `fabric/forge/neoforge`
   的通用包会被过滤掉——这是现有启发式策略，改成“未知加载器也放行”需要更细的元数据，留待后续。

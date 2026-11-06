@@ -48,4 +48,24 @@ class DownloadManagerTest {
         assertEquals(1, stats.failed, "连不上应计为失败");
         assertTrue(!file.exists());
     }
+
+    @Test
+    void verifySha1ForcesRedownloadOfSameSizeCorruptFile(@TempDir Path temp) throws Exception {
+        File file = temp.resolve("index.json").toFile();
+        Files.writeString(file.toPath(), "{}", StandardCharsets.UTF_8);
+        long size = file.length();
+        // 期望的是别的内容：大小一样、SHA1 不同
+        String expected = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+
+        DownloadManager.Task plain = new DownloadManager.Task(
+                "http://127.0.0.1:1/x", file, expected, size);
+        assertEquals(1, DownloadManager.downloadAll(List.of(plain), 1, null).skipped,
+                "默认只比大小，同尺寸文件会被当成完整");
+
+        DownloadManager.Task strict = new DownloadManager.Task(
+                "http://127.0.0.1:1/x", file, expected, size, true);
+        DownloadManager.Stats stats = DownloadManager.downloadAll(List.of(strict), 1, null);
+        assertEquals(0, stats.skipped, "verifySha1=true 时不能因为大小一致就跳过");
+        assertEquals(1, stats.failed, "下载不成功应计失败");
+    }
 }

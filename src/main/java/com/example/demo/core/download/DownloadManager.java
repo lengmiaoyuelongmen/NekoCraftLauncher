@@ -41,14 +41,26 @@ public final class DownloadManager {
     public final File target;
     public final String sha1;
     public final long size;
+    /**
+     * 是否强制校验已存在文件的 SHA1。
+     *
+     * <p>默认 false：已有文件只比大小（几千个资源逐个哈希太慢）。修复损坏文件时必须为 true，
+     * 否则「大小一样但内容坏了」会被当成完整文件跳过 —— 这正是修复功能最容易失效的地方。
+     */
+    public final boolean verifySha1;
     /** 最近一次失败原因（成功时为 null），供 UI 汇总展示。 */
     public volatile String failureReason;
 
     public Task(String url, File target, String sha1, long size) {
+      this(url, target, sha1, size, false);
+    }
+
+    public Task(String url, File target, String sha1, long size, boolean verifySha1) {
       this.url = url;
       this.target = target;
       this.sha1 = sha1;
       this.size = size;
+      this.verifySha1 = verifySha1;
     }
   }
 
@@ -250,6 +262,10 @@ public final class DownloadManager {
     File file = task.target;
     if (!file.isFile() || file.length() == 0) return false;
     if (task.size > 0 && file.length() != task.size) return false;
+    // 修复场景：大小对不代表内容对，必须按 SHA1 复核，否则会把损坏文件当成完整跳过
+    if (task.verifySha1 && task.sha1 != null && !task.sha1.isBlank()) {
+      return task.sha1.equalsIgnoreCase(sha1(file));
+    }
     String name = file.getName().toLowerCase(java.util.Locale.ROOT);
     boolean archive =
         name.endsWith(".jar") || name.endsWith(".zip") || name.endsWith(".mrpack");

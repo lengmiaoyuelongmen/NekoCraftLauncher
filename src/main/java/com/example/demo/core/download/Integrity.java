@@ -261,7 +261,7 @@ public final class Integrity {
         }
         List<DownloadManager.Task> tasks = new ArrayList<>();
         for (Issue issue : issues) {
-            tasks.add(new DownloadManager.Task(issue.url(), target(gameDir, issue), issue.sha1(), issue.size()));
+            tasks.add(new DownloadManager.Task(issue.url(), target(gameDir, issue), issue.sha1(), issue.size(), true));
         }
         DownloadManager.downloadAll(tasks, 6, null);
 
@@ -275,7 +275,7 @@ public final class Integrity {
                 continue;
             }
             DownloadManager.downloadAll(
-                    List.of(new DownloadManager.Task(fallback, target(gameDir, issue), issue.sha1(), issue.size())),
+                    List.of(new DownloadManager.Task(fallback, target(gameDir, issue), issue.sha1(), issue.size(), true)),
                     1, null);
         }
 
