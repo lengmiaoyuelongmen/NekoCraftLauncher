@@ -243,7 +243,6 @@ import com.example.demo.ui.component.DownloadTasksDialog;
 import com.example.demo.core.meta.ReleaseTime;
 import com.example.demo.ui.page.VersionDetailPage;
 import com.example.demo.ui.page.InstallerPage;
-import com.example.demo.ui.page.LaunchPage;
 import com.example.demo.ui.page.MinecraftVersionsPage;
 import com.example.demo.ui.component.AccountManagerDialog;
 import com.example.demo.ui.page.ModDetailPage;
@@ -1743,9 +1742,38 @@ public class HelloApplication extends Application {
     HBox.setHgrow(logContainer, Priority.ALWAYS);
     // 默认收起日志，先把「启动概览」露出来；想看实时输出点一下「展开日志」
     this.applyLogExpanded(false);
-    // 黄金比例分栏与模块标题在 ui.page.LaunchPage：这里只准备两列内容
+    ScrollPane userScroll = new ScrollPane(userArea);
+    userScroll.setFitToWidth(true);
+    userScroll.setFitToHeight(true);
+    userScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+    userScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+    userScroll.setStyle(
+        "-fx-background: transparent; -fx-background-color: transparent; -fx-border-color:"
+            + " transparent;");
+    // 黄金比例分栏：账户卡占可用宽度的 38.2%（1/φ²），再夹在 300~420 之间
+    javafx.beans.binding.DoubleBinding leftColumnWidth =
+        javafx.beans.binding.Bindings.createDoubleBinding(
+            () -> {
+              double available = panel.getWidth() - 42.0;
+              return Math.min(420.0, Math.max(300.0, available * 0.382));
+            },
+            panel.widthProperty());
+    userScroll.prefWidthProperty().bind(leftColumnWidth);
+    userScroll.minWidthProperty().bind(leftColumnWidth);
+    userScroll.maxWidthProperty().bind(leftColumnWidth);
+    HBox mainContent = new HBox(21.0, userScroll, logContainer);
+    VBox.setVgrow(mainContent, Priority.ALWAYS);
+    mainContent.setMinWidth(0.0);
     logContainer.setMinWidth(0.0);
-    VBox launchPanel = LaunchPage.build(userArea, logContainer);
+    ModuleHeader launchHeader =
+        new ModuleHeader(
+            "01 / NEKO",
+            "启动",
+            "猫娘助手 · 今天也要一起冒险",
+            "play",
+            ModuleHeader.Badge.CIRCLE,
+            "为爱发电 · 永远免费更新");
+    panel.getChildren().addAll(launchHeader, mainContent);
     this.loginForm
         .loginButton()
         .setOnAction(
