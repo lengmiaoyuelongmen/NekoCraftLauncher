@@ -236,6 +236,7 @@ import com.example.demo.core.game.JavaVersionProbe;
 import com.example.demo.core.launch.LaunchPreflight;
 import com.example.demo.core.model.GameDirDetector;
 import com.example.demo.core.model.LanguageConfig;
+import com.example.demo.core.launch.AutoRepair;
 import com.example.demo.core.launch.IntegrityCachePolicy;
 import com.example.demo.core.launch.LaunchGuards;
 import com.example.demo.core.launch.LaunchState;
@@ -5872,19 +5873,15 @@ private static void setFlexible(Node node, boolean on) {
               }
               this.checkLaunchCancelled();
               if (!report.issues().isEmpty()) {
-                log.accept("🔧 启动前发现 " + report.issues().size() + " 个缺失文件，正在自动补全…");
-                int fixed = Integrity.repair(gameDir, report.issues());
+                int total = report.issues().size();
+                log.accept(new AutoRepair(total, 0).startMessage());
+                AutoRepair repair = new AutoRepair(total, Integrity.repair(gameDir, report.issues()));
                 // 修复过就作废缓存，否则同一批文件 5 分钟内会被重复报成「缺失」
                 this.lastIntegrityReport = null;
                 this.lastIntegrityAt = 0L;
-                int remaining = report.issues().size() - fixed;
-                log.accept(
-                    "🔧 已补全 "
-                        + fixed
-                        + "/"
-                        + report.issues().size()
-                        + (remaining > 0 ? "，仍有 " + remaining + " 个缺失" : ""));
-                if (remaining > 0 && !this.confirmLaunchWithMissing(remaining)) {
+                log.accept(repair.resultMessage());
+                if (repair.needsConfirmation()
+                    && !this.confirmLaunchWithMissing(repair.remaining())) {
                   this.finishLaunching();
                   return;
                 }
