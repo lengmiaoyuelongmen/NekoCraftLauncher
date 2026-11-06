@@ -244,6 +244,7 @@ import com.example.demo.ui.page.VersionDetailPage;
 import com.example.demo.ui.page.InstallerPage;
 import com.example.demo.ui.page.MinecraftVersionsPage;
 import com.example.demo.ui.component.AccountManagerDialog;
+import com.example.demo.ui.page.ModDetailPage;
 public class HelloApplication extends Application {
   private static final Set<String> CLONE_DATA_DIRS =
       Set.of(
@@ -278,6 +279,7 @@ public class HelloApplication extends Application {
   private VersionDetailPage versionDetailPage;
   private InstallerPage installerPage;
   private MinecraftVersionsPage minecraftVersionsPage;
+  private ModDetailPage modDetailPage;
   private Stage stageRef;
   private volatile boolean testSuccess;
   private Rectangle navIndicator;
@@ -4030,95 +4032,30 @@ public class HelloApplication extends Application {
   }
 
   private VBox buildModPageShell(ModpackProject project, Instance instance) {
-    VBox page = new VBox(10.0);
-    page.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-    Button back = new Button("返回下载");
-    back.setGraphic(Icons.node("back", 13.0, "#9ca3af"));
-    back.setGraphicTextGap(4.0);
-    back.setStyle(
-        "-fx-background-color: transparent; -fx-text-fill: -app-text-dim; -fx-font-size: 12px;"
-            + " -fx-cursor: hand; -fx-padding: 2 4;");
-    back.setOnAction(e -> this.showDownloadPanel(this.communityPanel));
-    Label title = new Label(project.getTitle());
-    title.setStyle("-fx-text-fill: -app-text; -fx-font-size: 20px; -fx-font-weight: bold;");
-    Label source = new Label(project.getSource());
-    source.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
-    Region spacer = new Region();
-    HBox.setHgrow(spacer, Priority.ALWAYS);
-    HBox top = new HBox(10.0, back, title, spacer, source);
-    top.setAlignment(Pos.CENTER_LEFT);
-    Label desc = new Label(project.getDescription());
-    desc.setWrapText(true);
-    desc.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 13px;");
-    Label filter = new Label("显示全部游戏版本与加载器，按版本/加载器折叠；不会自动套用当前实例。");
-    filter.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
-    filter.setWrapText(true);
-    VBox hero = new VBox(6.0, desc, filter);
-    hero.setPadding(new Insets(14.0));
-    hero.setStyle(
-        "-fx-background-color: -app-card; -fx-background-radius: 12; -fx-border-color:"
-            + " -app-border-2; -fx-border-radius: 12;");
-    Label loading = new Label("正在读取可安装版本…");
-    loading.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 12px;");
-    page.getChildren().addAll(top, hero, loading);
-    return page;
+    if (this.modDetailPage == null) {
+      this.modDetailPage =
+          new ModDetailPage(
+              new ModDetailPage.Host() {
+                @Override
+                public void back() {
+                  HelloApplication.this.showDownloadPanel(HelloApplication.this.communityPanelNode());
+                }
+
+                @Override
+                public Node versionRow(ModpackProject project, JsonObject version) {
+                  return HelloApplication.this.buildModVersionRow(project, version);
+                }
+              });
+    }
+    return this.modDetailPage.shell(project);
   }
 
   private VBox buildModVersionList(
       ModpackProject project, JsonArray versions, String ignoredMc, String ignoredLoader) {
-    VBox box = new VBox(8.0);
-    Label heading = new Label("全部可下载文件（" + versions.size() + "）· 按游戏版本 / 加载器折叠");
-    heading.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 12px; -fx-font-weight: bold;");
-    box.getChildren().add(heading);
-    LinkedHashMap<String, List<JsonObject>> groups = new LinkedHashMap<>();
-    for (int i = 0; i < versions.size(); ++i) {
-      JsonObject version = versions.get(i).getAsJsonObject();
-      String string = this.firstJsonValue(version, "game_versions");
-      String loaderGroup = this.firstJsonValue(version, "loaders");
-      String key = string + " / " + loaderGroup;
-      groups.computeIfAbsent(key, k -> new ArrayList<>()).add(version);
+    if (this.modDetailPage == null) {
+      return new VBox();
     }
-    boolean first = true;
-    for (Map.Entry<String, List<JsonObject>> entry : groups.entrySet()) {
-      VBox rows = new VBox(6.0);
-      for (JsonObject version : entry.getValue()) {
-        rows.getChildren().add(this.buildModVersionRow(project, version));
-      }
-      ScrollPane groupScroll = new ScrollPane(rows);
-      groupScroll.setFitToWidth(true);
-      groupScroll.setPrefViewportHeight(Math.min(300, 74 * entry.getValue().size()));
-      groupScroll.setStyle(
-          "-fx-background: transparent; -fx-background-color: transparent; -fx-border-color:"
-              + " transparent;");
-      TitledPane pane =
-          new TitledPane(entry.getKey() + "  ·  " + entry.getValue().size() + " 个文件", groupScroll);
-      pane.setExpanded(first);
-      first = false;
-      pane.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 12px;");
-      box.getChildren().add(pane);
-    }
-    if (versions.isEmpty()) {
-      Label hint = new Label("这个项目没有可下载文件。");
-      hint.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 12px;");
-      box.getChildren().add(hint);
-    }
-    ScrollPane scroll = new ScrollPane(box);
-    scroll.setFitToWidth(true);
-    scroll.setStyle(
-        "-fx-background: transparent; -fx-background-color: transparent; -fx-border-color:"
-            + " transparent;");
-    VBox.setVgrow(scroll, Priority.ALWAYS);
-    VBox vBox = new VBox(scroll);
-    VBox.setVgrow(scroll, Priority.ALWAYS);
-    return vBox;
-  }
-
-  private String firstJsonValue(JsonObject object, String key) {
-    if (!object.has(key) || !object.get(key).isJsonArray()) {
-      return "其他";
-    }
-    JsonArray array = object.getAsJsonArray(key);
-    return array.isEmpty() ? "其他" : array.get(0).getAsString();
+    return this.modDetailPage.versionList(project, versions);
   }
 
   private HBox buildModVersionRow(ModpackProject project, JsonObject version) {
