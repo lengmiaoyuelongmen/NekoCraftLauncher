@@ -31,7 +31,7 @@ src/main/java/com/example/demo/
 │   ├── launch/    12   LaunchPlan, LaunchPlanner, LaunchContext, LaunchTask, LaunchPipeline, ClientJarTask, LibrariesTask, AssetsTask, NativesTask, NativeExtractor, LaunchCancelledException, GameCommandSender
 │   ├── meta/       2   VersionProfile, VersionManager
 │   ├── mod/        5   ModDependencyScanner, ModConflictChecker, ModpackImport, ModpackExporter, ServerPackExporter
-│   ├── model/     16   Instance, InstanceDirs, InstanceMeta, InstanceOverrides, MinecraftVersion, VersionDetails, VersionManifest, AssetIndex, Library, Modpack, ModpackProject, UserSession, LoginCardData, Favorites, Playtime, LaunchHistory
+│   ├── model/     16   Instance, InstanceDirs, InstanceMeta, InstanceSettings, MinecraftVersion, VersionDetails, VersionManifest, AssetIndex, Library, Modpack, ModpackProject, UserSession, LoginCardData, Favorites, Playtime, LaunchHistory
 │   ├── plugin/     3   PluginManager, PluginContext, NekoPlugin
 │   └── runtime/    6   HardwareInfo, SystemMetrics, PerformanceOptimizer, PerformanceTuner, MemoryAdvisor, NetworkBoost
 └── ui/                      # 53 个类，只能单向依赖 core
@@ -137,6 +137,26 @@ new LaunchPipeline()
 - 主类 8888 → **8434 行**（累计删掉下载/解压相关 ~450 行）
 - `-Xlint:all` 0 告警；冒烟 PASS
 
+### Phase 3a：实例设置跟着实例走
+
+原来三项覆盖（内存 / JVM 参数 / Java 路径）存在全局 `game/instance-settings.json` 大表里，
+现在改成 **`versions/<id>/instance.json`**，复制/导出/删除实例时设置跟着走（Prism 的做法）：
+
+```json
+{ "memoryMb": 2048, "jvmArgs": "-Dneko.test.instance=1", "isolation": true }
+```
+
+- `InstanceSettings` 负责读写与**旧表自动迁移**（第一次读到旧条目就搬到新位置并删掉旧条目）
+- 新增 `isolation` 覆盖项：`null` 跟随全局，`true/false` 强制开/关；启动时按 `effectiveIsolation()` 决定实例目录与 natives 目录
+- 实例设置页的「启动设置（本实例）」多了「版本隔离：跟随全局 / 开启 / 关闭」下拉
+- 实例面板里的目录、模组数、存档数都改按该实例的生效隔离状态计算
+
+验证：
+
+- 单元测试 26 → **31 通过**（新增 `InstanceSettingsTest` 5 个：落盘、清空、旧表迁移、隔离覆盖优先、改内存不丢隔离）
+- 真机写入 `{"memoryMb":2048,"jvmArgs":"-Dneko.test.instance=1"}` 后启动 1.12.2，实际命令行确认包含 `-Xmx2048M` 与 `-Dneko.test.instance=1`
+- 0 告警；冒烟 PASS
+
 ## 5. 迁移手法
 
 1. 脚本按「域 → 新包」映射移动文件，改 `package` 行。
@@ -153,6 +173,7 @@ new LaunchPipeline()
 | ~~**Phase 2**~~ ✅ | 启动管线对象化：`LaunchPlan` + `LaunchPlanner` + `NativeExtractor` 已落地 | 8 个新单测；14 实例全量生成命令；实机进游戏 |
 | ~~**Phase 5a**~~ ✅ | `ui/*` + `core/mod` 包结构闭环，入口只剩 `Launcher` | 守卫 PASS；编译/单测/冒烟全绿 |
 | ~~**Phase 2b**~~ ✅ | 启动准备管线：`LaunchPipeline` + `LaunchContext` + 4 个 Task，`GameFiles` 承接下载/校验 | 5 个管线单测；实机启动成功 |
+| ~~**Phase 3a**~~ ✅ | `InstanceSettings`：`versions/<id>/instance.json` + 旧表迁移 + 隔离覆盖 | 5 个单测；实机命令行带实例内存/JVM 参数 |
 | **Phase 2b** | 把 `startGame` 的编排（检查 Java → 校验 → 下载 → 解压 → 起进程）抽成 `LaunchTask` 链 + `LaunchPipeline`，UI 只订阅进度 | 主类再减 ~300 行；断点续跑可测 |
 | **Phase 3** | 实例一等公民：`InstanceSettings`（内存 / JVM 参数 / Java 路径 / 是否隔离 / 游戏目录）落到 `versions/<id>/instance.json`；实例设置页读写 | 两个实例用不同内存启动成功 |
 | **Phase 4** | 下载引擎统一：`DownloadEngine` 统一入口，所有下载带 SHA1 校验、并发上限、失败重试与镜像回退；`DownloadManager` 退化为其实现 | 强制断网/坏源测试通过 |

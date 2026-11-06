@@ -21,7 +21,7 @@ import java.util.function.Consumer;
 import com.example.demo.core.model.Instance;
 import com.example.demo.core.model.InstanceDirs;
 import com.example.demo.core.model.InstanceMeta;
-import com.example.demo.core.model.InstanceOverrides;
+import com.example.demo.core.model.InstanceSettings;
 import com.example.demo.core.app.LauncherConfig;
 import com.example.demo.core.runtime.MemoryAdvisor;
 import com.example.demo.ui.component.ScreenshotManagerDialog;
@@ -38,6 +38,12 @@ import com.example.demo.ui.shell.Toast;
  * 实例设置页（对标 PCL）：左侧子导航（概览/设置/模组/资源包/存档），右侧内容。
  */
 public final class InstanceSettingsPanel extends HBox {
+
+    /** 该实例实际生效的隔离状态（实例可覆盖全局）。 */
+    private boolean effectiveIsolation(String id) {
+        return InstanceSettings.effectiveIsolation(gameDir, id, config.isIsolation());
+    }
+
 
     private final File gameDir;
     private final LauncherConfig config;
@@ -128,7 +134,7 @@ public final class InstanceSettingsPanel extends HBox {
 
         // ---------- 右侧预构建 ----------
         settingsTab = new SettingsPanel(config, log);
-        modsTab = new ModsPanel(InstanceDirs.mods(gameDir, instanceId == null ? "" : instanceId, config.isIsolation()), config, log);
+        modsTab = new ModsPanel(InstanceDirs.mods(gameDir, instanceId == null ? "" : instanceId, effectiveIsolation(instanceId)), config, log);
 
         applyModFilter();
         content.setStyle("-fx-background-color: transparent;");
@@ -187,7 +193,7 @@ public final class InstanceSettingsPanel extends HBox {
     private void applyModFilter() {
         if (modsTab == null) return;
         Instance instance = Instance.of(gameDir, instanceId == null ? "" : instanceId);
-        modsTab.setModsDir(InstanceDirs.mods(gameDir, instance.id, config.isIsolation()));
+        modsTab.setModsDir(InstanceDirs.mods(gameDir, instance.id, effectiveIsolation(instance.id)));
         String loader = switch (instance.loader) {
             case "Fabric" -> "fabric";
             case "Forge" -> "forge";
@@ -237,8 +243,8 @@ public final class InstanceSettingsPanel extends HBox {
                 }
             }
         }
-        boolean isolated = config.isIsolation();
         String id = instanceId == null ? "" : instanceId;
+        boolean isolated = effectiveIsolation(id);
         File instanceRoot = InstanceDirs.root(gameDir, id, isolated);
         Node page = switch (tabName) {
             case "settings" -> buildInstanceSettingsTab(instanceRoot);
@@ -287,17 +293,17 @@ public final class InstanceSettingsPanel extends HBox {
         VBox info = card("实例信息", new String[][]{
                 {"游戏版本", instance.mcVersion},
                 {"加载器", instance.loader + ("原版".equals(instance.loader) ? "" : " " + instance.loaderVersion)},
-                {"实例目录", InstanceDirs.root(gameDir, instance.id, config.isIsolation()).getAbsolutePath()},
+                {"实例目录", InstanceDirs.root(gameDir, instance.id, effectiveIsolation(instance.id)).getAbsolutePath()},
                 {"客户端 jar", new File(new File(new File(gameDir, "versions"), instance.mcVersion),
                         instance.mcVersion + ".jar").getAbsolutePath()}
         });
 
-        int modCount = countFiles(InstanceDirs.mods(gameDir, instance.id, config.isIsolation()), ".jar");
-        int packCount = countFiles(InstanceDirs.resourcepacks(gameDir, instance.id, config.isIsolation()), ".zip");
+        int modCount = countFiles(InstanceDirs.mods(gameDir, instance.id, effectiveIsolation(instance.id)), ".jar");
+        int packCount = countFiles(InstanceDirs.resourcepacks(gameDir, instance.id, effectiveIsolation(instance.id)), ".zip");
         VBox counts = card("内容统计", new String[][]{
                 {"模组", modCount + " 个"},
                 {"资源包", packCount + " 个"},
-                {"存档", countDirs(InstanceDirs.saves(gameDir, instance.id, config.isIsolation())) + " 个"}
+                {"存档", countDirs(InstanceDirs.saves(gameDir, instance.id, effectiveIsolation(instance.id))) + " 个"}
         });
 
         java.io.File[] recentCrashFiles = new File(gameDir, "crash-reports")
@@ -365,24 +371,24 @@ public final class InstanceSettingsPanel extends HBox {
 
         HBox shortcuts = new HBox(10);
         Button openInstance = ghostButton("打开实例文件夹");
-        openInstance.setOnAction(e -> openDir(InstanceDirs.root(gameDir, instance.id, config.isIsolation())));
+        openInstance.setOnAction(e -> openDir(InstanceDirs.root(gameDir, instance.id, effectiveIsolation(instance.id))));
         Button openMods = ghostButton("打开模组文件夹");
-        openMods.setOnAction(e -> openDir(InstanceDirs.mods(gameDir, instance.id, config.isIsolation())));
+        openMods.setOnAction(e -> openDir(InstanceDirs.mods(gameDir, instance.id, effectiveIsolation(instance.id))));
         Button goMods = ghostButton("管理模组");
         goMods.setOnAction(e -> select("mods"));
         Button files = ghostButton("文件管理");
         files.setOnAction(e -> InstanceFileManager.show(
                 getScene() == null ? null : getScene().getWindow(),
-                InstanceDirs.root(gameDir, instance.id, config.isIsolation()), gameDir));
+                InstanceDirs.root(gameDir, instance.id, effectiveIsolation(instance.id)), gameDir));
         Button worlds = ghostButton("世界管理");
         worlds.setOnAction(e -> WorldManagerDialog.show(
                 getScene() == null ? null : getScene().getWindow(),
-                InstanceDirs.saves(gameDir, instance.id, config.isIsolation()),
+                InstanceDirs.saves(gameDir, instance.id, effectiveIsolation(instance.id)),
                 this::log));
         Button screenshots = ghostButton("截图管理");
         screenshots.setOnAction(e -> ScreenshotManagerDialog.show(
                 getScene() == null ? null : getScene().getWindow(),
-                new File(InstanceDirs.root(gameDir, instance.id, config.isIsolation()), "screenshots")));
+                new File(InstanceDirs.root(gameDir, instance.id, effectiveIsolation(instance.id)), "screenshots")));
         Button servers = ghostButton("服务器列表");
         servers.setOnAction(e -> ServerListDialog.show(
                 getScene() == null ? null : getScene().getWindow(), gameDir, onJoinServer));
@@ -435,7 +441,7 @@ public final class InstanceSettingsPanel extends HBox {
         });
         Button repairCore = ghostButton("修复核心");
         repairCore.setOnAction(e -> {
-            File natives = InstanceDirs.natives(gameDir, instance.id, config.isIsolation());
+            File natives = InstanceDirs.natives(gameDir, instance.id, effectiveIsolation(instance.id));
             File[] dlls = natives.listFiles();
             int count = 0;
             if (dlls != null) {
@@ -469,7 +475,7 @@ public final class InstanceSettingsPanel extends HBox {
 
         VBox personalCard = card("个性化", new String[][]{});
         personalCard.getChildren().add(personal);
-        InstanceOverrides.Override override = InstanceOverrides.get(gameDir, instance.id);
+        InstanceSettings.Settings override = InstanceSettings.get(gameDir, instance.id);
         VBox launchCard = card("启动设置（本实例）", new String[][]{});
         javafx.scene.control.CheckBox useMemory = new javafx.scene.control.CheckBox("覆盖最大内存");
         javafx.scene.control.Spinner<Integer> memorySpinner = new javafx.scene.control.Spinner<>(
@@ -481,7 +487,7 @@ public final class InstanceSettingsPanel extends HBox {
         javafx.scene.control.Button smartMemory = ghostButton("智能分配");
         smartMemory.setOnAction(e -> {
             MemoryAdvisor.Suggestion suggestion = MemoryAdvisor.suggest(
-                    InstanceDirs.mods(gameDir, instance.id, config.isIsolation()));
+                    InstanceDirs.mods(gameDir, instance.id, effectiveIsolation(instance.id)));
             useMemory.setSelected(true);
             memorySpinner.getValueFactory().setValue(suggestion.memoryMb());
             Toast.ok("建议 " + suggestion.memoryMb() + " MB：" + suggestion.reason());
@@ -494,25 +500,36 @@ public final class InstanceSettingsPanel extends HBox {
                 override.javaPath() == null ? "" : override.javaPath());
         javaField.setPromptText("留空 = 使用全局 Java；可填 java.exe 完整路径");
         HBox.setHgrow(javaField, Priority.ALWAYS);
+        // 版本隔离也可以按实例覆盖：默认跟随全局，跟 Prism 的实例级设置一致
+        javafx.scene.control.ComboBox<String> isolationBox = new javafx.scene.control.ComboBox<>();
+        isolationBox.getItems().addAll("版本隔离：跟随全局", "版本隔离：开启", "版本隔离：关闭");
+        isolationBox.getSelectionModel().select(
+                override.isolation() == null ? 0 : (override.isolation() ? 1 : 2));
+        isolationBox.setPrefWidth(220);
         javafx.scene.control.Button saveOverride = ghostButton("保存本实例设置");
         saveOverride.setOnAction(e -> {
             Integer memory = useMemory.isSelected() ? memorySpinner.getValue() : null;
-            InstanceOverrides.save(gameDir, instance.id, memory, jvmField.getText(), javaField.getText());
+            InstanceSettings.save(gameDir, instance.id, memory, jvmField.getText(), javaField.getText());
+            int isolationMode = isolationBox.getSelectionModel().getSelectedIndex();
+            InstanceSettings.saveIsolation(gameDir, instance.id,
+                    isolationMode == 0 ? null : isolationMode == 1);
             Toast.ok("已保存本实例启动设置");
             log("🎛 实例 " + instance.id + " 启动设置已保存");
         });
         javafx.scene.control.Button clearOverride = ghostButton("恢复全局");
         clearOverride.setOnAction(e -> {
-            InstanceOverrides.save(gameDir, instance.id, null, "", "");
+            InstanceSettings.save(gameDir, instance.id, null, "", "");
+            InstanceSettings.saveIsolation(gameDir, instance.id, null);
             useMemory.setSelected(false);
             memorySpinner.setDisable(true);
             jvmField.clear();
             javaField.clear();
+            isolationBox.getSelectionModel().select(0);
             Toast.ok("已恢复为全局设置");
         });
         launchCard.getChildren().addAll(
                 new HBox(10, useMemory, memorySpinner, smartMemory), jvmField, javaField,
-                new HBox(10, saveOverride, clearOverride));
+                new HBox(10, isolationBox), new HBox(10, saveOverride, clearOverride));
         VBox advancedCard = card("高级管理", new String[][]{});
         advancedCard.getChildren().add(advanced);
 
@@ -573,7 +590,7 @@ public final class InstanceSettingsPanel extends HBox {
         hint.setStyle("-fx-text-fill: -app-text-dim-3; -fx-font-size: 12px;");
         hint.setWrapText(true);
 
-        InstanceOverrides.Override override = InstanceOverrides.get(gameDir, instanceId);
+        InstanceSettings.Settings override = InstanceSettings.get(gameDir, instanceId);
         VBox card = card("内存与启动参数", new String[][]{});
 
         javafx.scene.control.CheckBox useMemory = new javafx.scene.control.CheckBox("覆盖最大内存");
@@ -609,7 +626,7 @@ public final class InstanceSettingsPanel extends HBox {
                 + " -fx-text-fill: #111827; -fx-font-weight: bold; -fx-background-radius: 9;"
                 + " -fx-padding: 8 20; -fx-cursor: hand;");
         save.setOnAction(e -> {
-            InstanceOverrides.save(gameDir, instanceId,
+            InstanceSettings.save(gameDir, instanceId,
                     useMemory.isSelected() ? memorySpinner.getValue() : null,
                     jvmField.getText(), javaField.getText());
             status.setText("已保存本实例设置");
@@ -618,7 +635,7 @@ public final class InstanceSettingsPanel extends HBox {
 
         Button clear = ghostButton("恢复全局");
         clear.setOnAction(e -> {
-            InstanceOverrides.save(gameDir, instanceId, null, "", "");
+            InstanceSettings.save(gameDir, instanceId, null, "", "");
             useMemory.setSelected(false);
             memorySpinner.setDisable(true);
             jvmField.clear();

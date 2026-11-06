@@ -159,7 +159,7 @@ import com.example.demo.core.meta.VersionProfile;
 import com.example.demo.core.model.AssetIndex;
 import com.example.demo.core.model.Instance;
 import com.example.demo.core.model.InstanceDirs;
-import com.example.demo.core.model.InstanceOverrides;
+import com.example.demo.core.model.InstanceSettings;
 import com.example.demo.core.model.LaunchHistory;
 import com.example.demo.core.model.MinecraftVersion;
 import com.example.demo.core.model.ModpackProject;
@@ -7182,7 +7182,10 @@ public class HelloApplication extends Application {
     }
     VersionProfile profile = VersionProfile.load(gameDir, id);
     log.accept("🧩 版本 " + profile.getId() + "（基于 " + profile.getRootId() + "）");
-    File instanceDir = InstanceDirs.root(gameDir, profile.getId(), this.config.isIsolation());
+    // 隔离状态按实例算：实例自己的 instance.json 优先，否则跟随全局设置
+    boolean isolated =
+        InstanceSettings.effectiveIsolation(gameDir, profile.getId(), this.config.isIsolation());
+    File instanceDir = InstanceDirs.root(gameDir, profile.getId(), isolated);
     LaunchContext context =
         new LaunchContext(
             profile,
@@ -7196,7 +7199,7 @@ public class HelloApplication extends Application {
         .add(new ClientJarTask(this.config.getDownloadSource()))
         .add(new LibrariesTask())
         .add(new AssetsTask())
-        .add(new NativesTask(this.config.isIsolation()))
+        .add(new NativesTask(isolated))
         .run(context);
     // 加载器实例需要一份和父版本同名的 client jar（Forge 的 ignoreList 依赖这个文件名）
     File clientJar = new File(new File(new File(gameDir, "versions"), profile.getRootId()),
@@ -7637,7 +7640,9 @@ public class HelloApplication extends Application {
     }
     this.launchPrepareStart = System.currentTimeMillis();
     File gameDir = new File(this.config.getGameDir());
-    File nativesDir = InstanceDirs.natives(gameDir, profile.getId(), this.config.isIsolation());
+    boolean isolated =
+        InstanceSettings.effectiveIsolation(gameDir, profile.getId(), this.config.isIsolation());
+    File nativesDir = InstanceDirs.natives(gameDir, profile.getId(), isolated);
     CompletableFuture<File> injectorFuture =
         this.currentSession.getType() == UserSession.LoginType.THIRD_PARTY
             ? AuthlibInjectorManager.ensureInjectorAsync(
@@ -7684,8 +7689,8 @@ public class HelloApplication extends Application {
                         } else if (actual > 0) {
                           this.logArea.appendText("☕ Java " + actual + "（需要 " + required + "）\n");
                         }
-                        InstanceOverrides.Override override =
-                            InstanceOverrides.get(gameDir, profile.getId());
+                        InstanceSettings.Settings override =
+                            InstanceSettings.get(gameDir, profile.getId());
                         LauncherConfig launchConfig =
                             this.config.copyForLaunch(
                                 override.memoryMb(), override.jvmArgs(), override.javaPath());
@@ -7711,7 +7716,7 @@ public class HelloApplication extends Application {
                           this.logArea.appendText("⚡ 智能性能：" + plan.summary() + "\n");
                         }
                         File instanceDir =
-                            InstanceDirs.root(gameDir, profile.getId(), this.config.isIsolation());
+                            InstanceDirs.root(gameDir, profile.getId(), isolated);
                         this.ensureChineseLanguage(instanceDir);
                         LaunchPlan plan =
                             LaunchPlanner.plan(
