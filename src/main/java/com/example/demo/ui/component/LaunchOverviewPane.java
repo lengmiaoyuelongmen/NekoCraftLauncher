@@ -19,6 +19,8 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
+import com.example.demo.core.model.InstanceId;
+import com.example.demo.core.model.LaunchFormat;
 import com.example.demo.core.model.LaunchHistory;
 import com.example.demo.core.app.LauncherConfig;
 import com.example.demo.ui.shell.Motion;
@@ -158,7 +160,7 @@ public final class LaunchOverviewPane extends VBox {
         } else {
             statValue.setText(summary.total() + " 次 · 成功率 " + summary.successRate() + "%");
             statSub.setText(
-                    "崩溃 " + summary.crashes() + " 次 · 平均准备 " + duration(summary.avgPrepMs()));
+                    "崩溃 " + summary.crashes() + " 次 · 平均准备 " + LaunchFormat.duration(summary.avgPrepMs()));
             LaunchHistory.Entry last = entries.isEmpty() ? null : entries.get(0);
             if (last == null) {
                 lastValue.setText("暂无");
@@ -168,9 +170,9 @@ public final class LaunchOverviewPane extends VBox {
                 lastSub.setText(
                         (LaunchHistory.isCrash(last) ? "异常结束" : "正常结束")
                                 + " · 准备 "
-                                + duration(last.prepMs())
+                                + LaunchFormat.duration(last.prepMs())
                                 + (last.sessionSeconds() > 0L
-                                        ? " · 游戏 " + clock(last.sessionSeconds())
+                                        ? " · 游戏 " + LaunchFormat.clock(last.sessionSeconds())
                                         : ""));
             }
         }
@@ -184,7 +186,7 @@ public final class LaunchOverviewPane extends VBox {
             instanceSub.setText("去「实例选择」挑一个版本");
         } else {
             instanceValue.setText(instance);
-            String mc = mcVersion(instance);
+            String mc = InstanceId.mcVersion(instance);
             instanceSub.setText("MC " + (mc == null ? "—" : mc) + " · " + loader(instance));
         }
 
@@ -218,9 +220,9 @@ public final class LaunchOverviewPane extends VBox {
         instance.setMinWidth(0.0);
         instance.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(instance, Priority.ALWAYS);
-        String costText = duration(entry.prepMs());
+        String costText = LaunchFormat.duration(entry.prepMs());
         if (entry.sessionSeconds() > 0L) {
-            costText = costText + " · " + clock(entry.sessionSeconds());
+            costText = costText + " · " + LaunchFormat.clock(entry.sessionSeconds());
         }
         Label cost = new Label(costText);
         cost.setMinWidth(74.0);
@@ -317,41 +319,5 @@ public final class LaunchOverviewPane extends VBox {
         return String.format("%02d-%02d %s", time.getMonthValue(), time.getDayOfMonth(), clock);
     }
 
-    private static String duration(long ms) {
-        if (ms <= 0) {
-            return "—";
-        }
-        if (ms < 1000) {
-            return ms + " ms";
-        }
-        return String.format(java.util.Locale.ROOT, "%.1f s", ms / 1000.0);
-    }
 
-    private static String clock(long seconds) {
-        if (seconds <= 0) {
-            return "0 分";
-        }
-        long minutes = seconds / 60;
-        if (minutes < 60) {
-            return minutes + " 分";
-        }
-        return (minutes / 60) + " 时 " + (minutes % 60) + " 分";
-    }
-
-    /** 从实例 id 里提取 MC 版本号（fabric-loader-… / 26.3-forge-… 都兼容）。 */
-    private static String mcVersion(String id) {
-        if (id == null) {
-            return null;
-        }
-        String value = id;
-        int forge = value.indexOf("-forge-");
-        if (forge > 0) {
-            value = value.substring(0, forge);
-        }
-        if (value.startsWith("fabric-loader-")) {
-            value = value.substring(value.lastIndexOf('-') + 1);
-        }
-        Matcher matcher = MC_VERSION.matcher(value);
-        return matcher.find() ? matcher.group(1) : null;
-    }
 }
