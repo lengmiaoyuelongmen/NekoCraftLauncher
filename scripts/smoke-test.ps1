@@ -197,6 +197,32 @@ public class SmokeWin {
         $exceptions = [regex]::Matches($err, 'Exception in thread[^\r\n]*') | ForEach-Object { $_.Value }
     }
 
+    # 空白页检测：整页几乎同色说明渲染失败（截图哈希「不同」并不代表页面有内容）
+    Add-Type -AssemblyName System.Drawing
+    function Get-DistinctColors([string]$path) {
+        $bmp = [System.Drawing.Bitmap]::FromFile($path)
+        try {
+            $colors = New-Object System.Collections.Generic.HashSet[int]
+            $stepX = [Math]::Max(1, [int]($bmp.Width / 40))
+            $stepY = [Math]::Max(1, [int]($bmp.Height / 40))
+            for ($y = 0; $y -lt $bmp.Height; $y += $stepY) {
+                for ($x = 0; $x -lt $bmp.Width; $x += $stepX) {
+                    [void]$colors.Add($bmp.GetPixel($x, $y).ToArgb())
+                }
+            }
+            return $colors.Count
+        } finally { $bmp.Dispose() }
+    }
+    $blank = @()
+    foreach ($shot in (Get-ChildItem $outDir -Filter *.png)) {
+        $count = Get-DistinctColors $shot.FullName
+        if ($count -lt 60) { $blank += ("{0}（只有 {1} 种颜色）" -f $shot.Name, $count) }
+    }
+    if ($blank.Count -gt 0) {
+        Write-Host ("FAIL: 页面几乎是空白: {0}" -f ($blank -join '; ')) -ForegroundColor Red
+        exit 1
+    }
+
     $shots = Get-ChildItem $outDir -Filter *.png | Select-Object -ExpandProperty Name
     $hashes = @(Get-ChildItem $outDir -Filter *.png | ForEach-Object { (Get-FileHash $_.FullName -Algorithm SHA256).Hash })
     $unique = @($hashes | Sort-Object -Unique).Count
