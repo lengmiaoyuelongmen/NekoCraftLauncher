@@ -11,6 +11,7 @@ import javafx.stage.Window;
 
 import java.util.List;
 
+import com.example.demo.core.game.CrashAnalyzer;
 /** 崩溃诊断弹窗：给原因和建议，可复制/打开日志。 */
 public final class CrashReportDialog {
 

@@ -18,6 +18,12 @@ import javafx.scene.shape.Rectangle;
 import java.io.File;
 import java.util.function.Consumer;
 
+import com.example.demo.core.model.Instance;
+import com.example.demo.core.model.InstanceDirs;
+import com.example.demo.core.model.InstanceMeta;
+import com.example.demo.core.model.InstanceOverrides;
+import com.example.demo.core.app.LauncherConfig;
+import com.example.demo.core.runtime.MemoryAdvisor;
 /**
  * 实例设置页（对标 PCL）：左侧子导航（概览/设置/模组/资源包/存档），右侧内容。
  */

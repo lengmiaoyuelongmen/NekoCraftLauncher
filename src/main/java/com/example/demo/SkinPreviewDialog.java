@@ -23,6 +23,7 @@ import javafx.stage.Window;
 import java.io.File;
 import java.util.List;
 
+import com.example.demo.core.app.LauncherConfig;
 /** 本地皮肤 / 披风预览，不上传材质站。 */
 public final class SkinPreviewDialog {
 

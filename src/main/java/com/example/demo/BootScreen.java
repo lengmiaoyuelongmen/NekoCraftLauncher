@@ -18,6 +18,7 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.util.Duration;
 
+import com.example.demo.core.app.AppVersion;
 /** Neko Core 启动页：背景只保留插画，文字和进度条全部由 JavaFX 实时绘制。 */
 public final class BootScreen extends StackPane {
 

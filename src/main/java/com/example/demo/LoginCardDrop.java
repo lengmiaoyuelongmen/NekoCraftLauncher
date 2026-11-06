@@ -10,6 +10,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.input.TransferMode;
 import javafx.scene.layout.VBox;
 
+import com.example.demo.core.model.LoginCardData;
 /**
  * 把登录卡片文件（txt）拖到登录面板上自动填表并登录。
  *

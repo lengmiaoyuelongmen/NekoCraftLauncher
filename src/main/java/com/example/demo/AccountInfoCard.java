@@ -11,6 +11,8 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.RowConstraints;
 import javafx.scene.layout.VBox;
 
+import com.example.demo.core.model.Playtime;
+import com.example.demo.core.app.AppVersion;
 /**
  * 账户卡里的「账号信息」面板：类型 / UUID / 验证服务器 / 加载器 / 游戏版本 / 当前实例 / 游戏时长。
  *

@@ -17,6 +17,10 @@ import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.Locale;
 
+import com.example.demo.core.model.InstanceDirs;
+import com.example.demo.core.download.DownloadManager;
+import com.example.demo.core.meta.VersionProfile;
+import com.example.demo.core.model.Instance;
 /** 从实例创建便携服务端目录，并可选启动。 */
 public final class PortableServerDialog {
 

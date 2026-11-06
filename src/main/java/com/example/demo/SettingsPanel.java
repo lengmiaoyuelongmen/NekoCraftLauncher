@@ -39,6 +39,18 @@ import java.util.concurrent.CompletableFuture;
 import java.util.Map;
 import java.util.function.Consumer;
 
+import com.example.demo.core.model.InstanceDirs;
+import com.example.demo.core.ai.DeepSeekClient;
+import com.example.demo.core.app.AppVersion;
+import com.example.demo.core.app.LauncherConfig;
+import com.example.demo.core.app.SupportBundle;
+import com.example.demo.core.app.UpdateChecker;
+import com.example.demo.core.auth.SecretStore;
+import com.example.demo.core.game.JavaScanner;
+import com.example.demo.core.runtime.HardwareInfo;
+import com.example.demo.core.runtime.MemoryAdvisor;
+import com.example.demo.core.runtime.PerformanceTuner;
+import com.example.demo.core.app.ConfigHistory;
 /**
  * 设置页：学习 PCL-CE 的「左侧选项卡 + 右侧内容」结构。
  * 页签：启动 / Java / 管理 / 个性化 / 杂项 / 软件信息。

@@ -10,6 +10,9 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
+import com.example.demo.core.model.LoginCardData;
+import com.example.demo.core.model.UserSession;
+import com.example.demo.core.app.LauncherConfig;
 /**
  * 启动页左侧的账户卡整列：头像、用户名、登录表单、账户信息、启动按钮、底部两个入口。
  *

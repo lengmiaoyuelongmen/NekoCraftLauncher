@@ -16,6 +16,8 @@ import javafx.scene.input.TransferMode;
 import javafx.scene.layout.StackPane;
 import javafx.scene.shape.Rectangle;
 
+import com.example.demo.core.model.UserSession;
+import com.example.demo.core.app.LauncherConfig;
 /**
  * 账户卡顶部的头像框：点击选择头像、右键菜单切换皮肤/自定义、拖入图片预览。
  *

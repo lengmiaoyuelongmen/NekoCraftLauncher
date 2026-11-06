@@ -26,6 +26,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
+import com.example.demo.core.model.Instance;
+import com.example.demo.core.model.InstanceDirs;
+import com.example.demo.core.model.InstanceMeta;
+import com.example.demo.core.model.Playtime;
+import com.example.demo.core.app.LauncherConfig;
 /**
  * 实例选择页（对标 PCL）：左侧文件夹列表，右侧搜索 + 按加载器分组的实例卡片。
  * 单击实例即选中并返回启动页。

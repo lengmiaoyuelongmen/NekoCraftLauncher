@@ -151,6 +151,48 @@ import javafx.util.Duration;
 import javafx.util.StringConverter;
 import javax.imageio.ImageIO;
 
+import com.example.demo.core.launch.LaunchCommand;
+import com.example.demo.core.meta.VersionManager;
+import com.example.demo.core.meta.VersionProfile;
+import com.example.demo.core.model.AssetIndex;
+import com.example.demo.core.model.Instance;
+import com.example.demo.core.model.InstanceDirs;
+import com.example.demo.core.model.InstanceOverrides;
+import com.example.demo.core.model.LaunchHistory;
+import com.example.demo.core.model.MinecraftVersion;
+import com.example.demo.core.model.ModpackProject;
+import com.example.demo.core.model.Playtime;
+import com.example.demo.core.model.UserSession;
+import com.example.demo.core.ai.DeepSeekClient;
+import com.example.demo.core.app.LauncherConfig;
+import com.example.demo.core.app.SingleInstance;
+import com.example.demo.core.auth.AuthlibInjectorManager;
+import com.example.demo.core.download.DownloadManager;
+import com.example.demo.core.download.IconProxy;
+import com.example.demo.core.download.Integrity;
+import com.example.demo.core.game.CrashAnalyzer;
+import com.example.demo.core.game.JavaManager;
+import com.example.demo.core.game.LoaderInstaller;
+import com.example.demo.core.runtime.PerformanceOptimizer;
+import com.example.demo.core.runtime.PerformanceTuner;
+import com.example.demo.core.ai.LocalAiAssistant;
+import com.example.demo.core.app.AppPaths;
+import com.example.demo.core.auth.AccountStore;
+import com.example.demo.core.auth.AuthManager;
+import com.example.demo.core.auth.SessionStore;
+import com.example.demo.core.game.ModConflictChecker;
+import com.example.demo.core.game.ModpackExporter;
+import com.example.demo.core.game.ModpackImport;
+import com.example.demo.core.game.PortableExporter;
+import com.example.demo.core.game.ServerPackExporter;
+import com.example.demo.core.launch.GameCommandSender;
+import com.example.demo.core.launch.LaunchCancelledException;
+import com.example.demo.core.model.Favorites;
+import com.example.demo.core.model.InstanceMeta;
+import com.example.demo.core.model.LoginCardData;
+import com.example.demo.core.runtime.HardwareInfo;
+import com.example.demo.core.runtime.MemoryAdvisor;
+import com.example.demo.core.runtime.NetworkBoost;
 public class HelloApplication extends Application {
   private static final Set<String> CLONE_DATA_DIRS =
       Set.of(

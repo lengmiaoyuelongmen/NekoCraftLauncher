@@ -20,6 +20,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Popup;
 
+import com.example.demo.core.app.LauncherConfig;
 /**
  * 启动页底部命令栏：AI 开关、命令输入、Tab 补全和历史上下键。
  *

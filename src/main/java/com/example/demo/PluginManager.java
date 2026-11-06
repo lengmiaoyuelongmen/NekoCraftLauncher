@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.ServiceLoader;
 import java.util.function.Consumer;
 
+import com.example.demo.core.app.AppPaths;
 /** 从 plugins/*.jar 加载 NekoPlugin 实现。 */
 public final class PluginManager {
 

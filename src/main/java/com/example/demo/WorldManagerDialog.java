@@ -19,6 +19,7 @@ import java.util.function.Consumer;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
+import com.example.demo.core.runtime.SystemMetrics;
 /** 世界 / 存档管理：查看大小、备份、删除、打开目录。 */
 public final class WorldManagerDialog {
 

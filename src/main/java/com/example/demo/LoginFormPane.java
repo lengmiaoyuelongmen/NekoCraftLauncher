@@ -13,6 +13,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 
+import com.example.demo.core.model.LoginCardData;
 /**
  * 账户卡的登录表单：登录方式下拉、验证服务器、账号密码、微软授权提示和登录大按钮。
  *

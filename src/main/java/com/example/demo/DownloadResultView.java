@@ -15,6 +15,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 
+import com.example.demo.core.model.ModpackProject;
 /**
  * 下载页的结果区：列表 + 加载/空状态浮层 + 预渲染遮罩 +「回到顶部 / 已显示 N 条」栏。
  *

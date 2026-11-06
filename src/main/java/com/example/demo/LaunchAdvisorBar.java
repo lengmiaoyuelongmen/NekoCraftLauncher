@@ -13,6 +13,8 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 
+import com.example.demo.core.model.LaunchHistory;
+import com.example.demo.core.app.LauncherConfig;
 /**
  * 启动页顶部的「启动顾问」横条：根据启动历史给出一句建议，并显示上次准备耗时与成功率。
  *

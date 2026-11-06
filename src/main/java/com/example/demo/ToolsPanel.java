@@ -21,6 +21,20 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
+import com.example.demo.core.meta.VersionProfile;
+import com.example.demo.core.model.LaunchHistory;
+import com.example.demo.core.model.Playtime;
+import com.example.demo.core.app.AppPaths;
+import com.example.demo.core.app.LauncherConfig;
+import com.example.demo.core.download.Aria2Downloader;
+import com.example.demo.core.download.DownloadManager;
+import com.example.demo.core.download.Integrity;
+import com.example.demo.core.download.ZipUtil;
+import com.example.demo.core.game.CrashAnalyzer;
+import com.example.demo.core.game.JavaScanner;
+import com.example.demo.core.runtime.NetworkBoost;
+import com.example.demo.core.runtime.PerformanceOptimizer;
+import com.example.demo.core.runtime.SystemMetrics;
 /**
  * 工具页：学习 PCL-CE 的「左侧页签 + 右侧内容」结构。
  * 页签：环境 / 缓存 / 快捷入口 / 百宝箱。

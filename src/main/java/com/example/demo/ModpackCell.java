@@ -24,6 +24,9 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.Rectangle;
 
+import com.example.demo.core.model.ModpackProject;
+import com.example.demo.core.download.IconProxy;
+import com.example.demo.core.model.Favorites;
 /**
  * 下载页的模组 / 整合包列表单元格：图标、标题、简介、作者 / 下载量 / 更新时间 / 来源、收藏与下载按钮。
  *

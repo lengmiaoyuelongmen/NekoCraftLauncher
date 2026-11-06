@@ -9,6 +9,10 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 
+import com.example.demo.core.launch.LaunchCommand;
+import com.example.demo.core.meta.VersionProfile;
+import com.example.demo.core.model.UserSession;
+import com.example.demo.core.app.LauncherConfig;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;

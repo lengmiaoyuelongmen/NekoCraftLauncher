@@ -23,6 +23,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.function.Consumer;
 
+import com.example.demo.core.download.ZipUtil;
 /** 日志页（对标 PCL 设置里的「查看日志」）：列出日志、导出、清理、打开目录。 */
 public final class LogsPanel extends VBox {
 

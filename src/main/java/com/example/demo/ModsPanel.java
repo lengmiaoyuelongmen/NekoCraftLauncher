@@ -49,6 +49,14 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
+import com.example.demo.core.app.AppPaths;
+import com.example.demo.core.app.LauncherConfig;
+import com.example.demo.core.download.CurseForgeClient;
+import com.example.demo.core.download.DownloadManager;
+import com.example.demo.core.download.IconProxy;
+import com.example.demo.core.game.ModDependencyScanner;
+import com.example.demo.core.game.ModpackImport;
+import com.example.demo.core.model.Favorites;
 /**
  * 模组页：左侧本地模组（实时刷新），右侧 Modrinth 在线搜索并一键安装。
  * 全部在启动器内完成，不弹新窗口。

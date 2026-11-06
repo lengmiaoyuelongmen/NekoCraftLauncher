@@ -19,6 +19,8 @@ import java.io.File;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
+import com.example.demo.core.app.LauncherConfig;
+import com.example.demo.core.runtime.PerformanceOptimizer;
 /**
  * 首次启动的全屏引导页（不是弹窗）：左侧说明，右侧四项可逆优化，底部应用/稍后。
  * 应用过程就在页面内显示结果，完成后淡出回到启动器。

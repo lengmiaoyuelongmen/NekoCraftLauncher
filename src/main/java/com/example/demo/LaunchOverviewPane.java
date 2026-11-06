@@ -19,6 +19,8 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
+import com.example.demo.core.model.LaunchHistory;
+import com.example.demo.core.app.LauncherConfig;
 /**
  * 启动页在日志收起时显示的「启动概览」：启动统计、最近一次启动、启动记录、当前实例和快捷操作。
  *

@@ -18,6 +18,8 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 
+import com.example.demo.core.app.LauncherConfig;
+import com.example.demo.core.download.SourcePinger;
 /**
  * 下载页顶部的搜索 + 筛选条：来源 / 标签 / 游戏版本 / 加载器 / 排序 + 刷新 / 测速 / 任务按钮。
  *
