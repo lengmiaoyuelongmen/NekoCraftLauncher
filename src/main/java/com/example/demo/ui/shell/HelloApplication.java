@@ -198,6 +198,7 @@ import com.example.demo.core.plugin.PluginManager;
 import com.example.demo.ui.component.AccountInfoCard;
 import com.example.demo.ui.component.BlockIcons;
 import com.example.demo.ui.component.CommandBar;
+import com.example.demo.ui.component.ConsoleToolbar;
 import com.example.demo.ui.component.CrashReportDialog;
 import com.example.demo.ui.component.DownloadFilterBar;
 import com.example.demo.ui.component.DownloadNavItem;
@@ -354,6 +355,7 @@ public class HelloApplication extends Application {
   private TextArea aiChatArea;
   private StackPane logPane;
   private Button logToggle;
+  private ConsoleToolbar consoleToolbar;
   private HBox logActionsBar;
   private LaunchAdvisorBar launchInsightBar;
   private LaunchOverviewPane launchOverviewPane;
@@ -1602,44 +1604,39 @@ public class HelloApplication extends Application {
     VBox.setVgrow(this.logPane, Priority.ALWAYS);
     this.logPane.setMinHeight(0.0);
     this.logArea.setMinHeight(0.0);
-    Button clearLog = new Button("清空日志");
-    clearLog.setOnAction(e -> this.logArea.clear());
-    Button copyLog = new Button("复制日志");
-    copyLog.setOnAction(
-        e -> {
-          ClipboardContent content = new ClipboardContent();
-          content.putString(this.logArea.getText());
-          Clipboard.getSystemClipboard().setContent(content);
-          Toast.ok("日志已复制");
-        });
-    Button openLogDir = new Button("日志目录");
-    openLogDir.setOnAction(e -> this.openDir(new File(this.config.getGameDir(), "logs")));
-    Button shortcuts = new Button("快捷键");
-    shortcuts.setOnAction(
-        e -> {
-          InAppDialog.alert(
-              "Neko Craft Launcher 快捷键",
-              "F1  启动页\n"
-                  + "F2  实例选择\n"
-                  + "F3  实例设置（概览）\n"
-                  + "F4  实例设置 · 模组\n"
-                  + "F5  下载\n"
-                  + "F6  设置\n"
-                  + "F7  工具\n"
-                  + "F8  设置 · 查看日志\n"
-                  + "F9  收起 / 展开日志\n"
-                  + "Esc 关闭弹窗");
-        });
-    Label promise = new Label("NEKO · 为爱发电");
-    promise.setStyle("-fx-text-fill: -app-accent; -fx-font-size: 10.5px; -fx-font-weight: bold;");
-    Region promiseSpacer = new Region();
-    HBox.setHgrow(promiseSpacer, Priority.ALWAYS);
-    this.logToggle = new Button("展开日志");
-    this.logToggle.setStyle(
-        "-fx-background-color: rgba(255,255,255,0.06); -fx-text-fill: -app-text-2;"
-            + " -fx-background-radius: 6; -fx-padding: 3 10; -fx-font-size: 11px; -fx-cursor:"
-            + " hand;");
-    this.logToggle.setOnAction(e -> this.applyLogExpanded(!this.logExpanded));
+    this.consoleToolbar =
+        new ConsoleToolbar(
+            new ConsoleToolbar.Host() {
+              @Override
+              public void toggleLog() {
+                HelloApplication.this.applyLogExpanded(!HelloApplication.this.logExpanded);
+              }
+
+              @Override
+              public void clearLog() {
+                HelloApplication.this.logArea.clear();
+              }
+
+              @Override
+              public void copyLog() {
+                ClipboardContent content = new ClipboardContent();
+                content.putString(HelloApplication.this.logArea.getText());
+                Clipboard.getSystemClipboard().setContent(content);
+                Toast.ok("日志已复制");
+              }
+
+              @Override
+              public void openLogDir() {
+                HelloApplication.this.openDir(
+                    new File(HelloApplication.this.config.getGameDir(), "logs"));
+              }
+
+              @Override
+              public void showShortcuts() {
+                InAppDialog.alert("Neko Craft Launcher 快捷键", ConsoleToolbar.shortcutHelp());
+              }
+            });
+    this.logToggle = this.consoleToolbar.toggleButton();
     this.launchOverviewPane =
         new LaunchOverviewPane(
             this.config,
@@ -1661,22 +1658,7 @@ public class HelloApplication extends Application {
     VBox.setVgrow(this.launchOverviewScroll, Priority.ALWAYS);
     this.logActionsBar =
         logActions =
-            new HBox(
-                8.0,
-                this.logToggle,
-                clearLog,
-                copyLog,
-                openLogDir,
-                shortcuts,
-                promiseSpacer,
-                promise);
-    logActions.setAlignment(Pos.CENTER_LEFT);
-    for (Button action : new Button[] {clearLog, copyLog, openLogDir, shortcuts}) {
-      action.setStyle(
-          "-fx-background-color: rgba(255,255,255,0.05); -fx-text-fill: -app-text-dim;"
-              + " -fx-background-radius: 6; -fx-padding: 3 10; -fx-font-size: 11px; -fx-cursor:"
-              + " hand;");
-    }
+            this.consoleToolbar.node();
     this.commandBar = new CommandBar(this.config, this::handleCommandInput, this::onAiModeToggled);
     HBox commandBar = this.commandBar;
     this.launchInsightBar =
