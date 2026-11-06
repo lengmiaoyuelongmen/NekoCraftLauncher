@@ -337,20 +337,23 @@ public final class VersionProfile {
         if (!element.has("rules") || !element.get("rules").isJsonArray()) return true;
         JsonArray rules = element.getAsJsonArray("rules");
         boolean hasAllowRule = false;
+        boolean matched = false;
         boolean allowed = false;
         for (JsonElement el : rules) {
             if (!el.isJsonObject()) continue;
             JsonObject rule = el.getAsJsonObject();
             String action = rule.has("action") ? rule.get("action").getAsString() : "allow";
-            boolean matches = matches(rule, features);
             if ("allow".equals(action)) {
                 hasAllowRule = true;
-                if (matches) allowed = true;
-            } else if ("disallow".equals(action) && matches) {
-                allowed = false;
             }
+            if (!matches(rule, features)) {
+                continue;
+            }
+            matched = true;
+            allowed = "allow".equals(action);
         }
-        return hasAllowRule ? allowed : true;
+        // 一条都没命中：只有 disallow 规则时保留（例如 "除 macOS 外都可用"），否则默认排除
+        return matched ? allowed : !hasAllowRule;
     }
 
     private static boolean matches(JsonObject rule, Map<String, Boolean> features) {
