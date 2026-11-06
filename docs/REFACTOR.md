@@ -1,6 +1,7 @@
 # 架构与重构说明
 
 > 这份文档记录 2026-11 那次「反编译恢复 + 结构化重构」的结果、约定和后续计划。
+> 2026-11-06 起的分层方案（core / ui、对标 PCL2/HMCL/Prism）见 [ARCHITECTURE.md](ARCHITECTURE.md)。
 
 ## 1. 背景
 
