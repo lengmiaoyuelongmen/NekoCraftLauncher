@@ -228,6 +228,10 @@ import com.example.demo.core.game.ImportErrors;
 import com.example.demo.core.launch.LaunchScriptExporter;
 import com.example.demo.core.instance.InstanceCloner;
 import com.example.demo.core.instance.InstanceFiles;
+import com.example.demo.core.game.JavaVersionProbe;
+import com.example.demo.core.launch.LaunchPreflight;
+import com.example.demo.core.model.GameDirDetector;
+import com.example.demo.core.model.LanguageConfig;
 public class HelloApplication extends Application {
   private static final Set<String> CLONE_DATA_DIRS =
       Set.of(
@@ -7199,27 +7203,13 @@ public class HelloApplication extends Application {
 
   private void preflight(VersionProfile profile, Consumer<String> log) throws Exception {
     File gameDir = new File(this.config.getGameDir());
-    if (!gameDir.isDirectory() && !gameDir.mkdirs()) {
-      throw new Exception("游戏目录不可用: " + gameDir.getAbsolutePath());
-    }
-    File probe = new File(gameDir, ".write-test");
-    try {
-      Files.writeString(
-          probe.toPath(), (CharSequence) "ok", StandardCharsets.UTF_8, new OpenOption[0]);
-    } catch (Exception e) {
-      throw new Exception("游戏目录不可写: " + gameDir.getAbsolutePath());
-    } finally {
-      probe.delete();
-    }
-    long usable = gameDir.getUsableSpace();
-    if (usable > 0L && usable < 314572800L) {
-      throw new Exception("磁盘剩余空间不足 300MB（当前 " + usable / 1024L / 1024L + " MB）");
-    }
+    LaunchPreflight.Report report =
+        LaunchPreflight.check(gameDir, profile.getJavaMajorVersion());
     log.accept(
         "🧪 自检通过：目录可写，磁盘剩余 "
-            + usable / 1024L / 1024L / 1024L
+            + report.usableBytes() / 1024L / 1024L / 1024L
             + " GB，需要 Java "
-            + profile.getJavaMajorVersion());
+            + report.requiredJava());
   }
 
   /*
@@ -7228,29 +7218,7 @@ public class HelloApplication extends Application {
    * Enabled aggressive exception aggregation
    */
   private int javaMajorVersion(String javaPath) {
-    try {
-      Process process = new ProcessBuilder(javaPath, "-version").redirectErrorStream(true).start();
-      try (BufferedReader reader =
-          new BufferedReader(
-              new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8)); ) {
-        String line;
-        while ((line = reader.readLine()) != null) {
-          Matcher matcher = Pattern.compile("version \"(\\d+)(?:\\.(\\d+))?").matcher(line);
-          if (!matcher.find()) continue;
-          int major = Integer.parseInt(matcher.group(1));
-          if (major == 1 && matcher.group(2) != null) {
-            major = Integer.parseInt(matcher.group(2));
-          }
-          int n = major;
-          return n;
-        }
-      }
-      process.waitFor(5L, TimeUnit.SECONDS);
-      return -1;
-    } catch (Exception exception) {
-      // empty catch block
-    }
-    return -1;
+    return JavaVersionProbe.probe(javaPath);
   }
 
   private void updateGeekTelemetry() {
@@ -7414,29 +7382,7 @@ public class HelloApplication extends Application {
   }
 
   private void ensureChineseLanguage(File instanceDir) {
-    try {
-      File options;
-      if (!instanceDir.isDirectory()) {
-        instanceDir.mkdirs();
-      }
-      if (!(options = new File(instanceDir, "options.txt")).isFile()) {
-        Files.writeString(
-            options.toPath(),
-            (CharSequence) "lang:zh_cn\n",
-            StandardCharsets.UTF_8,
-            new OpenOption[0]);
-        return;
-      }
-      String text = Files.readString(options.toPath(), StandardCharsets.UTF_8);
-      text =
-          text.contains("lang:")
-              ? text.replaceAll("(?m)^lang:.*$", "lang:zh_cn")
-              : text + (text.endsWith("\n") ? "" : "\n") + "lang:zh_cn\n";
-      Files.writeString(
-          options.toPath(), (CharSequence) text, StandardCharsets.UTF_8, new OpenOption[0]);
-    } catch (Exception exception) {
-      // empty catch block
-    }
+    LanguageConfig.ensureChinese(instanceDir);
   }
 
   private void joinServer(String address) {
@@ -7853,46 +7799,11 @@ public class HelloApplication extends Application {
   }
 
   private File detectMinecraftRoot(File selected) {
-    File[] direct;
-    if (selected == null || !selected.isDirectory()) {
-      return null;
-    }
-    for (File candidate : direct = new File[] {selected, new File(selected, ".minecraft")}) {
-      if (!this.hasVersions(candidate)) continue;
-      return candidate;
-    }
-    File[] children = selected.listFiles(File::isDirectory);
-    if (children != null) {
-      for (File child : children) {
-        if (this.hasVersions(child)) {
-          return child;
-        }
-        File dot = new File(child, ".minecraft");
-        if (!this.hasVersions(dot)) continue;
-        return dot;
-      }
-    }
-    return null;
+    return GameDirDetector.detect(selected);
   }
 
   private boolean hasVersions(File dir) {
-    File versions = new File(dir, "versions");
-    if (!versions.isDirectory()) {
-      return false;
-    }
-    File[] subs = versions.listFiles(File::isDirectory);
-    if (subs == null) {
-      return false;
-    }
-    for (File sub : subs) {
-      if (new File(sub, sub.getName() + ".json").isFile()) {
-        return true;
-      }
-      File[] jsons = sub.listFiles(f -> f.isFile() && f.getName().endsWith(".json"));
-      if (jsons == null || jsons.length <= 0) continue;
-      return true;
-    }
-    return false;
+    return GameDirDetector.hasVersions(dir);
   }
 
   private void selectInstance(Instance instance) {

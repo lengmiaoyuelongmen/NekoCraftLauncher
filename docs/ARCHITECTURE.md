@@ -22,17 +22,17 @@
 ```
 src/main/java/com/example/demo/
 ├── Launcher.java            # 进程入口（唯一留在默认包的类）
-├── core/                    # 79 个类，0 处 import javafx / 0 处 import ui.*
+├── core/                    # 85 个类，0 处 import javafx / 0 处 import ui.*
 │   ├── ai/         2   DeepSeekClient, LocalAiAssistant
 │   ├── app/        8   AppPaths, AppVersion, LauncherConfig, SingleInstance, ConfigHistory, UpdateChecker, SupportBundle, Bootstrap
 │   ├── auth/       7   AuthManager, AccountStore, MicrosoftAuth, AuthlibInjectorManager, SessionStore, SecretStore, LoginCardParser
 │   ├── download/   9   DownloadManager, GameFiles, Downloader, Aria2Downloader, Integrity, SourcePinger, CurseForgeClient, IconProxy, ZipUtil
-│   ├── game/       8   JavaManager, JavaRuntimeIndex, JavaRuntimeInstaller, JavaScanner, LoaderInstaller, PortableExporter, CrashAnalyzer, ImportErrors
+│   ├── game/       9   JavaManager, JavaRuntimeIndex, JavaRuntimeInstaller, JavaVersionProbe, JavaScanner, LoaderInstaller, PortableExporter, CrashAnalyzer, ImportErrors
 │   ├── instance/   2   InstanceFiles, InstanceCloner
-│   ├── launch/    13   LaunchPlan, LaunchPlanner, LaunchContext, LaunchTask, LaunchPipeline, ClientJarTask, LibrariesTask, AssetsTask, NativesTask, NativeExtractor, LaunchScriptExporter, LaunchCancelledException, GameCommandSender
+│   ├── launch/    14   LaunchPlan, LaunchPlanner, LaunchContext, LaunchTask, LaunchPipeline, ClientJarTask, LibrariesTask, AssetsTask, NativesTask, NativeExtractor, LaunchScriptExporter, LaunchPreflight, LaunchCancelledException, GameCommandSender
 │   ├── meta/       2   VersionProfile, VersionManager
 │   ├── mod/        5   ModDependencyScanner, ModConflictChecker, ModpackImport, ModpackExporter, ServerPackExporter
-│   ├── model/     16   Instance, InstanceDirs, InstanceMeta, InstanceSettings, MinecraftVersion, VersionDetails, VersionManifest, AssetIndex, Library, Modpack, ModpackProject, UserSession, LoginCardData, Favorites, Playtime, LaunchHistory
+│   ├── model/     18   Instance, InstanceDirs, InstanceMeta, InstanceSettings, MinecraftVersion, VersionDetails, VersionManifest, AssetIndex, Library, Modpack, ModpackProject, UserSession, LoginCardData, Favorites, Playtime, LaunchHistory, LanguageConfig, GameDirDetector
 │   ├── plugin/     3   PluginManager, PluginContext, NekoPlugin
 │   └── runtime/    6   HardwareInfo, SystemMetrics, PerformanceOptimizer, PerformanceTuner, MemoryAdvisor, NetworkBoost
 └── ui/                      # 54 个类，只能单向依赖 core
@@ -247,6 +247,25 @@ sha256）、`JavaManager`（编排：本地检测 → 查询 → 下载 → 校�
 - 单元测试 53 → **62 通过**（选包规则 5 个、安装/校验 4 个）
 - 真实 API 实跑（只查询不下载）：Java 8 / 21 两个大版本都能在 Azul 与 Adoptium 拿到正确的 zip 与 sha256
 
+### Phase 5b-4：启动前的小逻辑全部外迁
+
+主类里还有几段「纯逻辑但埋在 UI 里」的代码，这轮抽出来并补测试：
+
+| 新类 | 内容 | 测试 |
+|---|---|---|
+| `core.model.LanguageConfig` | 首次启动写 `options.txt` 的 `lang:zh_cn`，已有其它设置不动 | 3 个 |
+| `core.model.GameDirDetector` | 从任选目录识别 Minecraft 根（自身 / `.minecraft` / 子目录） | 2 个 |
+| `core.game.JavaVersionProbe` | 解析 `java -version`（1.8.0_401 → 8，17.0.2 → 17） | 1 个 |
+| `core.launch.LaunchPreflight` | 启动前自检：目录可写、磁盘 ≥300MB，异常信息直接给用户看 | 2 个 |
+
+主类 **8,520 → 8,428 行**；单测 **62 → 70 通过**。实机启动 1.12.2 验证新自检链路：
+
+```
+🧪 自检通过：目录可写，磁盘剩余 57 GB，需要 Java 8
+✅ 游戏进程已启动
+[Game] Created: 1024x512 textures-atlas / OpenAL initialized
+```
+
 ## 5. 迁移手法
 
 1. 脚本按「域 → 新包」映射移动文件，改 `package` 行。
@@ -269,6 +288,7 @@ sha256）、`JavaManager`（编排：本地检测 → 查询 → 下载 → 校�
 | ~~**Phase 5b-2**~~ ✅ | 实例文件操作外迁：`InstanceFiles` / `InstanceCloner` | 6 个新单测；主类 -58 行 |
 | ~~**Phase 5b-3**~~ ✅ | 窗口/托盘生命周期外迁：`WindowChrome` + 6 方法 Host | 2 个新单测；主类 -89 行 |
 | ~~**Java 运行时**~~ ✅ | 双下载源（Zulu → Adoptium）+ SHA-256 校验 + 健壮解压 | 9 个新单测；真实 API 实跑验证 |
+| ~~**Phase 5b-4**~~ ✅ | 启动前逻辑外迁：`LanguageConfig` / `GameDirDetector` / `JavaVersionProbe` / `LaunchPreflight` | 8 个新单测；实机启动验证 |
 | **Phase 2b** | 把 `startGame` 的编排（检查 Java → 校验 → 下载 → 解压 → 起进程）抽成 `LaunchTask` 链 + `LaunchPipeline`，UI 只订阅进度 | 主类再减 ~300 行；断点续跑可测 |
 | **Phase 3** | 实例一等公民：`InstanceSettings`（内存 / JVM 参数 / Java 路径 / 是否隔离 / 游戏目录）落到 `versions/<id>/instance.json`；实例设置页读写 | 两个实例用不同内存启动成功 |
 | **Phase 4** | 下载引擎统一：`DownloadEngine` 统一入口，所有下载带 SHA1 校验、并发上限、失败重试与镜像回退；`DownloadManager` 退化为其实现 | 强制断网/坏源测试通过 |
