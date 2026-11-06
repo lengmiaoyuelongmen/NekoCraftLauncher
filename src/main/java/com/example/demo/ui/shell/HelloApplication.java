@@ -177,6 +177,7 @@ import com.example.demo.core.ai.LocalAiAssistant;
 import com.example.demo.core.app.AppPaths;
 import com.example.demo.core.auth.AccountStore;
 import com.example.demo.core.auth.AuthManager;
+import com.example.demo.core.auth.SessionState;
 import com.example.demo.core.auth.SessionStore;
 import com.example.demo.core.game.PortableExporter;
 import com.example.demo.core.launch.GameCommandSender;
@@ -5503,28 +5504,24 @@ public class HelloApplication extends Application {
   }
 
   private void switchAccount(AccountStore.Account account) {
-    UserSession session;
-    this.currentSession = session = AccountStore.toSession(account);
-    SessionStore.save(session, account.loginType(), account.server());
+    SessionState.Restored restored = SessionState.fromAccount(account);
+    if (restored == null) {
+      return;
+    }
+    this.currentSession = restored.session();
+    SessionStore.save(restored.session(), restored.loginType(), restored.server());
     this.usernameLabel.setText(account.username());
     this.applySessionUi(true);
-    this.userTypeLabel.setText(
-        account.userType().isBlank() ? account.loginType() : account.userType());
+    this.userTypeLabel.setText(restored.displayType());
     this.userTypeLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: #4CAF50;");
-    this.updatePlayerInfo(this.userTypeLabel.getText(), account.server(), session);
-    if (session.getUuid() != null) {
-      this.uuidLabel.setText("UUID: " + session.getUuid().toString().substring(0, 13) + "...");
-    } else {
-      this.uuidLabel.setText("");
-    }
+    this.updatePlayerInfo(restored.displayType(), restored.server(), restored.session());
+    String shortUuid = SessionState.shortUuid(restored.session());
+    this.uuidLabel.setText(shortUuid.isEmpty() ? "" : "UUID: " + shortUuid);
     if (this.loginTypeComboRef != null) {
-      this.loginTypeComboRef.setValue(
-          this.loginTypeComboRef.getItems().contains(account.loginType())
-              ? account.loginType()
-              : account.loginType());
+      this.loginTypeComboRef.setValue(restored.loginType());
     }
-    if (this.serverFieldRef != null && !account.server().isBlank()) {
-      this.serverFieldRef.getEditor().setText(account.server());
+    if (this.serverFieldRef != null && !restored.server().isBlank()) {
+      this.serverFieldRef.getEditor().setText(restored.server());
     }
     this.config.setPreviewSkinPath(account.skinPath());
     this.config.setPreviewCapePath(account.capePath());
@@ -5555,60 +5552,39 @@ public class HelloApplication extends Application {
 
   private void restoreSessionFromRegistry() {
     this.applySessionUi(false);
-    SessionStore.Saved saved = SessionStore.load();
-    if (saved == null || saved.username().isBlank()) {
+    SessionState.Restored restored = SessionState.fromSaved(SessionStore.load());
+    if (restored == null) {
       return;
     }
     try {
-      UserSession session = new UserSession();
-      session.setUsername(saved.username());
-      session.setAccessToken(saved.accessToken());
-      session.setSkinUrl(saved.skinUrl());
-      session.setUserType(saved.userType());
-      session.setAuthServerUrl(saved.server());
-      session.setType(
-          "正版登录 (微软)".equals(saved.loginType())
-              ? UserSession.LoginType.MICROSOFT
-              : ("第三方外置登录".equals(saved.loginType())
-                  ? UserSession.LoginType.THIRD_PARTY
-                  : UserSession.LoginType.OFFLINE));
-      try {
-        if (!saved.uuid().isBlank()) {
-          session.setUuid(UUID.fromString(saved.uuid()));
-        }
-      } catch (Exception exception) {
-        // empty catch block
-      }
-      this.currentSession = session;
-      this.usernameLabel.setText(saved.username());
+      this.currentSession = restored.session();
+      this.usernameLabel.setText(restored.session().getUsername());
       this.applySessionUi(true);
-      this.userTypeLabel.setText(saved.userType().isBlank() ? saved.loginType() : saved.userType());
-      this.updatePlayerInfo(
-          saved.userType().isBlank() ? saved.loginType() : saved.userType(),
-          saved.server(),
-          session);
+      this.userTypeLabel.setText(restored.displayType());
+      this.updatePlayerInfo(restored.displayType(), restored.server(), restored.session());
       this.userTypeLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: #4CAF50;");
-      if (session.getUuid() != null) {
-        this.uuidLabel.setText("UUID: " + session.getUuid().toString().substring(0, 13) + "...");
-      }
+      String shortUuid = SessionState.shortUuid(restored.session());
+      this.uuidLabel.setText(shortUuid.isEmpty() ? "" : "UUID: " + shortUuid);
       if (this.loginTypeComboRef != null) {
         this.loginTypeComboRef.setValue(
-            this.loginTypeComboRef.getItems().contains(saved.loginType())
-                ? saved.loginType()
+            this.loginTypeComboRef.getItems().contains(restored.loginType())
+                ? restored.loginType()
                 : "离线登录");
-        boolean thirdParty = "第三方外置登录".equals(saved.loginType());
+        boolean thirdParty = "第三方外置登录".equals(restored.loginType());
         if (this.serverFieldRef != null) {
           this.serverFieldRef.setVisible(thirdParty);
           this.serverFieldRef.setManaged(thirdParty);
-          if (!saved.server().isBlank()) {
-            this.serverFieldRef.getEditor().setText(saved.server());
+          if (!restored.server().isBlank()) {
+            this.serverFieldRef.getEditor().setText(restored.server());
           }
         }
       }
-      if (saved.skinUrl() != null && !saved.skinUrl().isBlank()) {
-        this.loadSkinHead(saved.skinUrl());
+      String skinUrl = restored.session().getSkinUrl();
+      if (skinUrl != null && !skinUrl.isBlank()) {
+        this.loadSkinHead(skinUrl);
       }
-      this.logArea.appendText("🔐 已从本机注册表恢复登录: " + saved.username() + "\n");
+      this.logArea.appendText(
+          "🔐 已从本机注册表恢复登录: " + restored.session().getUsername() + "\n");
     } catch (Exception e) {
       this.logArea.appendText("⚠ 登录状态恢复失败: " + e.getMessage() + "\n");
     }
@@ -5658,8 +5634,7 @@ public class HelloApplication extends Application {
                         this.userTypeLabel.setText(type);
                         this.updatePlayerInfo(type, serverUrl, session);
                         this.userTypeLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: #4CAF50;");
-                        this.uuidLabel.setText(
-                            "UUID: " + session.getUuid().toString().substring(0, 13) + "...");
+                        this.uuidLabel.setText("UUID: " + SessionState.shortUuid(session));
                         this.currentSession = session;
                         SessionStore.save(session, type, serverUrl);
                         AccountStore.upsert(session, type, serverUrl);

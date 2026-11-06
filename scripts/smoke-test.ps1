@@ -113,21 +113,22 @@ public class SmokeWin {
     # ---------- 启动 ----------
     Write-Host "[2/4] 启动启动器..." -ForegroundColor Cyan
     # 结束所有启动器实例（包括 IDEA 里跑的那份），否则单实例锁会让新进程只弹「已有实例在运行」
-    Get-CimInstance Win32_Process -Filter "Name='java.exe' OR Name='javaw.exe'" -ErrorAction SilentlyContinue |
-        Where-Object {
-            $_.CommandLine -and ($_.CommandLine -match 'mc-launcher\.jar' -or $_.CommandLine -match 'com\.example\.demo\.Launcher')
-        } |
-        ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+    function Stop-ExistingLauncher {
+        Get-Process javaw, java -ErrorAction SilentlyContinue |
+            Where-Object { $_.MainWindowTitle -like "*$Title*" } |
+            ForEach-Object { try { $_.Kill() } catch { } }
+    }
+    Stop-ExistingLauncher
     Start-Sleep -Seconds 1
     # 用 javaw 启动：java.exe 会带一个控制台窗口，抢焦点还会把截图挡掉
     $javaExe = Join-Path $JavaHome "bin\javaw.exe"
     if (-not (Test-Path $javaExe)) { $javaExe = Join-Path $JavaHome "bin\java.exe" }
-    Start-Process -FilePath $javaExe `
+    $launcher = Start-Process -FilePath $javaExe `
         -ArgumentList '-jar', $Jar -WorkingDirectory $root `
-        -RedirectStandardOutput $stdout -RedirectStandardError $stderr -WindowStyle Hidden
+        -RedirectStandardOutput $stdout -RedirectStandardError $stderr -WindowStyle Hidden -PassThru
     # 轮询等窗口出现，不要用固定 sleep（冷启动/杀毒扫描会拖慢）
-    if (-not (Wait-Launcher ([Math]::Max(30, $StartupWaitSec + 20)))) {
-        throw "启动器窗口没有出现（$Title，等待 $([Math]::Max(30, $StartupWaitSec + 20)) 秒）"
+    if (-not (Wait-Launcher ([Math]::Max(90, $StartupWaitSec + 20)))) {
+        throw "启动器窗口没有出现（$Title，等待 $([Math]::Max(90, $StartupWaitSec + 20)) 秒）"
     }
     if (-not (Focus-Launcher)) { throw "无法把启动器窗口切到前台（$Title）" }
     Capture-Window "01-launch"
@@ -168,15 +169,11 @@ public class SmokeWin {
         exit 1
     }
     Write-Host "PASS: 5 个页面切换完成，stderr 无异常" -ForegroundColor Green
-    if (-not $KeepRunning) {
-        Get-CimInstance Win32_Process -Filter "Name='java.exe' OR Name='javaw.exe'" -ErrorAction SilentlyContinue |
-            Where-Object {
-                $_.CommandLine -and ($_.CommandLine -match 'mc-launcher\.jar' -or $_.CommandLine -match 'com\.example\.demo\.Launcher')
-            } |
-            ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
-    }
     exit 0
 }
 finally {
+    if (-not $KeepRunning -and $launcher) {
+        try { $launcher.Kill() } catch { }
+    }
     Pop-Location
 }
