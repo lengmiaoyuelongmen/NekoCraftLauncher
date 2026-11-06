@@ -546,6 +546,35 @@ powershell -ExecutionPolicy Bypass -File scripts\smoke-test.ps1 -SkipBuild
 - 不用 PowerShell `Get-Content`/`Set-Content` 改源码。
 - 每次改动后：0 告警 + 单测 + 冒烟，缺一不可。
 
+## 14. 主类拆分现状（2026-11-06 收尾）
+
+### 已搬出主类的页面 / 组件
+
+| 类 | 内容 | 真机验证方式 |
+|---|---|---|
+| `ui.page.DownloadPage` | 下载中心外壳：分类导航 + 滑动指示器 + 内容区切换 | UIA 点下载/Minecraft/模组/安装包 |
+| `ui.page.MinecraftVersionsPage` | Minecraft 版本页：筛选 chip / 最新版本 / 三个折叠分组 | UIA 展开「正式版 (103)」 |
+| `ui.page.InstallerPage` | 安装器页：版本下拉 / 实例名 / 7 个加载器手风琴 / 状态与进度 | UIA 点 Forge、NeoForge、Fabric |
+| `ui.page.VersionDetailPage` | 版本详情页 + 5 个加载器 chip | UIA 详情 → 返回列表 → Fabric chip |
+| `ui.page.ModDetailPage` | 社区项目详情：简介 + 按版本/加载器折叠的文件列表 | UIA 点 Sodium 卡片 |
+| `ui.component.AccountManagerDialog` | 账户管理：切换 / 删除 / 添加 | 全屏截图（对话框是独立窗口） |
+| `ui.component.DownloadTasksDialog` | 下载任务对话框 | 编译 + 冒烟 |
+| `ui.component.McVersionCell` | 版本行单元格（不再反向引用主类） | UIA 展开版本列表 |
+
+主类：**8,970 → 7,292 行**（-1,678，-19%）。
+
+### 还没拆的（按优先级）
+
+1. **启动页装配**（`createLaunchPanel` 及启动概览/控制台）——和 `LaunchState` 状态机耦合最深，拆的时候必须逐项验证「启动 → 取消 → 崩溃 → 重开」。
+2. **设置页 / 工具页 / 世界页的装配**——面板组件已在 `ui.component`，主类只剩布局与回调，收益中等。
+3. **会话业务**：`handleLogin` / `logout` / `restoreSessionFromRegistry` / `switchAccount`——都是「网络 + 存储 + 界面刷新」混合体，建议先抽一个 `SessionController` 再挪界面。
+4. **社区搜索流水线**（`performSearch` / `loadSearchPage` / 预取）——纯业务，适合进 core，但需要网络桩才能测。
+
+### 冒烟脚本这次的两个坑（已修）
+
+- 用 `java.exe` 启动会带一个控制台窗口，抢焦点还挡截图 → 改用 `javaw.exe`。
+- 脚本报错时启动的游戏进程仍在跑，外层工具会一直等这个子进程，**看起来像卡死** → 在 `finally` 里无条件收掉启动器，并给抢前台加重试。
+
 ## 13. 账户管理对话框独立（Phase 5h）
 
 | 归属 | 内容 |
