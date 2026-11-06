@@ -235,6 +235,7 @@ import com.example.demo.core.model.GameDirDetector;
 import com.example.demo.core.model.LanguageConfig;
 import com.example.demo.core.launch.LaunchState;
 import com.example.demo.core.download.ModrinthSearch;
+import com.example.demo.core.download.SearchSession;
 import com.example.demo.core.mod.ProjectFormat;
 import com.example.demo.core.model.InstanceId;
 import com.example.demo.core.launch.ServerAddress;
@@ -3517,7 +3518,7 @@ public class HelloApplication extends Application {
     if (this.loadingMoreResults) {
       return;
     }
-    if (this.searchTotal >= 0 && this.searchOffset >= this.searchTotal) {
+    if (!SearchSession.hasMore(this.searchOffset, this.searchTotal)) {
       return;
     }
     this.loadingMoreResults = true;
@@ -3559,13 +3560,8 @@ public class HelloApplication extends Application {
     if (cachedPage != null) {
       this.loadingMoreResults = false;
       this.resultView.status().hide();
-      ArrayList<ModpackProject> addedCache = new ArrayList<ModpackProject>();
-      for (ModpackProject project : cachedPage) {
-        boolean exists = this.modpackData.stream().anyMatch(p -> project.getId().equals(p.getId()));
-        if (exists) continue;
-        this.modpackData.add(project);
-        addedCache.add(project);
-      }
+      List<ModpackProject> addedCache =
+          SearchSession.mergeUnique(this.modpackData, cachedPage);
       this.searchOffset = offset + cachedPage.size();
       this.updateLoadMoreButton();
       this.prefetchIcons(addedCache);
