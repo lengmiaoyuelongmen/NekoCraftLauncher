@@ -198,6 +198,7 @@ import com.example.demo.core.plugin.PluginManager;
 import com.example.demo.ui.component.AccountInfoCard;
 import com.example.demo.ui.component.BlockIcons;
 import com.example.demo.ui.component.CommandBar;
+import com.example.demo.ui.component.ConsoleContainer;
 import com.example.demo.ui.component.ConsoleToolbar;
 import com.example.demo.ui.component.CrashReportDialog;
 import com.example.demo.ui.component.DownloadFilterBar;
@@ -356,6 +357,7 @@ public class HelloApplication extends Application {
   private StackPane logPane;
   private Button logToggle;
   private ConsoleToolbar consoleToolbar;
+  private ConsoleContainer consoleContainer;
   private HBox logActionsBar;
   private LaunchAdvisorBar launchInsightBar;
   private LaunchOverviewPane launchOverviewPane;
@@ -1355,52 +1357,17 @@ public class HelloApplication extends Application {
   }
 
   private void refreshLaunchBody() {
-    if (this.logPane == null || this.consoleBox == null) {
+    if (this.consoleContainer == null) {
       return;
     }
     boolean aiOn = this.config.isAiEnabled();
-    boolean showLog = !aiOn && this.logExpanded;
-    boolean showOverview = !aiOn && !this.logExpanded;
-    HelloApplication.setFlexible(this.aiChatArea, aiOn);
-    HelloApplication.setFlexible(
-        this.launchOverviewScroll == null ? this.launchOverviewPane : this.launchOverviewScroll,
-        showOverview);
-    this.logPane.setVisible(showLog);
-    this.logPane.setManaged(showLog);
-    this.logPane.setMinHeight(showLog ? 180.0 : 0.0);
-    this.logPane.setPrefHeight(showLog ? -1.0 : 0.0);
-    this.logPane.setMaxHeight(showLog ? Double.MAX_VALUE : 0.0);
-    VBox.setVgrow(this.logPane, showLog ? Priority.ALWAYS : Priority.NEVER);
-    // 只有日志展开时才让 consoleBox 撑高；AI 模式下撑高会把命令栏顶到一大片空白里，
-    // 聊天区才是那个该占满剩余高度的容器。
-    boolean growConsole = showLog;
-    this.consoleBox.setMaxHeight(growConsole ? Double.MAX_VALUE : -1.0);
-    VBox.setVgrow(this.consoleBox, growConsole ? Priority.ALWAYS : Priority.NEVER);
-    if (this.logToggle != null) {
-      this.logToggle.setText(this.logExpanded ? "收起日志" : "展开日志");
-    }
-    if (this.logActionsBar != null) {
-      // AI 模式下日志区不显示，这一排按钮（收起日志/清空/复制…）也没意义
-      this.logActionsBar.setVisible(!aiOn);
-      this.logActionsBar.setManaged(!aiOn);
-      if (!aiOn) {
-        for (Node node : this.logActionsBar.getChildren()) {
-          if (node == this.logToggle
-              || node
-                  == this.logActionsBar.getChildren().get(this.logActionsBar.getChildren().size() - 1)
-              || node instanceof Region && !(node instanceof Button)) continue;
-          node.setVisible(this.logExpanded);
-          node.setManaged(this.logExpanded);
-        }
-      }
-    }
-    if (showOverview && this.launchOverviewPane != null) {
+    this.consoleContainer.refresh(this.logExpanded, aiOn);
+    if (!aiOn && !this.logExpanded && this.launchOverviewPane != null) {
       this.launchOverviewPane.refresh();
     }
-    this.consoleBox.requestLayout();
   }
 
-  private static void setFlexible(Node node, boolean on) {
+private static void setFlexible(Node node, boolean on) {
     if (node == null) {
       return;
     }
@@ -1539,11 +1506,7 @@ public class HelloApplication extends Application {
     this.versionComboBox.setVisible(false);
     this.versionComboBox.setManaged(false);
     VBox userArea = this.accountColumn;
-    VBox logContainer = new VBox(4.0);
-    logContainer.setStyle(
-        "-fx-background-color: -app-card; -fx-background-radius: 16; -fx-padding: 6;"
-            + " -fx-border-color: -app-border-2; -fx-border-width: 1; -fx-border-radius: 16;"
-            + " -fx-effect: dropshadow(gaussian, rgba(15,23,42,0.07), 20, 0.08, 0, 6);");
+    VBox logContainer;
     this.logArea = new TextArea();
     // 下载器的源站提示（慢源切换、CDN 源站错误）直接写进日志
     DownloadManager.setMessageSink(this::logLine);
@@ -1672,14 +1635,19 @@ public class HelloApplication extends Application {
             });
     this.consoleBox = new VBox(0.0, this.logPane, commandBar);
     this.consoleBox.setFillWidth(true);
-    logContainer
-        .getChildren()
-        .addAll(
+    this.consoleContainer =
+        new ConsoleContainer(
             this.aiChatArea,
             this.launchOverviewScroll,
             this.consoleBox,
-            logActions,
+            this.logPane,
+            this.consoleToolbar,
             downloadBar);
+    logContainer = this.consoleContainer.node();
+    logContainer.setStyle(
+        "-fx-background-color: -app-card; -fx-background-radius: 16; -fx-padding: 6;"
+            + " -fx-border-color: -app-border-2; -fx-border-width: 1; -fx-border-radius: 16;"
+            + " -fx-effect: dropshadow(gaussian, rgba(15,23,42,0.07), 20, 0.08, 0, 6);");
     HBox.setHgrow(logContainer, Priority.ALWAYS);
     // 默认收起日志，先把「启动概览」露出来；想看实时输出点一下「展开日志」
     this.applyLogExpanded(false);
