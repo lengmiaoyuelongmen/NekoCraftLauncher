@@ -19,6 +19,10 @@ class LaunchHistoryTest {
         return new LaunchHistory.Entry(time, "1.12.2", prepMs, sessionSeconds, exitCode, crash);
     }
 
+    private LaunchHistory.Entry stoppedEntry(long time) {
+        return new LaunchHistory.Entry(time, "1.12.2", 500, 30, 0, false, true);
+    }
+
     @Test
     void emptyHistoryLooksPerfect(@TempDir Path temp) {
         LaunchHistory.Summary summary = LaunchHistory.summary(temp.toFile());
@@ -78,6 +82,28 @@ class LaunchHistoryTest {
         assertEquals(60, entries.size());
         assertEquals(64, entries.get(0).time(), "最老的记录被裁掉");
         assertEquals(5, entries.get(59).time());
+    }
+
+    @Test
+    void stoppedGameIsRecordedSeparately(@TempDir Path temp) {
+        LaunchHistory.record(temp.toFile(), stoppedEntry(1));
+
+        LaunchHistory.Entry saved = LaunchHistory.recent(temp.toFile()).get(0);
+        assertTrue(saved.stopped(), "主动结束要写进记录（旧数据默认 false）");
+        assertEquals("主动结束", LaunchHistory.outcomeLabel(saved));
+        assertFalse(LaunchHistory.isCrash(saved), "主动结束不算崩溃");
+
+        LaunchHistory.Summary summary = LaunchHistory.summary(temp.toFile());
+        assertEquals(1, summary.total());
+        assertEquals(0, summary.crashes());
+        assertEquals(100, summary.successRate());
+    }
+
+    @Test
+    void outcomeLabels() {
+        assertEquals("正常结束", LaunchHistory.outcomeLabel(entry(1, 100, 60, 0, false)));
+        assertEquals("异常结束", LaunchHistory.outcomeLabel(entry(1, 100, 0, 1, true)));
+        assertEquals("主动结束", LaunchHistory.outcomeLabel(stoppedEntry(1)));
     }
 
     @Test

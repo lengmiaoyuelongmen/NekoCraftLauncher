@@ -168,7 +168,7 @@ public final class LaunchOverviewPane extends VBox {
             } else {
                 lastValue.setText(time(last.time()));
                 lastSub.setText(
-                        (LaunchHistory.isCrash(last) ? "异常结束" : "正常结束")
+                        LaunchHistory.outcomeLabel(last)
                                 + " · 准备 "
                                 + LaunchFormat.duration(last.prepMs())
                                 + (last.sessionSeconds() > 0L
@@ -205,11 +205,12 @@ public final class LaunchOverviewPane extends VBox {
 
     private HBox historyRow(LaunchHistory.Entry entry) {
         boolean crashed = LaunchHistory.isCrash(entry);
-        Label state = new Label(crashed ? "异常" : "正常");
+        String stateText = crashed ? "异常" : (entry.stopped() ? "主动" : "正常");
+        Label state = new Label(stateText);
         state.setMinWidth(40.0);
         state.setStyle(
                 "-fx-text-fill: "
-                        + (crashed ? "#e11d48" : "#0f9d6e")
+                        + (crashed ? "#e11d48" : (entry.stopped() ? "#6b7280" : "#0f9d6e"))
                         + "; -fx-font-size: 11px; -fx-font-weight: bold;");
         Label rowTime = new Label(time(entry.time()));
         rowTime.setMinWidth(78.0);

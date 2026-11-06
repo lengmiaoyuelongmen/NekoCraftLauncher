@@ -14,7 +14,13 @@ import java.util.List;
 public final class LaunchHistory {
 
     public record Entry(long time, String instanceId, long prepMs, long sessionSeconds,
-                        int exitCode, boolean crash) {
+                        int exitCode, boolean crash, boolean stopped) {
+
+        /** 旧数据没有 stopped 字段时按「正常退出」处理。 */
+        public Entry(long time, String instanceId, long prepMs, long sessionSeconds,
+                     int exitCode, boolean crash) {
+            this(time, instanceId, prepMs, sessionSeconds, exitCode, crash, false);
+        }
     }
 
     public record Summary(int total, int crashes, long avgPrepMs) {
@@ -52,6 +58,14 @@ public final class LaunchHistory {
      */
     public static boolean isCrash(Entry entry) {
         return entry.crash() && (entry.exitCode() != 0 || entry.sessionSeconds() <= 0);
+    }
+
+    /** 概览里显示的结束方式：主动结束 / 异常结束 / 正常结束。 */
+    public static String outcomeLabel(Entry entry) {
+        if (isCrash(entry)) {
+            return "异常结束";
+        }
+        return entry.stopped() ? "主动结束" : "正常结束";
     }
 
     public static synchronized Summary summary(File gameDir) {

@@ -6493,7 +6493,8 @@ private static void setFlexible(Node node, boolean on) {
                               this.lastLaunchPrepMs,
                               sessionSeconds,
                               exited.exitValue(),
-                              crashLike));
+                              crashLike,
+                              forcedStop));
                       this.lastLaunchPrepMs = 0L;
                       if (this.launchInsightBar != null) {
                         this.launchInsightBar.refresh();
