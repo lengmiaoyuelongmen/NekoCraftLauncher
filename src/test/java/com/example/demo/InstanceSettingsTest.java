@@ -89,6 +89,18 @@ class InstanceSettingsTest {
     }
 
     @Test
+    void savesGameArguments(@TempDir Path temp) throws Exception {
+        String id = "1.20.4";
+        instanceDir(temp, id);
+
+        InstanceSettings.save(temp.toFile(), id, 2048, "", "", "--width 1920 --height 1080");
+
+        InstanceSettings.Settings settings = InstanceSettings.get(temp.toFile(), id);
+        assertEquals("--width 1920 --height 1080", settings.gameArgs());
+        assertEquals(2048, settings.memoryMb(), "保存游戏参数不能把内存弄丢");
+    }
+
+    @Test
     void savingLaunchSettingsKeepsIsolationOverride(@TempDir Path temp) throws Exception {
         String id = "1.7.10";
         instanceDir(temp, id);

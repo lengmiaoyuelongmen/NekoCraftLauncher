@@ -167,6 +167,15 @@ public final class LaunchPlanner {
             throw new IllegalStateException("版本 JSON 既没有 arguments.game 也没有 minecraftArguments");
         }
 
+        String extraGame = config.getGameArgs() == null ? "" : config.getGameArgs().trim();
+        if (!extraGame.isEmpty()) {
+            for (String arg : extraGame.split("\\s+")) {
+                if (!arg.isBlank()) {
+                    command.add(arg);
+                }
+            }
+        }
+
         if (!command.contains("--lang")) {
             command.add("--lang");
             command.add("zh_CN");

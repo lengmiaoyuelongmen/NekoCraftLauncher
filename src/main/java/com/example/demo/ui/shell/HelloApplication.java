@@ -7296,7 +7296,10 @@ public class HelloApplication extends Application {
                             InstanceSettings.get(gameDir, profile.getId());
                         LauncherConfig launchConfig =
                             this.config.copyForLaunch(
-                                override.memoryMb(), override.jvmArgs(), override.javaPath());
+                                override.memoryMb(),
+                                override.jvmArgs(),
+                                override.javaPath(),
+                                override.gameArgs());
                         if (!override.isEmpty()) {
                           this.logArea.appendText(
                               "🎛 使用实例级启动设置"

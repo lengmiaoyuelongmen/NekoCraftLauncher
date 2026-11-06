@@ -500,6 +500,10 @@ public final class InstanceSettingsPanel extends HBox {
                 override.javaPath() == null ? "" : override.javaPath());
         javaField.setPromptText("留空 = 使用全局 Java；可填 java.exe 完整路径");
         HBox.setHgrow(javaField, Priority.ALWAYS);
+        javafx.scene.control.TextField gameArgsField = new javafx.scene.control.TextField(
+                override.gameArgs() == null ? "" : override.gameArgs());
+        gameArgsField.setPromptText("留空 = 使用全局游戏参数；例如 --width 1920 --height 1080");
+        HBox.setHgrow(gameArgsField, Priority.ALWAYS);
         // 版本隔离也可以按实例覆盖：默认跟随全局，跟 Prism 的实例级设置一致
         javafx.scene.control.ComboBox<String> isolationBox = new javafx.scene.control.ComboBox<>();
         isolationBox.getItems().addAll("版本隔离：跟随全局", "版本隔离：开启", "版本隔离：关闭");
@@ -509,7 +513,8 @@ public final class InstanceSettingsPanel extends HBox {
         javafx.scene.control.Button saveOverride = ghostButton("保存本实例设置");
         saveOverride.setOnAction(e -> {
             Integer memory = useMemory.isSelected() ? memorySpinner.getValue() : null;
-            InstanceSettings.save(gameDir, instance.id, memory, jvmField.getText(), javaField.getText());
+            InstanceSettings.save(gameDir, instance.id, memory, jvmField.getText(), javaField.getText(),
+                    gameArgsField.getText());
             int isolationMode = isolationBox.getSelectionModel().getSelectedIndex();
             InstanceSettings.saveIsolation(gameDir, instance.id,
                     isolationMode == 0 ? null : isolationMode == 1);
@@ -524,11 +529,12 @@ public final class InstanceSettingsPanel extends HBox {
             memorySpinner.setDisable(true);
             jvmField.clear();
             javaField.clear();
+            gameArgsField.clear();
             isolationBox.getSelectionModel().select(0);
             Toast.ok("已恢复为全局设置");
         });
         launchCard.getChildren().addAll(
-                new HBox(10, useMemory, memorySpinner, smartMemory), jvmField, javaField,
+                new HBox(10, useMemory, memorySpinner, smartMemory), jvmField, javaField, gameArgsField,
                 new HBox(10, isolationBox), new HBox(10, saveOverride, clearOverride));
         VBox advancedCard = card("高级管理", new String[][]{});
         advancedCard.getChildren().add(advanced);

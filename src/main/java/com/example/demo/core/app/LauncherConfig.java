@@ -57,6 +57,9 @@ public class LauncherConfig {
     /** 额外的 JVM 参数，例如 "-XX:+UseG1GC -XX:+AlwaysPreTouch" */
     private String jvmArgs = "";
 
+    /** 额外的游戏参数，例如 "--width 1920 --height 1080" */
+    private String gameArgs = "";
+
     /** 版本隔离：每个实例独立 mods/config/saves（PCL 同名功能），默认开启 */
     private boolean isolation = true;
 
@@ -250,6 +253,7 @@ public class LauncherConfig {
         if (memoryMb > 16384) memoryMb = 16384;
         if (javaPath == null) javaPath = "";
         if (jvmArgs == null) jvmArgs = "";
+        if (gameArgs == null) gameArgs = "";
         if (avatarImage == null) avatarImage = "";
         if (lastImportDir == null) lastImportDir = "";
         if (lastPage == null || lastPage.isBlank()) lastPage = "launch";
@@ -363,6 +367,14 @@ public class LauncherConfig {
 
     public void setJvmArgs(String jvmArgs) {
         this.jvmArgs = jvmArgs;
+    }
+
+    public String getGameArgs() {
+        return gameArgs == null ? "" : gameArgs;
+    }
+
+    public void setGameArgs(String gameArgs) {
+        this.gameArgs = gameArgs;
     }
 
     public boolean isAutoSelectJava() {
@@ -513,6 +525,15 @@ public class LauncherConfig {
     /** 启动时用的副本：应用实例级内存 / JVM 覆盖，不动全局配置。 */
     public LauncherConfig copyForLaunch(Integer memoryMb, String jvmArgs) {
         return copyForLaunch(memoryMb, jvmArgs, null);
+    }
+
+    public LauncherConfig copyForLaunch(Integer memoryMb, String jvmArgs, String javaPath,
+                                        String gameArgs) {
+        LauncherConfig copy = copyForLaunch(memoryMb, jvmArgs, javaPath);
+        if (gameArgs != null && !gameArgs.isBlank()) {
+            copy.setGameArgs(gameArgs);
+        }
+        return copy;
     }
 
     public LauncherConfig copyForLaunch(Integer memoryMb, String jvmArgs, String javaPath) {

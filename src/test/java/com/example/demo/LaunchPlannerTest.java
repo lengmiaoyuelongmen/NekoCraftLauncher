@@ -106,4 +106,22 @@ class LaunchPlannerTest {
         assertTrue(command.contains("Steve"), "旧版 minecraftArguments 也要替换占位符");
         assertTrue(command.contains("--gameDir"));
     }
+
+    @Test
+    void appendsCustomGameArguments(@TempDir Path temp) throws Exception {
+        VersionProfile profile = profile(temp);
+        LauncherConfig config = new LauncherConfig();
+        config.setGameArgs("--width 1920 --height 1080");
+
+        List<String> command = LaunchPlanner
+                .plan(profile, session(), config, temp.toFile(), "java",
+                        temp.resolve("natives").toFile(), null)
+                .command();
+
+        int lang = command.indexOf("--lang");
+        int width = command.indexOf("--width");
+        assertTrue(width > 0, "自定义游戏参数必须进命令行: " + command);
+        assertTrue(command.contains("1920") && command.contains("1080"));
+        assertTrue(width < lang || lang < 0, "游戏参数应在 --lang 之前，保持版本参数在前");
+    }
 }

@@ -334,6 +334,27 @@ IDLE --beginPrepare()--> PREPARING --markRunning()--> RUNNING --finish()--> IDLE
 
 主类 **8,359 → 8,265 行**；单测 84 → **87 通过**。
 
+### Phase 3c：实例级「游戏参数」
+
+之前只能给每个实例配 JVM 参数，游戏参数（`--width`、`--height`、模组用的启动开关）只能全局拼。
+
+| 层 | 改动 |
+|---|---|
+| `LauncherConfig` | 新增 `gameArgs`（全局默认），`copyForLaunch` 增加带 gameArgs 的重载 |
+| `InstanceSettings` | `Settings` 增加 `gameArgs`，写进 `versions/<id>/instance.json`，旧数据缺失时为 null |
+| `LaunchPlanner` | 版本参数之后、`--lang` 之前追加自定义游戏参数 |
+| 实例设置页 | 「启动设置（本实例）」新增「游戏参数」输入框，支持「恢复全局」一并清空 |
+
+验证：
+
+- 单测 87 → **89 通过**（planner 追加参数、实例设置读写不丢内存）
+- **真实数据实跑**：给 `versions/1.12.2/instance.json` 写 `--width 1920 --height 1080`，
+  走 `InstanceSettings → copyForLaunch → LaunchPlanner`，命令行尾
+  `… --versionType release --width 1920 --height 1080 --lang zh_CN`，同时保住 `-Xmx2048M`；
+  验证后已删除测试设置
+
+主类 8,265 → **8,270 行**（多了几行转发，功能在 core）。
+
 > 这一轮没有动 UI 结构：桌面控制服务不可用（`CONTROL_UNAVAILABLE`），无法在真实界面里验证
 > 大块 UI 抽取，因此只做可单测的 core 迁移，避免把没验证过的 UI 改动交出去。
 

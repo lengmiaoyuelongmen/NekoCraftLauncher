@@ -20,18 +20,20 @@ import java.nio.file.Files;
  */
 public final class InstanceSettings {
 
-    public static final Settings EMPTY = new Settings(null, null, null, null);
+    public static final Settings EMPTY = new Settings(null, null, null, null, null);
 
     /**
      * @param isolation {@code null} 表示跟随全局设置；{@code true/false} 表示该实例强制隔离/不隔离
      */
-    public record Settings(Integer memoryMb, String jvmArgs, String javaPath, Boolean isolation) {
+    public record Settings(Integer memoryMb, String jvmArgs, String javaPath, Boolean isolation,
+                           String gameArgs) {
 
         public boolean isEmpty() {
             return memoryMb == null
                     && (jvmArgs == null || jvmArgs.isBlank())
                     && (javaPath == null || javaPath.isBlank())
-                    && isolation == null;
+                    && isolation == null
+                    && (gameArgs == null || gameArgs.isBlank());
         }
 
         public boolean hasIsolationOverride() {
@@ -69,9 +71,19 @@ public final class InstanceSettings {
         if (gameDir == null || instanceId == null || instanceId.isBlank()) {
             return;
         }
+        save(gameDir, instanceId, memoryMb, jvmArgs, javaPath, null);
+    }
+
+    /** 带游戏参数的重载；{@code gameArgs} 为 null 表示保留原值。 */
+    public static void save(File gameDir, String instanceId, Integer memoryMb, String jvmArgs,
+                            String javaPath, String gameArgs) {
+        if (gameDir == null || instanceId == null || instanceId.isBlank()) {
+            return;
+        }
         Settings current = get(gameDir, instanceId);
-        write(gameDir, instanceId,
-                new Settings(memoryMb, trimToNull(jvmArgs), trimToNull(javaPath), current.isolation()));
+        write(gameDir, instanceId, new Settings(memoryMb, trimToNull(jvmArgs), trimToNull(javaPath),
+                current.isolation(),
+                gameArgs == null ? current.gameArgs() : trimToNull(gameArgs)));
     }
 
     /** 单独保存「是否隔离」；{@code null} 表示恢复跟随全局。 */
@@ -80,8 +92,8 @@ public final class InstanceSettings {
             return;
         }
         Settings current = get(gameDir, instanceId);
-        write(gameDir, instanceId,
-                new Settings(current.memoryMb(), current.jvmArgs(), current.javaPath(), isolation));
+        write(gameDir, instanceId, new Settings(current.memoryMb(), current.jvmArgs(),
+                current.javaPath(), isolation, current.gameArgs()));
     }
 
     /** 该实例实际生效的隔离状态：实例有覆盖用实例的，否则用全局。 */
@@ -127,6 +139,9 @@ public final class InstanceSettings {
             if (settings.isolation() != null) {
                 json.addProperty("isolation", settings.isolation());
             }
+            if (settings.gameArgs() != null) {
+                json.addProperty("gameArgs", settings.gameArgs());
+            }
             Files.writeString(own.toPath(), GSON.toJson(json), StandardCharsets.UTF_8);
             clearLegacy(gameDir, instanceId);
         } catch (Exception ignored) {
@@ -149,7 +164,9 @@ public final class InstanceSettings {
                     ? trimToNull(json.get("javaPath").getAsString()) : null;
             Boolean isolation = json.has("isolation") && !json.get("isolation").isJsonNull()
                     ? json.get("isolation").getAsBoolean() : null;
-            return new Settings(memory, jvm, javaPath, isolation);
+            String gameArgs = json.has("gameArgs") && !json.get("gameArgs").isJsonNull()
+                    ? trimToNull(json.get("gameArgs").getAsString()) : null;
+            return new Settings(memory, jvm, javaPath, isolation, gameArgs);
         } catch (Exception broken) {
             return null;
         }
@@ -185,7 +202,7 @@ public final class InstanceSettings {
                 ? entry.get("memoryMb").getAsInt() : null;
         String jvm = entry.has("jvmArgs") ? trimToNull(entry.get("jvmArgs").getAsString()) : null;
         String javaPath = entry.has("javaPath") ? trimToNull(entry.get("javaPath").getAsString()) : null;
-        Settings migrated = new Settings(memory, jvm, javaPath, null);
+        Settings migrated = new Settings(memory, jvm, javaPath, null, null);
         if (!migrated.isEmpty()) {
             // 迁移落地：写进实例目录，并从旧表里摘掉
             write(gameDir, instanceId, migrated);
