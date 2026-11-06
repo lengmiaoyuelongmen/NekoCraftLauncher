@@ -236,6 +236,8 @@ import com.example.demo.core.game.JavaVersionProbe;
 import com.example.demo.core.launch.LaunchPreflight;
 import com.example.demo.core.model.GameDirDetector;
 import com.example.demo.core.model.LanguageConfig;
+import com.example.demo.core.launch.IntegrityCachePolicy;
+import com.example.demo.core.launch.LaunchGuards;
 import com.example.demo.core.launch.LaunchState;
 import com.example.demo.core.download.ModrinthSearch;
 import com.example.demo.core.download.SearchSession;
@@ -5793,16 +5795,17 @@ private static void setFlexible(Node node, boolean on) {
 
   /** 启动入口的统一检查：已经在启动或已有游戏在跑时，给出提示并拦下。 */
   private boolean blockIfAlreadyRunning() {
-    if (this.isGameProcessAlive()) {
-      this.logLine("⚠ 已有游戏在运行，请先点顶栏「结束游戏」再启动新的实例");
-      Toast.info("已有游戏在运行，请先结束当前游戏");
-      return true;
+    LaunchGuards.Block block =
+        LaunchGuards.blockReason(this.isGameProcessAlive(), this.launchState.isLaunching());
+    if (block == LaunchGuards.Block.NONE) {
+      return false;
     }
-    if (this.launchState.isLaunching()) {
-      this.logLine("🎮 游戏正在运行中，如需中止请点顶栏的「取消启动」");
-      return true;
+    this.logLine(LaunchGuards.logMessage(block));
+    String toast = LaunchGuards.toastMessage(block);
+    if (!toast.isEmpty()) {
+      Toast.info(toast);
     }
-    return false;
+    return true;
   }
 
   private void handleLaunch() {
@@ -5838,13 +5841,12 @@ private static void setFlexible(Node node, boolean on) {
               Integrity.Report report = null;
               long now = System.currentTimeMillis();
               // 5 分钟内刚查过同一个实例就直接复用，别每次启动都把几百个文件再扫一遍
-              if (this.lastIntegrityReport != null
-                  && profile.getId().equals(this.lastIntegrityProfile)
-                  && now - this.lastIntegrityAt < 5 * 60 * 1000L) {
+              if (IntegrityCachePolicy.reusable(this.lastIntegrityReport != null,
+                  this.lastIntegrityProfile, this.lastIntegrityAt, profile.getId(), now)) {
                 report = this.lastIntegrityReport;
                 log.accept(
                     "📋 复用 "
-                        + Math.max(1L, (now - this.lastIntegrityAt) / 1000L)
+                        + IntegrityCachePolicy.ageSeconds(this.lastIntegrityAt, now)
                         + " 秒前的完整性检查结果（"
                         + report.issues().size()
                         + " 个缺失）");
