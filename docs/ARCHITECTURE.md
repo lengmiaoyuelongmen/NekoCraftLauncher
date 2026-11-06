@@ -665,6 +665,48 @@ Platform.runLater(() -> { if (expandedLoader == null) expand("Fabric"); });
 - 点「模组」：搜索框提示变为「搜索 模组…」，列表为 Fabric API / Sodium / Iris Shaders…
 - 点安装包分类：安装器页正常打开（加载器版本列表可见）
 
+## 15. 暂停点（2026-11-06 22:30）
+
+### 状态：可运行、可验证
+
+| 项 | 值 |
+|---|---|
+| 构建 | `mvnw -o -q clean package` 通过，0 告警 |
+| 单测 | **150 通过** |
+| 冒烟 | PASS（5 页截图，逐页等到真实绘制） |
+| 架构守卫 | PASS（含编码守卫） |
+| 主类 | `HelloApplication` 7,240 行（起点 8,970） |
+
+### 本轮新拆的东西
+
+| 类 | 内容 |
+|---|---|
+| `core.download.SearchSession` | 搜索缓存键 / 翻页 / 跨页去重 / 默认筛选判定 |
+| `core.model.LaunchFormat` | 启动概览的耗时与会话时长格式化 |
+| `core.auth.SessionState` | 登录类型映射、UUID 解析、展示文案（会话业务收口） |
+| `ui.component.AccountManagerDialog` | 账户管理对话框 |
+
+新增测试：`SearchSessionTest`(6)、`LaunchHistoryTest`(7)、`LaunchFormatTest`(3)、`SessionStateTest`(7)。
+
+### 未完成的阻塞项：启动页布局搬迁
+
+尝试过三次（提交 `0c21494` 尝试、`8a4987a` 回滚、后续两次重试），每次都回滚。已知事实：
+
+- `LaunchPage.build(userArea, logContainer)` **不抛异常**；
+- 抽取后 `launchPanel` 有 2 个子节点、账户列 11 个、控制台 5 个，但两列 `opacity=0`；
+- 去掉 `LaunchPage` 里重复的 `Motion.stagger` 后，内容区**依然空白**；
+- 用「等到画面有内容再截图」的方式复验，抓到的是顶栏正常 + 内容区空（299 种颜色），
+  排除「没画完」的可能。
+
+下一步建议：把 `createLaunchPanel` 整体复制进 `LaunchPage`（不做删改），逐句比对
+`setVgrow / setMaxSize / setPadding / Motion` 的差异；或先用软件渲染
+（`-Dprism.order=sw`）排除渲染层干扰。
+
+### 环境注意
+
+- 这台机器冷启动 + 首帧现在很慢（实测窗口出现 30~40 秒），冒烟已按 90 秒等待并做"画出来再截图"；
+- 跑 UI 验证前先关掉占 CPU 的程序，结果会可靠得多。
+
 ## 9. 新增代码放哪里
 
 | 想做的事 | 放哪 | 注意 |
