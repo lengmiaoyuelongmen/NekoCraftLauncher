@@ -894,30 +894,30 @@ public final class ToolsPanel extends VBox {
         });
     }
 
-    /** 校验并可选一键补齐缺失库文件（走 DownloadManager）。 */
+    /** 校验并可选一键补齐缺失库文件（走 DownloadManager）。手动校验走 SHA1 深度检查。 */
     private void verifyLibrariesWithRepair() {
-        Toast.info("正在校验库文件…");
+        Toast.info("正在校验库文件（含 SHA1）…");
         File game = gameDir();
         java.util.concurrent.CompletableFuture.runAsync(() -> {
-            Integrity.Report report = Integrity.check(game, null, config.getAssetSampleCount());
+            Integrity.Report report = Integrity.check(game, null, config.getAssetSampleCount(), true);
             Platform.runLater(() -> {
                 lastReport = report;
                 lastReportAt = System.currentTimeMillis();
                 updateCheckResultClick();
                 if (report.issues().isEmpty()) {
                     checkResult.setStyle("-fx-text-fill: #9ca3af; -fx-font-size: 11px;");
-                    checkResult.setText("检查 " + report.checked() + " 个文件 · 无缺失 ✓");
+                    checkResult.setText("检查 " + report.checked() + " 个文件 · 无异常 ✓");
                     Toast.ok("文件完整（检查 " + report.checked() + " 个）");
                     log("✅ 完整性校验通过，共检查 " + report.checked() + " 个");
                     return;
                 }
                 checkResult.setStyle("-fx-text-fill: #ffb74d; -fx-font-size: 11px;");
-                checkResult.setText("检查 " + report.checked() + " 个文件 · 缺失 "
+                checkResult.setText("检查 " + report.checked() + " 个文件 · 异常 "
                         + report.issues().size() + " 个（点击查看明细）");
                 javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
                         javafx.scene.control.Alert.AlertType.CONFIRMATION);
                 alert.setTitle("完整性校验");
-                alert.setHeaderText("缺失 " + report.issues().size() + " 个文件（共检查 "
+                alert.setHeaderText("异常 " + report.issues().size() + " 个文件（共检查 "
                         + report.checked() + " 个）");
                 alert.setContentText("是否立即下载补齐？");
                 if (alert.showAndWait().orElse(javafx.scene.control.ButtonType.CANCEL)
@@ -927,7 +927,7 @@ public final class ToolsPanel extends VBox {
                 Toast.info("正在补齐文件…");
                 java.util.concurrent.CompletableFuture.runAsync(() -> {
                     int ok = Integrity.repair(game, report.issues());
-                    Integrity.Report after = Integrity.check(game, null, config.getAssetSampleCount());
+                    Integrity.Report after = Integrity.check(game, null, config.getAssetSampleCount(), true);
                     Platform.runLater(() -> {
                         lastReport = after;
                         lastReportAt = System.currentTimeMillis();
@@ -936,7 +936,7 @@ public final class ToolsPanel extends VBox {
                                 + (after.issues().isEmpty() ? "#9ca3af" : "#ffb74d")
                                 + "; -fx-font-size: 11px;");
                         checkResult.setText("已补齐 " + ok + "/" + report.issues().size()
-                                + " · 剩余缺失 " + after.issues().size() + " 个"
+                                + " · 剩余异常 " + after.issues().size() + " 个"
                                 + (after.issues().isEmpty() ? "" : "（点击查看明细）"));
                         Toast.ok("已补齐 " + ok + "/" + report.issues().size() + " 个文件");
                         log("🔧 补齐文件 " + ok + "/" + report.issues().size());

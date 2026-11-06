@@ -157,6 +157,30 @@ new LaunchPipeline()
 - 真机写入 `{"memoryMb":2048,"jvmArgs":"-Dneko.test.instance=1"}` 后启动 1.12.2，实际命令行确认包含 `-Xmx2048M` 与 `-Dneko.test.instance=1`
 - 0 告警；冒烟 PASS
 
+### Phase 4a：校验和（SHA1）落地
+
+`Integrity` 以前只比大小：截断能发现，但「大小恰好一样、内容坏了」永远查不出来。现在：
+
+- `Issue` 带 `reason`：`MISSING / SIZE / SHA1`，明细里直接显示「库文件（SHA1 不符）」
+- `Integrity.check(..., verifySha1=true)` 会对「大小相符」的文件再算一遍 SHA1（同一次检查里相同文件只算一次，多个实例共享 libraries 不重复哈希）
+- 覆盖范围从「库文件」扩到 客户端 jar、资源索引、抽样资源对象
+- `repair()` 补完后按 **大小 + SHA1** 复核，不再出现「补了但没修好还报已补齐」
+- 工具页「校验文件」默认走深度模式
+
+真实数据验证（14 个已装实例，全量深度校验 8.4 秒）：
+
+```
+1.12.2 / 1.8.9 / 1.7.10 / 1.16.5 / 1.18.2 / 26.3 / fabric / forge…  issues=0
+1.20.1 家族 4 个实例                                               issues=1（资源索引 SHA1 不符）
+```
+
+抓到一个真问题：`game/assets/indexes/5.json` 大小 413067 与官方完全一致，但 SHA1 是
+`8a45c6be…`，官方是 `ada52cc6…`，逐字节比对有 5920 字节不同（从 `minecraft/lang/af_za.json`
+的 hash 开始）—— 旧逻辑只比大小，永远发现不了；现在点「校验文件 → 补齐」会重新下载并校验。
+
+单测 31 → **36 通过**（新增 `IntegrityTest` 5 个：完好 / 缺失 / 大小不符 / 同尺寸不同内容
+只有深度模式能发现 / 0 字节算缺失）。
+
 ## 5. 迁移手法
 
 1. 脚本按「域 → 新包」映射移动文件，改 `package` 行。
@@ -174,6 +198,7 @@ new LaunchPipeline()
 | ~~**Phase 5a**~~ ✅ | `ui/*` + `core/mod` 包结构闭环，入口只剩 `Launcher` | 守卫 PASS；编译/单测/冒烟全绿 |
 | ~~**Phase 2b**~~ ✅ | 启动准备管线：`LaunchPipeline` + `LaunchContext` + 4 个 Task，`GameFiles` 承接下载/校验 | 5 个管线单测；实机启动成功 |
 | ~~**Phase 3a**~~ ✅ | `InstanceSettings`：`versions/<id>/instance.json` + 旧表迁移 + 隔离覆盖 | 5 个单测；实机命令行带实例内存/JVM 参数 |
+| ~~**Phase 4a**~~ ✅ | `Integrity` 支持 SHA1 深度校验 + 修复后复核 | 5 个单测；14 实例全量深度校验 |
 | **Phase 2b** | 把 `startGame` 的编排（检查 Java → 校验 → 下载 → 解压 → 起进程）抽成 `LaunchTask` 链 + `LaunchPipeline`，UI 只订阅进度 | 主类再减 ~300 行；断点续跑可测 |
 | **Phase 3** | 实例一等公民：`InstanceSettings`（内存 / JVM 参数 / Java 路径 / 是否隔离 / 游戏目录）落到 `versions/<id>/instance.json`；实例设置页读写 | 两个实例用不同内存启动成功 |
 | **Phase 4** | 下载引擎统一：`DownloadEngine` 统一入口，所有下载带 SHA1 校验、并发上限、失败重试与镜像回退；`DownloadManager` 退化为其实现 | 强制断网/坏源测试通过 |

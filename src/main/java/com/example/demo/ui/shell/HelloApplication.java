@@ -805,7 +805,9 @@ public class HelloApplication extends Application {
           MemoryAdvisor.Suggestion suggestion =
               MemoryAdvisor.suggest(
                   InstanceDirs.mods(
-                      detectGameDir, this.config.getLastInstance(), this.config.isIsolation()));
+                      detectGameDir,
+                      this.config.getLastInstance(),
+                      this.isIsolated(detectGameDir, this.config.getLastInstance())));
           Platform.runLater(
               () -> {
                 this.logArea.appendText("🖥 硬件识别：" + hardware.summary() + "\n");
@@ -5018,7 +5020,7 @@ public class HelloApplication extends Application {
             InstanceDirs.mods(
                 new File(this.config.getGameDir()),
                 this.currentInstanceId(),
-                this.config.isIsolation());
+                this.isIsolated(this.currentInstanceId()));
         if (!mods.isDirectory()) {
           mods.mkdirs();
         }
@@ -5303,7 +5305,7 @@ public class HelloApplication extends Application {
     if (serverPack.isSelected()) {
       File instanceRoot =
           InstanceDirs.root(
-              new File(this.config.getGameDir()), instance.id, this.config.isIsolation());
+              new File(this.config.getGameDir()), instance.id, this.isIsolated(instance.id));
       FileChooser chooser = new FileChooser();
       chooser.setTitle("导出服务端文件包");
       chooser
@@ -5497,7 +5499,7 @@ public class HelloApplication extends Application {
 
   private void installDroppedMods(List<File> jars) {
     File game = new File(this.config.getGameDir());
-    File mods = InstanceDirs.mods(game, this.currentInstanceId(), this.config.isIsolation());
+    File mods = InstanceDirs.mods(game, this.currentInstanceId(), this.isIsolated(this.currentInstanceId()));
     if (!mods.isDirectory()) {
       mods.mkdirs();
     }
@@ -6414,7 +6416,7 @@ public class HelloApplication extends Application {
     String id = this.currentInstanceId();
     File game = new File(this.config.getGameDir());
     boolean versionOk = id != null && VersionProfile.isInstalled(game, id);
-    File mods = InstanceDirs.mods(game, id, this.config.isIsolation());
+    File mods = InstanceDirs.mods(game, id, this.isIsolated(id));
     int modCount = 0;
     File[] jars =
         mods.listFiles(
@@ -8000,6 +8002,17 @@ public class HelloApplication extends Application {
     return installed.isEmpty() ? null : installed.get(0);
   }
 
+  /** 该实例实际生效的隔离状态：实例自己的 instance.json 可覆盖全局开关。 */
+  private boolean isIsolated(String instanceId) {
+    return InstanceSettings.effectiveIsolation(
+        new File(this.config.getGameDir()), instanceId, this.config.isIsolation());
+  }
+
+  /** 指定游戏目录时判断隔离（例如首次启动检测目录，config 里还没切过去）。 */
+  private boolean isIsolated(File gameDir, String instanceId) {
+    return InstanceSettings.effectiveIsolation(gameDir, instanceId, this.config.isIsolation());
+  }
+
   private void switchGameDir(File dir) {
     if (dir == null) {
       return;
@@ -8103,7 +8116,7 @@ public class HelloApplication extends Application {
     try {
       File gameDir = new File(this.config.getGameDir());
       VersionProfile profile = VersionProfile.load(gameDir, id);
-      File instanceDir = InstanceDirs.root(gameDir, id, this.config.isIsolation());
+      File instanceDir = InstanceDirs.root(gameDir, id, this.isIsolated(id));
       String java =
           this.config.getJavaPath() == null || this.config.getJavaPath().isBlank()
               ? new File(
@@ -8119,7 +8132,7 @@ public class HelloApplication extends Application {
                   gameDir,
                   instanceDir,
                   java,
-                  InstanceDirs.natives(gameDir, id, this.config.isIsolation()),
+                  InstanceDirs.natives(gameDir, id, this.isIsolated(id)),
                   null)
               .command();
       StringBuilder script = new StringBuilder("@echo off\r\n");
@@ -8677,7 +8690,7 @@ if (files != null && files.size() > 0) {
       InstanceDirs.root(
           new File(this.config.getGameDir()),
           this.currentInstanceId(),
-          this.config.isIsolation());
+          this.isIsolated(this.currentInstanceId()));
   File file =
       targetDir =
           "整合包".equals(projectType)
