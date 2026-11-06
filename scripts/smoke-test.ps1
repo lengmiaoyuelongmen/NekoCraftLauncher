@@ -200,9 +200,11 @@ public class SmokeWin {
     $shots = Get-ChildItem $outDir -Filter *.png | Select-Object -ExpandProperty Name
     $hashes = @(Get-ChildItem $outDir -Filter *.png | ForEach-Object { (Get-FileHash $_.FullName -Algorithm SHA256).Hash })
     $unique = @($hashes | Sort-Object -Unique).Count
-    # 01（启动页）与 05（切回启动页）本来就该一样，所以要求至少 4 张不同
-    if ($hashes.Count -ne 5 -or $unique -lt 4) {
-        Write-Host ("FAIL: 页面没有真正切换（截图 {0} 张，不同的 {1} 张）" -f $hashes.Count, $unique) -ForegroundColor Red
+    # 01 与 05 都是启动页，允许相同；但 01→02→03→04 必须四张都不一样，否则就是某次点击没生效
+    $pageHashes = @($hashes[0], $hashes[1], $hashes[2], $hashes[3])
+    $pageUnique = @($pageHashes | Sort-Object -Unique).Count
+    if ($hashes.Count -ne 5 -or $pageUnique -ne 4) {
+        Write-Host ("FAIL: 页面没有真正切换（前四张里只有 {0} 张不同）" -f $pageUnique) -ForegroundColor Red
         exit 1
     }
     Write-Host ""
