@@ -57,6 +57,7 @@ import com.example.demo.ui.shell.ModuleHeader;
 import com.example.demo.ui.shell.Motion;
 import com.example.demo.ui.shell.Theme;
 import com.example.demo.ui.shell.Toast;
+import com.example.demo.core.model.InstanceSettings;
 /**
  * 设置页：学习 PCL-CE 的「左侧选项卡 + 右侧内容」结构。
  * 页签：启动 / Java / 管理 / 个性化 / 杂项 / 软件信息。
@@ -534,7 +535,7 @@ public final class SettingsPanel extends VBox {
         File game = new File(config.getGameDir());
         String id = config.getLastInstance();
         if (id == null || id.isBlank()) return new File(game, "mods");
-        return InstanceDirs.mods(game, id, config.isIsolation());
+        return InstanceDirs.mods(game, id, InstanceSettings.effectiveIsolation(game, id, config.isIsolation()));
     }
 
     private long totalMemoryMb() {
@@ -750,7 +751,8 @@ public final class SettingsPanel extends VBox {
                 return;
             }
             PortableServerDialog.show(owner(), new File(config.getGameDir()),
-                    instanceId, config.isIsolation());
+                    instanceId, InstanceSettings.effectiveIsolation(
+                            new File(config.getGameDir()), instanceId, config.isIsolation()));
         });
         VBox card = card(
                 section("局域网联机"),

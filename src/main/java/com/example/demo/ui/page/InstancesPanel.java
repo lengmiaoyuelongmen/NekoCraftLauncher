@@ -35,6 +35,7 @@ import com.example.demo.ui.shell.Icons;
 import com.example.demo.ui.shell.ModuleHeader;
 import com.example.demo.ui.shell.Motion;
 import com.example.demo.ui.shell.Toast;
+import com.example.demo.core.model.InstanceSettings;
 /**
  * 实例选择页（对标 PCL）：左侧文件夹列表，右侧搜索 + 按加载器分组的实例卡片。
  * 单击实例即选中并返回启动页。
@@ -123,7 +124,8 @@ public final class InstancesPanel extends HBox {
                 + " -fx-padding: 6 14; -fx-cursor: hand; -fx-font-size: 12px;");
         fileManager.setOnAction(e -> InstanceFileManager.show(
                 getScene() == null ? null : getScene().getWindow(),
-                InstanceDirs.root(gameDir, selectedId, config.isIsolation()), gameDir));
+                InstanceDirs.root(gameDir, selectedId,
+                        InstanceSettings.effectiveIsolation(gameDir, selectedId, config.isIsolation())), gameDir));
 
         searchField.setPromptText("搜索游戏实例");
         searchField.setStyle("-fx-background-color: -app-input; -fx-text-fill: -app-text;"
@@ -487,7 +489,8 @@ public final class InstancesPanel extends HBox {
     }
 
     private void openInstanceFolder(Instance instance, boolean logs) {
-        File root = InstanceDirs.root(gameDir, instance.id, config.isIsolation());
+        File root = InstanceDirs.root(gameDir, instance.id,
+                InstanceSettings.effectiveIsolation(gameDir, instance.id, config.isIsolation()));
         File dir = logs ? new File(root, "logs") : root;
         try {
             if (!dir.isDirectory()) dir.mkdirs();
