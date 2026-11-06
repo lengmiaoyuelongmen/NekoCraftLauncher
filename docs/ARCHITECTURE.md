@@ -546,6 +546,35 @@ powershell -ExecutionPolicy Bypass -File scripts\smoke-test.ps1 -SkipBuild
 - 不用 PowerShell `Get-Content`/`Set-Content` 改源码。
 - 每次改动后：0 告警 + 单测 + 冒烟，缺一不可。
 
+## 11. 安装器页独立（Phase 5f）
+
+| 归属 | 内容 |
+|---|---|
+| `ui.page.InstallerPage` | 安装器整页：版本下拉 / 实例名 / 7 个加载器手风琴 / 加载器版本列表 / 状态与进度条 |
+| `HelloApplication` | 只剩 `startInstallerFromPanel`（官网分流、启动安装流程）与几个转发方法 |
+
+主类 **8,062 → 7,710 行**（重构起点 8,970）。
+
+### 顺带修掉一个真实 bug：点 Forge 却展开 Fabric
+
+拆完后用 UIA 点「Forge」分类，页面展开的却是 Fabric。原因：
+
+```java
+// build() 末尾
+Platform.runLater(() -> expand("Fabric"));   // 默认展开
+// 用户点分类 → 同步 expand("Forge")
+```
+
+同步的 `expand("Forge")` 先执行，随后排队中的 runLater 把它覆盖回 Fabric —— **点任何加载器都会显示 Fabric**。
+修复：默认展开也要先判断有没有已经展开的：
+
+```java
+Platform.runLater(() -> { if (expandedLoader == null) expand("Fabric"); });
+```
+
+**实机验证**：点 Forge → 展开 Forge（66.1.5 / 66.1.4 / 66.1.3 … 真实版本号）；
+点 NeoForge → 展开 NeoForge 并显示「正在读取 NeoForge 版本…」；点 Fabric → 展开 Fabric。
+
 ## 10. 版本详情页独立（Phase 5e）
 
 | 归属 | 内容 |

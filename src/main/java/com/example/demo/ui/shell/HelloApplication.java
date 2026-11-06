@@ -241,6 +241,7 @@ import com.example.demo.ui.page.DownloadPage;
 import com.example.demo.ui.component.DownloadTasksDialog;
 import com.example.demo.core.meta.ReleaseTime;
 import com.example.demo.ui.page.VersionDetailPage;
+import com.example.demo.ui.page.InstallerPage;
 public class HelloApplication extends Application {
   private static final Set<String> CLONE_DATA_DIRS =
       Set.of(
@@ -273,6 +274,7 @@ public class HelloApplication extends Application {
   private WindowChrome windowChrome;
   private DownloadPage downloadPage;
   private VersionDetailPage versionDetailPage;
+  private InstallerPage installerPage;
   private Stage stageRef;
   private volatile boolean testSuccess;
   private Rectangle navIndicator;
@@ -372,21 +374,8 @@ public class HelloApplication extends Application {
   private VBox installerPanel;
   private VBox versionDetailPanel;
   private VBox modDetailPanel;
-  private ComboBox<MinecraftVersion> installerVersionCombo;
   private final Map<String, ComboBox<String>> installerLoaderCombos =
       new LinkedHashMap<String, ComboBox<String>>();
-  private Label installerTitle;
-  private final Map<String, VBox> installerLoaderBodies = new LinkedHashMap<String, VBox>();
-  private final Map<String, HBox> installerLoaderHeaders = new LinkedHashMap<String, HBox>();
-  private final Map<String, Label> installerLoaderSubtitles = new LinkedHashMap<String, Label>();
-  private final Map<String, Label> installerLoaderArrows = new LinkedHashMap<String, Label>();
-  private final Map<String, String> installerSelectedVersions = new LinkedHashMap<String, String>();
-  private String installerExpandedLoader;
-  private TextField installerNameField;
-  private Label installerStatus;
-  private ProgressBar installerProgress;
-  private VBox installerAccordion;
-  private String currentLoader = "Fabric";
   private String currentProjectType = "整合包";
   private DownloadFilterBar filterBar;
   private DownloadResultView resultView;
@@ -2855,16 +2844,15 @@ public class HelloApplication extends Application {
     return row;
   }
 
-  private void setInstallerProgress(boolean running) {
-    if (this.installerProgress == null) {
-      return;
+  private void setInstallerStatus(String text) {
+    if (this.installerPage != null) {
+      this.installerPage.setStatus(text);
     }
-    this.installerProgress.setVisible(running);
-    this.installerProgress.setManaged(running);
-    if (running) {
-      this.installerProgress.setProgress(-1.0);
-    } else {
-      this.installerProgress.setProgress(0.0);
+  }
+
+  private void setInstallerProgress(boolean running) {
+    if (this.installerPage != null) {
+      this.installerPage.setBusy(running);
     }
   }
 
@@ -2986,343 +2974,47 @@ public class HelloApplication extends Application {
   }
 
   private VBox createInstallerPanel() {
-    String[] loaders;
-    VBox panel = new VBox(10.0);
-    panel.setAlignment(Pos.TOP_LEFT);
-    panel.setPadding(new Insets(0.0));
-    Button back = new Button("返回列表");
-    back.setGraphic(Icons.node("back", 13.0, "#9ca3af"));
-    back.setGraphicTextGap(4.0);
-    back.setStyle(
-        "-fx-background-color: transparent; -fx-text-fill: -app-text-dim; -fx-font-size: 12px;"
-            + " -fx-cursor: hand; -fx-padding: 2 4;");
-    back.setOnAction(e -> this.showDownloadPanel(this.minecraftPanel));
-    this.installerTitle = new Label("安装新实例");
-    this.installerTitle.setStyle(
-        "-fx-text-fill: -app-text; -fx-font-size: 18px; -fx-font-weight: bold;");
-    Region topSpacer = new Region();
-    HBox.setHgrow(topSpacer, Priority.ALWAYS);
-    HBox top = new HBox(10.0, back, this.installerTitle, topSpacer);
-    top.setAlignment(Pos.CENTER_LEFT);
-    this.installerVersionCombo = new ComboBox<>();
-    this.installerVersionCombo.setPrefWidth(150.0);
-    this.installerVersionCombo.setPromptText("Minecraft 版本");
-    this.installerVersionCombo.setStyle("-fx-background-radius: 8;");
-    this.installerVersionCombo.setConverter(
-        new StringConverter<MinecraftVersion>() {
+    this.installerPage =
+        new InstallerPage(
+            new InstallerPage.Host() {
+              @Override
+              public void backToList() {
+                HelloApplication.this.showDownloadPanel(HelloApplication.this.minecraftPanelNode());
+              }
 
-          @Override
-          public String toString(MinecraftVersion value) {
-            return value == null ? "" : value.getId();
-          }
-
-          @Override
-          public MinecraftVersion fromString(String string) {
-            return null;
-          }
-        });
-    this.installerVersionCombo
-        .valueProperty()
-        .addListener((o, ov, nv) -> this.refreshInstallerLoaderVersions());
-    this.installerNameField = new TextField();
-    this.installerNameField.setPromptText("实例名（留空使用版本号）");
-    this.installerNameField.setPrefWidth(200.0);
-    HBox.setHgrow(this.installerNameField, Priority.ALWAYS);
-    HBox versionRow =
-        new HBox(
-            10.0,
-            this.installerLabel("游戏版本"),
-            this.installerVersionCombo,
-            this.installerLabel("实例名"),
-            this.installerNameField);
-    versionRow.setAlignment(Pos.CENTER_LEFT);
-    this.installerAccordion = new VBox(6.0);
-    for (String loader :
-        loaders =
-            new String[] {"原版", "Fabric", "Forge", "NeoForge", "Quilt", "OptiFine", "LabyMod"}) {
-      this.installerAccordion.getChildren().add(this.createInstallerLoaderRow(loader));
-    }
-    Button download = new Button("开始下载");
-    download.setStyle(
-        "-fx-background-color: linear-gradient(to bottom right, #d1d5db, #9ca3af); -fx-text-fill:"
-            + " #111827; -fx-font-weight: bold; -fx-background-radius: 9; -fx-padding: 9 26;"
-            + " -fx-cursor: hand; -fx-font-size: 13px;");
-    download.setMinWidth(Double.NEGATIVE_INFINITY);
-    download.setOnAction(e -> this.startInstallerFromPanel(download));
-    this.installerProgress = new ProgressBar();
-    this.installerProgress.setMaxWidth(Double.MAX_VALUE);
-    this.installerProgress.setVisible(false);
-    this.installerProgress.setManaged(false);
-    this.installerProgress.setStyle("-fx-accent: -app-accent;");
-    this.installerStatus = new Label("先选游戏版本，再展开加载器选择具体版本。");
-    this.installerStatus.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11.5px;");
-    this.installerStatus.setWrapText(true);
-    HBox.setHgrow(this.installerStatus, Priority.ALWAYS);
-    HBox bottom = new HBox(12.0, download, this.installerStatus);
-    bottom.setAlignment(Pos.CENTER_LEFT);
-    VBox bottomBox = new VBox(6.0, bottom, this.installerProgress);
-    ScrollPane accordionScroll = new ScrollPane(this.installerAccordion);
-    accordionScroll.setFitToWidth(true);
-    accordionScroll.setPrefViewportHeight(330.0);
-    accordionScroll.setPrefHeight(360.0);
-    accordionScroll.setMinHeight(250.0);
-    accordionScroll.setMaxHeight(360.0);
-    accordionScroll.setStyle(
-        "-fx-background: transparent; -fx-background-color: transparent; -fx-border-color:"
-            + " transparent;");
-    VBox card = new VBox(10.0, versionRow, accordionScroll, bottomBox);
-    card.setPadding(new Insets(14.0));
-    card.setMaxWidth(780.0);
-    card.setMaxHeight(Double.MAX_VALUE);
-    card.setStyle(
-        "-fx-background-color: -app-card; -fx-background-radius: 12; -fx-border-color:"
-            + " -app-border-2; -fx-border-radius: 12;");
-    panel.getChildren().addAll(top, card);
-    Platform.runLater(() -> this.expandInstallerLoader("Fabric"));
-    return panel;
-  }
-
-  private Label installerLabel(String text) {
-    Label label = new Label(text);
-    label.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 12px;");
-    return label;
-  }
-
-  private VBox createInstallerLoaderRow(String name) {
-    VBox holder = new VBox(0.0);
-    holder.setStyle(
-        "-fx-background-color: -app-row; -fx-background-radius: 10; -fx-border-color:"
-            + " -app-border-soft; -fx-border-radius: 10;");
-    HBox header = new HBox(10.0);
-    header.setPadding(new Insets(8.0, 12.0, 8.0, 12.0));
-    header.setAlignment(Pos.CENTER_LEFT);
-    header.setCursor(Cursor.HAND);
-    Label title = new Label(name);
-    title.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 13px; -fx-font-weight: bold;");
-    Label subtitle = new Label("选择版本");
-    subtitle.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
-    Region spacer = new Region();
-    HBox.setHgrow(spacer, Priority.ALWAYS);
-    Label arrow = new Label("▾");
-    arrow.setStyle("-fx-text-fill: -app-text-dim; -fx-font-size: 12px;");
-    header.getChildren().addAll(title, subtitle, spacer, arrow);
-    header.setOnMouseClicked(e -> this.expandInstallerLoader(name));
-    VBox body = new VBox(4.0);
-    body.setPadding(new Insets(2.0, 10.0, 10.0, 10.0));
-    body.setVisible(false);
-    body.setManaged(false);
-    holder.getChildren().addAll(header, body);
-    this.installerLoaderHeaders.put(name, header);
-    this.installerLoaderSubtitles.put(name, subtitle);
-    this.installerLoaderArrows.put(name, arrow);
-    this.installerLoaderBodies.put(name, body);
-    return holder;
-  }
-
-  private void expandInstallerLoader(String name) {
-    if (name == null || !this.installerLoaderBodies.containsKey(name)) {
-      return;
-    }
-    this.installerExpandedLoader = name;
-    this.currentLoader = name;
-    for (Map.Entry<String, VBox> entry : this.installerLoaderBodies.entrySet()) {
-      Label arrow;
-      boolean open = entry.getKey().equals(name);
-      entry.getValue().setVisible(open);
-      entry.getValue().setManaged(open);
-      HBox header = this.installerLoaderHeaders.get(entry.getKey());
-      if (header != null) {
-        header.setStyle(
-            open
-                ? "-fx-background-color: -app-hover-2; -fx-background-radius: 10 10 0 0;"
-                : "-fx-background-color: transparent; -fx-background-radius: 10;");
-      }
-      if ((arrow = this.installerLoaderArrows.get(entry.getKey())) == null) continue;
-      arrow.setText(open ? "▴" : "▾");
-    }
-    this.loadInstallerLoaderVersions(name);
-  }
-
-  private void loadInstallerLoaderVersions(String name) {
-    MinecraftVersion game;
-    VBox body = this.installerLoaderBodies.get(name);
-    if (body == null) {
-      return;
-    }
-    body.getChildren().clear();
-    Label subtitle = this.installerLoaderSubtitles.get(name);
-    MinecraftVersion minecraftVersion =
-        game = this.installerVersionCombo == null ? null : this.installerVersionCombo.getValue();
-    if (game == null) {
-      body.getChildren().setAll(this.installerMessage("先选择 Minecraft 版本"));
-      if (subtitle != null) {
-        subtitle.setText("等待游戏版本");
-      }
-      return;
-    }
-    if ("原版".equals(name)) {
-      body.getChildren().setAll(this.installerMessage("纯原版不需要加载器，直接开始下载即可。"));
-      if (subtitle != null) {
-        subtitle.setText("纯原版");
-      }
-      return;
-    }
-    if ("OptiFine".equals(name) || "LabyMod".equals(name)) {
-      body.getChildren().setAll(this.installerMessage("官网安装器，点「开始下载」会打开官网。"));
-      if (subtitle != null) {
-        subtitle.setText("官网安装器");
-      }
-      return;
-    }
-    body.getChildren().setAll(this.installerMessage("正在读取 " + name + " 版本…"));
-    String mc = game.getId();
-
-    LoaderInstaller.listLoaderVersions(name, mc)
-        .thenAccept(
-            versions ->
-                Platform.runLater(
-                    () -> {
-                      if (!name.equals(this.installerExpandedLoader)) {
-                        return;
-                      }
-                      if (this.installerVersionCombo.getValue() != game) {
-                        return;
-                      }
-                      String selected = this.installerSelectedVersions.get(name);
-                      VBox list = new VBox(4.0);
-                      list.getChildren()
-                          .add(this.installerVersionRow(name, null, "自动（最新）", selected == null));
-                      for (String version : versions) {
-                        list.getChildren()
-                            .add(
-                                this.installerVersionRow(
-                                    name, version, version, version.equals(selected)));
-                      }
-                      body.getChildren().setAll(this.installerBodyScroll(list));
-                      if (subtitle != null) {
-                        subtitle.setText(selected == null ? "自动（最新）" : selected);
-                      }
-                    }))
-        .exceptionally(
-            ex -> {
-              Platform.runLater(
-                  () -> {
-                    if (!name.equals(this.installerExpandedLoader)) {
-                      return;
-                    }
-                    body.getChildren().setAll(this.installerMessage("读取版本失败：" + ex.getMessage()));
-                  });
-              return null;
+              @Override
+              public void startInstall(Button trigger) {
+                HelloApplication.this.startInstallerFromPanel(trigger);
+              }
             });
-  }
-
-  private ScrollPane installerBodyScroll(Node content) {
-    ScrollPane scroll = new ScrollPane(content);
-    scroll.setFitToWidth(true);
-    scroll.setPrefHeight(190.0);
-    scroll.setMinHeight(190.0);
-    scroll.setMaxHeight(190.0);
-    scroll.setStyle(
-        "-fx-background: transparent; -fx-background-color: transparent; -fx-border-color:"
-            + " transparent;");
-    return scroll;
-  }
-
-  private HBox installerVersionRow(String loader, String version, String text, boolean selected) {
-    HBox row = new HBox(8.0);
-    row.setAlignment(Pos.CENTER_LEFT);
-    row.setPadding(new Insets(7.0, 10.0, 7.0, 10.0));
-    row.setCursor(Cursor.HAND);
-    row.setUserData(version);
-    Label mark = new Label(selected ? "●" : "○");
-    mark.setStyle(
-        "-fx-text-fill: "
-            + (selected ? "-app-accent" : "-app-text-dim-3")
-            + "; -fx-font-size: 11px;");
-    Label label = new Label(text);
-    label.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 12px;");
-    row.getChildren().addAll(mark, label);
-    row.setStyle(this.installerVersionRowStyle(selected));
-    row.setOnMouseClicked(
-        e -> {
-          Parent patt0$temp;
-          this.installerSelectedVersions.put(loader, version);
-          Label subtitle = this.installerLoaderSubtitles.get(loader);
-          if (subtitle != null) {
-            subtitle.setText(version == null ? "自动（最新）" : version);
-          }
-          if ((patt0$temp = row.getParent()) instanceof VBox) {
-            VBox parent = (VBox) patt0$temp;
-            for (Node node : parent.getChildren()) {
-              if (!(node instanceof HBox)) continue;
-              HBox other = (HBox) node;
-              boolean isSelected = Objects.equals(other.getUserData(), version);
-              other.setStyle(this.installerVersionRowStyle(isSelected));
-              Node patt1$temp = other.getChildren().get(0);
-              if (!(patt1$temp instanceof Label)) continue;
-              Label dot = (Label) patt1$temp;
-              dot.setText(isSelected ? "●" : "○");
-              dot.setStyle(
-                  "-fx-text-fill: "
-                      + (isSelected ? "-app-accent" : "-app-text-dim-3")
-                      + "; -fx-font-size: 11px;");
-            }
-          }
-        });
-    return row;
-  }
-
-  private String installerVersionRowStyle(boolean selected) {
-    return "-fx-background-color: "
-        + (selected ? "-app-hover-2" : "transparent")
-        + "; -fx-background-radius: 7; -fx-border-color: transparent;";
-  }
-
-  private Label installerMessage(String text) {
-    Label label = new Label(text);
-    label.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11.5px; -fx-padding: 8 10;");
-    label.setWrapText(true);
-    return label;
+    return this.installerPage.build();
   }
 
   private void startInstallerFromPanel(Button trigger) {
-    String loader;
-    MinecraftVersion game;
-    MinecraftVersion minecraftVersion =
-        game = this.installerVersionCombo == null ? null : this.installerVersionCombo.getValue();
-    if (game == null) {
-      if (this.installerStatus != null) {
-        this.installerStatus.setText("请先选择 Minecraft 版本。");
-      }
+    if (this.installerPage == null) {
       return;
     }
-    String string =
-        loader = this.installerExpandedLoader == null ? "原版" : this.installerExpandedLoader;
+    MinecraftVersion game = this.installerPage.selectedGame();
+    if (game == null) {
+      this.installerPage.setStatus("请先选择 Minecraft 版本。");
+      return;
+    }
+    String loader = this.installerPage.expandedLoader() == null
+        ? "原版" : this.installerPage.expandedLoader();
     if ("OptiFine".equals(loader)) {
       this.openBrowser("https://optifine.net/downloads");
-      if (this.installerStatus != null) {
-        this.installerStatus.setText("已打开 OptiFine 官网，下载后手动安装。");
-      }
+      this.installerPage.setStatus("已打开 OptiFine 官网，下载后手动安装。");
       return;
     }
     if ("LabyMod".equals(loader)) {
       this.openBrowser("https://labymod.net/download");
-      if (this.installerStatus != null) {
-        this.installerStatus.setText("已打开 LabyMod 官网，下载后手动安装。");
-      }
+      this.installerPage.setStatus("已打开 LabyMod 官网，下载后手动安装。");
       return;
     }
-    String loaderVersion = this.installerSelectedVersions.get(loader);
+    String loaderVersion = this.installerPage.selectedLoaderVersion(loader);
     this.setInstallerProgress(true);
-    if (this.installerStatus != null) {
-      this.installerStatus.setText(
-          "正在安装 "
-              + game.getId()
-              + " · "
-              + loader
-              + (loaderVersion == null ? "" : " " + loaderVersion)
-              + "…");
-    }
+    this.installerPage.setStatus("正在安装 " + game.getId() + " · " + loader
+        + (loaderVersion == null ? "" : " " + loaderVersion) + "…");
     this.startInstall(game, loader, loaderVersion, trigger);
   }
 
@@ -3378,39 +3070,14 @@ public class HelloApplication extends Application {
       this.downloadContentArea().getChildren().add(this.installerPanel);
     }
     this.showDownloadPanel(this.installerPanel);
-    this.fillInstallerPublicVersions(version);
-    if (this.installerNameField != null) {
-      this.installerNameField.setText(version.getId());
-    }
-    this.expandInstallerLoader(loader == null || loader.isBlank() ? "Fabric" : loader);
-    if (this.installerTitle != null) {
-      this.installerTitle.setText("安装 Minecraft " + version.getId());
-    }
-  }
-
-  private void fillInstallerPublicVersions(MinecraftVersion selected) {
-    if (this.installerVersionCombo == null) {
-      return;
-    }
-    List<MinecraftVersion> versions =
+    List<MinecraftVersion> releases =
         this.allMinecraftVersions.stream()
             .filter(v -> "release".equals(v.getType()))
             .collect(Collectors.toList());
-    if (selected != null && versions.stream().noneMatch(v -> v.getId().equals(selected.getId()))) {
-      versions.add(0, selected);
-    }
-    this.installerVersionCombo.getItems().setAll(versions);
-    if (selected != null) {
-      this.installerVersionCombo.setValue(selected);
-    }
-  }
-
-  private void updateInstallerTitle() {
-    if (this.installerTitle == null || this.installerVersionCombo == null) {
-      return;
-    }
-    MinecraftVersion game = this.installerVersionCombo.getValue();
-    this.installerTitle.setText((game == null ? "安装新实例" : "安装 Minecraft " + game.getId()));
+    this.installerPage.setGameVersions(releases, version);
+    this.installerPage.setInstanceName(version.getId());
+    this.installerPage.showFor(loader == null || loader.isBlank() ? "Fabric" : loader);
+    this.installerPage.updateTitle();
   }
 
   private VBox createWorldsNoticePanel() {
@@ -3710,36 +3377,18 @@ public class HelloApplication extends Application {
   }
 
   private void showInstaller(String loader) {
-    if (this.installerVersionCombo == null) {
+    if (this.installerPage == null) {
       return;
     }
-    if (this.installerVersionCombo.getItems().isEmpty()) {
+    if (!this.installerPage.hasGameVersions()) {
       List<MinecraftVersion> releases =
           this.allMinecraftVersions.stream()
               .filter(v -> "release".equals(v.getType()))
               .collect(Collectors.toList());
-      this.installerVersionCombo.getItems().setAll(releases);
-      if (!releases.isEmpty()) {
-        this.installerVersionCombo.setValue(releases.get(0));
-      }
+      this.installerPage.setGameVersions(releases, null);
+      this.installerPage.selectFirstGameVersion();
     }
-    this.updateInstallerTitle();
-    if (loader != null && this.installerLoaderBodies.containsKey(loader)) {
-      this.expandInstallerLoader(loader);
-    } else if (this.installerExpandedLoader == null) {
-      this.expandInstallerLoader("Fabric");
-    }
-  }
-
-  private void refreshInstallerLoaderVersions() {
-    if (this.installerVersionCombo == null) {
-      return;
-    }
-    this.installerSelectedVersions.clear();
-    this.updateInstallerTitle();
-    if (this.installerExpandedLoader != null) {
-      this.loadInstallerLoaderVersions(this.installerExpandedLoader);
-    }
+    this.installerPage.showFor(loader);
   }
 
   private void executeInstallProcess(
@@ -3783,9 +3432,7 @@ public class HelloApplication extends Application {
                   btn.setDisable(false);
                   btn.setText("开始下载");
                   this.setInstallerProgress(false);
-                  if (this.installerStatus != null) {
-                    this.installerStatus.setText("安装完成：" + installedId);
-                  }
+                  this.setInstallerStatus("安装完成：" + installedId);
                 });
           } catch (Exception e) {
             Platform.runLater(
@@ -3794,9 +3441,7 @@ public class HelloApplication extends Application {
                   btn.setDisable(false);
                   btn.setText("开始下载");
                   this.setInstallerProgress(false);
-                  if (this.installerStatus != null) {
-                    this.installerStatus.setText("安装失败：" + e.getMessage());
-                  }
+                  this.setInstallerStatus("安装失败：" + e.getMessage());
                 });
           }
         });
