@@ -6498,6 +6498,11 @@ private static void setFlexible(Node node, boolean on) {
                       if (this.launchInsightBar != null) {
                         this.launchInsightBar.refresh();
                       }
+                      // 刚写完一条启动记录：概览里的「N 次 · 成功率」要马上跟着变，
+                      // 否则用户看到的还是上一局的数字（曾经就是这样）
+                      if (this.launchOverviewPane != null) {
+                        this.launchOverviewPane.refresh();
+                      }
                       this.logArea.appendText(
                           GameExit.logMessage(
                               GameExit.kind(forcedStop, exited.exitValue()), exited.exitValue()));
