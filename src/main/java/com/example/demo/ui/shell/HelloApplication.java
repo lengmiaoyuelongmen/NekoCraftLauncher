@@ -242,6 +242,7 @@ import com.example.demo.ui.component.DownloadTasksDialog;
 import com.example.demo.core.meta.ReleaseTime;
 import com.example.demo.ui.page.VersionDetailPage;
 import com.example.demo.ui.page.InstallerPage;
+import com.example.demo.ui.page.MinecraftVersionsPage;
 public class HelloApplication extends Application {
   private static final Set<String> CLONE_DATA_DIRS =
       Set.of(
@@ -275,6 +276,7 @@ public class HelloApplication extends Application {
   private DownloadPage downloadPage;
   private VersionDetailPage versionDetailPage;
   private InstallerPage installerPage;
+  private MinecraftVersionsPage minecraftVersionsPage;
   private Stage stageRef;
   private volatile boolean testSuccess;
   private Rectangle navIndicator;
@@ -361,7 +363,6 @@ public class HelloApplication extends Application {
   private Label downloadStatsLabel;
   private Label launchVersionLabel;
   private ImageView avatarImageView;
-  private String minecraftFilter = "all";
   private VBox favoritesPanel;
   private VBox worldsNoticePanel;
   private VBox favoritesList;
@@ -414,8 +415,6 @@ public class HelloApplication extends Application {
           });
   private ObservableList<MinecraftVersion> allMinecraftVersions =
       FXCollections.observableArrayList();
-  private VBox minecraftCategoriesContainer;
-  private VBox latestVersionsContainer;
   private static final HttpClient httpClient =
       HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(15L)).build();
   private boolean isSearching = false;
@@ -2717,131 +2716,14 @@ public class HelloApplication extends Application {
   }
 
   private VBox createMinecraftPanel() {
-    String[][] filters;
-    VBox panel = new VBox(15.0);
-    panel.setAlignment(Pos.TOP_LEFT);
-    VBox.setVgrow(panel, Priority.ALWAYS);
-    HBox filterRow = new HBox(8.0);
-    filterRow.setAlignment(Pos.CENTER_LEFT);
-    ToggleGroup typeGroup = new ToggleGroup();
-    for (String[] filter :
-        filters =
-            new String[][] {{"all", "全部"}, {"release", "正式版"}, {"snapshot", "快照"}, {"old", "旧版"}}) {
-      ToggleButton chip = new ToggleButton(filter[1]);
-      chip.setToggleGroup(typeGroup);
-      chip.setSelected(filter[0].equals(this.minecraftFilter));
-      String idle =
-          "-fx-background-color: -app-card; -fx-text-fill: -app-text-dim; -fx-background-radius:"
-              + " 16; -fx-padding: 5 14; -fx-cursor: hand; -fx-border-color: transparent;";
-      String active =
-          "-fx-background-color: rgba(156, 163, 175,0.16); -fx-text-fill: #d1d5db;"
-              + " -fx-background-radius: 16; -fx-padding: 5 14; -fx-cursor: hand; -fx-border-color:"
-              + " #9ca3af; -fx-border-radius: 16;";
-      chip.setStyle(chip.isSelected() ? active : idle);
-      chip.selectedProperty()
-          .addListener((o, ov, nv) -> chip.setStyle(nv != false ? active : idle));
-      chip.setOnAction(
-          e -> {
-            if (!chip.isSelected()) {
-              chip.setSelected(true);
-              return;
-            }
-            this.minecraftFilter = filter[0];
-            this.populateMinecraftCategories();
-          });
-      filterRow.getChildren().add(chip);
+    if (this.minecraftVersionsPage == null) {
+      this.minecraftVersionsPage =
+          new MinecraftVersionsPage(
+              this.allMinecraftVersions,
+              this.config.getGameDir(),
+              version -> HelloApplication.this.openVersionDetail(version));
     }
-    VBox latestVersionCard = new VBox(10.0);
-    latestVersionCard.setStyle(
-        "-fx-background-color: linear-gradient(to bottom, -app-card-top, -app-card-alt2);"
-            + " -fx-background-radius: 18; -fx-padding: 16 18; -fx-border-color: -app-border-soft;"
-            + " -fx-border-radius: 18; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.24), 20, 0.1,"
-            + " 0, 6);");
-    Label latestTitle = new Label("最新版本");
-    latestTitle.setStyle(
-        "-fx-text-fill: -app-text-strong; -fx-font-size: 16px; -fx-font-weight: bold;");
-    latestVersionCard.getChildren().add(latestTitle);
-    VBox latestVersionsContainer = new VBox(10.0);
-    this.latestVersionsContainer = latestVersionsContainer;
-    latestVersionCard.getChildren().add(latestVersionsContainer);
-    this.minecraftCategoriesContainer = new VBox(10.0);
-    this.minecraftCategoriesContainer.setStyle("-fx-background-color: transparent;");
-    ScrollPane scrollPane = new ScrollPane(this.minecraftCategoriesContainer);
-    scrollPane.setFitToWidth(true);
-    scrollPane.setStyle(
-        "-fx-background: transparent; -fx-background-color: transparent; -fx-border-color:"
-            + " transparent;");
-    VBox.setVgrow(scrollPane, Priority.ALWAYS);
-    HBox.setHgrow(scrollPane, Priority.ALWAYS);
-    panel.getChildren().addAll(filterRow, latestVersionCard, scrollPane);
-    this.allMinecraftVersions.addListener(
-        (javafx.collections.ListChangeListener<MinecraftVersion>)
-            c -> {
-              if (!this.allMinecraftVersions.isEmpty()) {
-                this.populateLatestVersions(latestVersionsContainer);
-                this.populateMinecraftCategories();
-              }
-            });
-    return panel;
-  }
-
-  private void populateLatestVersions(VBox container) {
-    container.getChildren().clear();
-    MinecraftVersion latestRelease =
-        this.allMinecraftVersions.stream()
-            .filter(v -> "release".equals(v.getType()))
-            .findFirst()
-            .orElse(null);
-    MinecraftVersion latestSnapshot =
-        this.allMinecraftVersions.stream()
-            .filter(v -> "snapshot".equals(v.getType()))
-            .findFirst()
-            .orElse(null);
-    if (latestRelease != null) {
-      container.getChildren().add(this.createLatestVersionRow(latestRelease));
-    }
-    if (latestSnapshot != null) {
-      container.getChildren().add(this.createLatestVersionRow(latestSnapshot));
-    }
-  }
-
-  private HBox createLatestVersionRow(MinecraftVersion version) {
-    HBox row = new HBox(12.0);
-    row.setAlignment(Pos.CENTER_LEFT);
-    row.setPadding(new Insets(7.0, 10.0, 7.0, 10.0));
-    row.setMinHeight(54.0);
-    row.setStyle("-fx-background-color: -app-hover-2; -fx-background-radius: 8; -fx-cursor: hand;");
-    row.setOnMouseEntered(
-        e ->
-            row.setStyle(
-                "-fx-background-color: #333; -fx-background-radius: 8; -fx-cursor: hand;"));
-    row.setOnMouseExited(
-        e ->
-            row.setStyle(
-                "-fx-background-color: -app-hover-2; -fx-background-radius: 8; -fx-cursor: hand;"));
-    StackPane icon = BlockIcons.create(version.getType());
-    icon.setPrefSize(40.0, 40.0);
-    icon.setMinSize(40.0, 40.0);
-    icon.setMaxSize(40.0, 40.0);
-    VBox info = new VBox(2.0);
-    info.setAlignment(Pos.CENTER_LEFT);
-    Label title = new Label(version.getId());
-    title.setStyle("-fx-text-fill: -app-text-strong; -fx-font-size: 16px; -fx-font-weight: bold;");
-    String typeStr = "release".equals(version.getType()) ? "最新正式版" : "最新预览版";
-    String time = ReleaseTime.format(version.getReleaseTime());
-    Label subtitle = new Label(typeStr + (time.isEmpty() ? "" : " · 发布于 " + time));
-    subtitle.setStyle("-fx-text-fill: -app-text-muted-3; -fx-font-size: 11.5px;");
-    info.getChildren().addAll(title, subtitle);
-    HBox.setHgrow(info, Priority.ALWAYS);
-    Button installBtn = new Button("详情");
-    installBtn.setStyle(
-        "-fx-background-color: #9ca3af; -fx-text-fill: #111827; -fx-font-weight: bold;"
-            + " -fx-background-radius: 8; -fx-cursor: hand; -fx-padding: 6 16;");
-    installBtn.setMinWidth(Double.NEGATIVE_INFINITY);
-    installBtn.setOnAction(e -> this.openVersionDetail(version));
-    row.setOnMouseClicked(e -> this.openVersionDetail(version));
-    row.getChildren().addAll(icon, info, installBtn);
-    return row;
+    return this.minecraftVersionsPage.build();
   }
 
   private void setInstallerStatus(String text) {
@@ -2869,108 +2751,6 @@ public class HelloApplication extends Application {
             + (loaderVersion == null ? " · 最新加载器" : " · " + loaderVersion)
             + "）");
     this.executeInstallProcess(version, loader, loaderVersion, trigger);
-  }
-
-  private void populateMinecraftCategories() {
-    this.minecraftCategoriesContainer.getChildren().clear();
-    ObservableList<MinecraftVersion> pool = this.allMinecraftVersions;
-    List<MinecraftVersion> releases =
-        pool.stream().filter(v -> "release".equals(v.getType())).toList();
-    List<MinecraftVersion> snapshots =
-        pool.stream().filter(v -> "snapshot".equals(v.getType())).toList();
-    List<MinecraftVersion> old =
-        pool.stream().filter(v -> v.getType() != null && v.getType().startsWith("old")).toList();
-    if (!("snapshot".equals(this.minecraftFilter)
-        || "old".equals(this.minecraftFilter)
-        || releases.isEmpty())) {
-      this.minecraftCategoriesContainer
-          .getChildren()
-          .add(this.createCategoryPanel("正式版", releases));
-    }
-    if (!("release".equals(this.minecraftFilter)
-        || "old".equals(this.minecraftFilter)
-        || snapshots.isEmpty())) {
-      this.minecraftCategoriesContainer
-          .getChildren()
-          .add(this.createCategoryPanel("快照 / 预览版", snapshots));
-    }
-    if (!("release".equals(this.minecraftFilter)
-        || "snapshot".equals(this.minecraftFilter)
-        || old.isEmpty())) {
-      this.minecraftCategoriesContainer
-          .getChildren()
-          .add(this.createCategoryPanel("远古版（Alpha / Beta）", old));
-    }
-    if (this.minecraftCategoriesContainer.getChildren().isEmpty()) {
-      Label none = new Label("没有符合筛选的版本。");
-      none.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 12px; -fx-padding: 10;");
-      this.minecraftCategoriesContainer.getChildren().add(none);
-    }
-  }
-
-  private VBox createCategoryPanel(String categoryName, List<MinecraftVersion> versions) {
-    VBox panel = new VBox();
-    panel.setStyle(
-        "-fx-background-color: linear-gradient(to bottom, -app-card-top, -app-card-alt2);"
-            + " -fx-background-radius: 16; -fx-border-color: -app-border-soft; -fx-border-radius:"
-            + " 16; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.20), 16, 0.08, 0, 4);");
-    HBox header = new HBox(10.0);
-    header.setPadding(new Insets(15.0, 20.0, 15.0, 20.0));
-    header.setStyle("-fx-cursor: hand; -fx-background-radius: 10;");
-    header.setOnMouseEntered(
-        e ->
-            header.setStyle(
-                "-fx-background-color: -app-hover-2; -fx-cursor: hand; -fx-background-radius:"
-                    + " 10;"));
-    header.setOnMouseExited(
-        e ->
-            header.setStyle(
-                "-fx-background-color: transparent; -fx-cursor: hand; -fx-background-radius: 10;"));
-    Label title = new Label(categoryName + " (" + versions.size() + ")");
-    title.setStyle("-fx-text-fill: -app-text-strong; -fx-font-size: 16px; -fx-font-weight: bold;");
-    StackPane arrow = Icons.node("chevron-down", 12.0, "#9ca3af");
-    Region spacer = new Region();
-    HBox.setHgrow(spacer, Priority.ALWAYS);
-    header.getChildren().addAll(title, spacer, arrow);
-    VBox content = new VBox(10.0);
-    content.setPadding(new Insets(0.0, 10.0, 10.0, 10.0));
-    content.setVisible(false);
-    content.setManaged(false);
-    content.setStyle("-fx-background-color: -app-card-alt; -fx-background-radius: 0 0 10 10;");
-    ListView<MinecraftVersion> listView = new ListView<MinecraftVersion>();
-    listView.setItems(FXCollections.observableArrayList(versions));
-    listView.setPrefHeight(300.0);
-    listView.setStyle(
-        "-fx-background-color: transparent; -fx-control-inner-background: transparent;"
-            + " -fx-border-color: transparent;");
-    listView.setCellFactory(param -> new McVersionCell());
-    listView.addEventFilter(
-        ScrollEvent.SCROLL,
-        (EventHandler<ScrollEvent>)
-            event -> {
-              ScrollBar bar;
-              event.consume();
-              Node patt0$temp = listView.lookup(".scroll-bar:vertical");
-              if (patt0$temp instanceof ScrollBar
-                  && (bar = (ScrollBar) patt0$temp).getMax() > bar.getMin()
-                  && bar.isVisible()) {
-                double range = bar.getMax() - bar.getMin();
-                double next = bar.getValue() - event.getDeltaY() / 1000.0 * range;
-                bar.setValue(Math.max(bar.getMin(), Math.min(bar.getMax(), next)));
-              }
-            });
-    content.getChildren().add(listView);
-    header.setOnMouseClicked(
-        e -> {
-          boolean show = !content.isVisible();
-          content.setVisible(show);
-          content.setManaged(show);
-          arrow
-              .getChildren()
-              .setAll(Icons.node(show ? "chevron-up" : "chevron-down", 12.0, "#9ca3af"));
-        });
-    panel.getChildren().addAll(header, content);
-    return panel;
   }
 
   private VBox createInstallerPanel() {
@@ -3460,11 +3240,9 @@ public class HelloApplication extends Application {
   }
 
   private void loadMinecraftVersions() {
-    // 以前这里靠 children.get(0)/get(1) 强转 VBox，索引一变就 ClassCastException
-    if (this.latestVersionsContainer != null) {
-      this.populateLatestVersions(this.latestVersionsContainer);
+    if (this.minecraftVersionsPage != null) {
+      this.minecraftVersionsPage.refresh();
     }
-    this.populateMinecraftCategories();
   }
 
   private void ensureCommunityPrewarm() {
@@ -7502,86 +7280,6 @@ public class HelloApplication extends Application {
     private static final long serialVersionUID = 1L;
 
     private ImportCancelledException() {}
-  }
-
-  class McVersionCell extends ListCell<MinecraftVersion> {
-    private HBox card = new HBox(20.0);
-    private StackPane blockPane;
-    private Label title;
-    private Label typeLabel;
-    private Button installBtn;
-
-    public McVersionCell() {
-      this.card.setPadding(new Insets(15.0, 20.0, 15.0, 20.0));
-      this.card.setStyle("-fx-background-color: -app-hover-2; -fx-background-radius: 8;");
-      this.card.setCursor(Cursor.HAND);
-      this.card.getStyleClass().add("mod-card");
-      this.card.setOnMouseEntered(
-          e -> this.card.setStyle("-fx-background-color: #333; -fx-background-radius: 8;"));
-      this.card.setOnMouseExited(
-          e -> this.card.setStyle("-fx-background-color: -app-hover-2; -fx-background-radius: 8;"));
-      this.blockPane = new StackPane();
-      this.blockPane.setPrefSize(50.0, 50.0);
-      VBox info = new VBox(6.0);
-      this.title = new Label();
-      this.title.setStyle(
-          "-fx-text-fill: -app-text-strong; -fx-font-size: 18px; -fx-font-weight: bold;");
-      this.typeLabel = new Label();
-      this.typeLabel.setStyle(
-          "-fx-font-size: 12px; -fx-font-weight: bold; -fx-padding: 2 8; -fx-background-radius:"
-              + " 4;");
-      info.getChildren().addAll(this.title, this.typeLabel);
-      HBox.setHgrow(info, Priority.ALWAYS);
-      this.installBtn = new Button("详情");
-      this.installBtn.setStyle(
-          "-fx-background-color: #9ca3af; -fx-text-fill: #111827; -fx-font-weight: bold;"
-              + " -fx-background-radius: 8; -fx-cursor: hand; -fx-padding: 8 22;");
-      this.installBtn.setMinWidth(Double.NEGATIVE_INFINITY);
-      this.installBtn.setOnAction(
-          e -> {
-            if (this.getItem() != null) {
-              HelloApplication.this.openVersionDetail(this.getItem());
-            }
-          });
-      this.card.setOnMouseClicked(
-          e -> {
-            if (this.getItem() != null) {
-              HelloApplication.this.openVersionDetail(this.getItem());
-            }
-          });
-      this.card.getChildren().addAll(this.blockPane, info, this.installBtn);
-    }
-
-    @Override
-    protected void updateItem(MinecraftVersion version, boolean empty) {
-      super.updateItem(version, empty);
-      if (empty || version == null) {
-        this.setGraphic(null);
-        return;
-      }
-      boolean installed =
-          VersionProfile.isInstalled(
-              new File(HelloApplication.this.config.getGameDir()), version.getId());
-      this.title.setText(version.getId() + (installed ? "   · 已安装" : ""));
-      this.blockPane.getChildren().clear();
-      if (version.getType().equals("release")) {
-        this.typeLabel.setText("正式版");
-        this.typeLabel.setStyle(
-            "-fx-text-fill: #4CAF50; -fx-font-size: 12px; -fx-font-weight: bold;"
-                + " -fx-background-color: rgba(76, 175, 80, 0.1); -fx-padding: 2 8;"
-                + " -fx-background-radius: 4;");
-      } else {
-        this.typeLabel.setText("快照版");
-        this.typeLabel.setStyle(
-            "-fx-text-fill: #FF9800; -fx-font-size: 12px; -fx-font-weight: bold;"
-                + " -fx-background-color: rgba(255, 152, 0, 0.1); -fx-padding: 2 8;"
-                + " -fx-background-radius: 4;");
-      }
-      this.blockPane.getChildren().add(BlockIcons.create(version.getType()));
-      this.installBtn.setText("详情");
-      this.installBtn.setDisable(false);
-      this.setGraphic(this.card);
-    }
   }
 
   /** 用户选定版本后真正开始下载/安装。 */

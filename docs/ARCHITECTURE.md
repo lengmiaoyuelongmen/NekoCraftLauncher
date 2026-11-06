@@ -546,6 +546,20 @@ powershell -ExecutionPolicy Bypass -File scripts\smoke-test.ps1 -SkipBuild
 - 不用 PowerShell `Get-Content`/`Set-Content` 改源码。
 - 每次改动后：0 告警 + 单测 + 冒烟，缺一不可。
 
+## 12. Minecraft 版本页独立（Phase 5g）
+
+| 归属 | 内容 |
+|---|---|
+| `ui.page.MinecraftVersionsPage` | 类型筛选 chip、最新版本卡片、正式版/快照/远古版三个可折叠分组（含 ListView 滚轮处理） |
+| `ui.component.McVersionCell` | 版本行单元格：图标 + 版本号（含「已安装」）+ 类型徽标 + 详情按钮 |
+| `HelloApplication` | 只保留「版本清单」这一份数据与 `openVersionDetail` 回调 |
+
+主类 **7,710 → 7,405 行**。
+
+**实机验证**：下载 → Minecraft：筛选 chip / 最新版本（26.3、26.4-snapshot-7 带发布时间）/
+分组数量（正式版 103、快照 758、远古版 61）都正常；点「正式版 (103)」展开后列表渲染正确
+（26.3 显示「· 已安装」、26.2、26.1.2 …），说明新的单元格组件与已安装检测都工作。
+
 ## 11. 安装器页独立（Phase 5f）
 
 | 归属 | 内容 |
