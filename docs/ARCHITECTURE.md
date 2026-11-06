@@ -509,6 +509,28 @@ repaired=1/1
 | **Phase 5b** | 把 8.5k 行的 `HelloApplication` 拆成 shell（窗口/导航/主题）+ 各页面类，页面可单独实例化 | 主类 ≤ 800 行 |
 | **Phase 6** | 可观测性：启动耗时分解、下载统计、崩溃报告归档 | 日志里能看出每一步耗时 |
 
+## 附：界面验证（无 MCP 控制时）
+
+MCP 的桌面控制可能不可用（`CONTROL_UNAVAILABLE`），那时 UI 改动不能只靠编译 + 冒烟。
+临时脚本 `C:\Users\Administrator\.dsh\tmp\neko-verify\ui.ps1`（未进仓库）用 Win32 直接操作窗口：
+
+```powershell
+powershell -File ui.ps1 launch                 # 启动 jar 并等窗口
+powershell -File ui.ps1 click 626 30           # 窗口内相对坐标点击（自动置顶）
+powershell -File ui.ps1 wheel 520 500 6        # 滚轮
+powershell -File ui.ps1 shot out.png           # PrintWindow 截图
+powershell -File ui.ps1 stop
+```
+
+这一轮用它补验了此前只有单测/冒烟覆盖的功能：
+
+- **关闭对话框**：点 ✕ → 弹出「终止启动器？」（退出启动器 / 最小化到托盘 / 取消 + 记住选择）→ 点取消正常返回
+- **实例设置页**：滚到底部确认「启动设置（本实例）」包含 内存覆盖 / JVM 参数 / Java 路径 / **游戏参数** / 版本隔离下拉
+- **下载页**：搜索与列表正常（默认整合包分类，显示 40 条 / 共 19187）
+
+并顺手把「加入服务器」的地址解析（域名 / 端口 / IPv6 方括号）抽成
+`core.launch.ServerAddress`，加了 5 个用例（单测 119 → **124 通过**）。
+
 ## 7. 常用命令
 
 ```powershell

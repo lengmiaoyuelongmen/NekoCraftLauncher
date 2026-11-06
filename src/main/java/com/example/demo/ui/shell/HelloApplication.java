@@ -236,6 +236,7 @@ import com.example.demo.core.launch.LaunchState;
 import com.example.demo.core.download.ModrinthSearch;
 import com.example.demo.core.mod.ProjectFormat;
 import com.example.demo.core.model.InstanceId;
+import com.example.demo.core.launch.ServerAddress;
 public class HelloApplication extends Application {
   private static final Set<String> CLONE_DATA_DIRS =
       Set.of(
@@ -7335,27 +7336,11 @@ public class HelloApplication extends Application {
                                 nativesDir,
                                 env.injector());
                         if (this.pendingJoinAddress != null && !this.pendingJoinAddress.isBlank()) {
-                          String join = this.pendingJoinAddress;
+                          ServerAddress join = ServerAddress.parse(this.pendingJoinAddress);
                           this.pendingJoinAddress = null;
-                          String host = join;
-                          int port = 25565;
-                          if (join.startsWith("[")) {
-                            int end = join.indexOf(93);
-                            if (end > 0) {
-                              host = join.substring(1, end);
-                              if (join.length() > end + 2 && join.charAt(end + 1) == ':') {
-                                port = Integer.parseInt(join.substring(end + 2));
-                              }
-                            }
-                          } else if (join.lastIndexOf(58) > 0) {
-                            try {
-                              port = Integer.parseInt(join.substring(join.lastIndexOf(58) + 1));
-                              host = join.substring(0, join.lastIndexOf(58));
-                            } catch (Exception exception) {
-                              // empty catch block
-                            }
+                          if (join != null) {
+                            plan = plan.append(join.launchArguments());
                           }
-                          plan = plan.append("--server", host, "--port", String.valueOf(port));
                         }
                         this.gameInstanceId = profile.getId();
                         this.gameStartAt = System.currentTimeMillis();
