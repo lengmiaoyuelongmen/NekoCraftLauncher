@@ -25,6 +25,12 @@ public final class NativeExtractor {
     }
 
     /**
+     * 一条原生库：下载地址、libraries 下的相对路径、校验信息（老格式没有 sha1/size 时为 null/-1）。
+     */
+    public record NativeArtifact(String url, String path, String sha1, long size) {
+    }
+
+    /**
      * 把该版本所有原生库解压到 {@code nativesDir}。
      *
      * @return 本次新解出的 dll 数量（已存在的不重复解压）
@@ -35,15 +41,15 @@ public final class NativeExtractor {
         }
         int extracted = 0;
         for (JsonObject lib : profile.nativeLibraries()) {
-            String[] artifact = nativeArtifact(lib);
+            NativeArtifact artifact = nativeArtifact(lib);
             if (artifact == null) {
                 continue;
             }
-            File jarFile = new File(libsDir, artifact[1]);
+            File jarFile = new File(libsDir, artifact.path());
             if (!jarFile.isFile()) {
                 continue;
             }
-            File target = subDir(nativesDir, artifact[1]);
+            File target = subDir(nativesDir, artifact.path());
             if (!target.exists()) {
                 target.mkdirs();
             }
@@ -62,9 +68,9 @@ public final class NativeExtractor {
      * <p>优先用版本 JSON 里的 {@code downloads.classifiers.windows}（1.19+ 都是这样，
      * 路径带 {@code natives-windows}），没有时退回老格式的 {@code -natives-windows.jar}。
      *
-     * @return {@code [url, path]}；不是原生库时返回 {@code null}
+     * @return 不是原生库时返回 {@code null}
      */
-    public static String[] nativeArtifact(JsonObject lib) {
+    public static NativeArtifact nativeArtifact(JsonObject lib) {
         try {
             JsonObject downloads = lib.getAsJsonObject("downloads");
             if (lib.has("natives")
@@ -82,12 +88,19 @@ public final class NativeExtractor {
                     return null;
                 }
                 JsonObject artifact = classifiers.getAsJsonObject(key);
-                return new String[]{artifact.get("url").getAsString(), artifact.get("path").getAsString()};
+                String sha1 = artifact.has("sha1") ? artifact.get("sha1").getAsString() : null;
+                long size = artifact.has("size") ? artifact.get("size").getAsLong() : -1L;
+                return new NativeArtifact(
+                        artifact.get("url").getAsString(),
+                        artifact.get("path").getAsString(),
+                        sha1,
+                        size);
             }
             String path = VersionProfile.libraryPath(lib);
             String url = VersionProfile.libraryUrl(lib);
             if (path != null && url != null && path.endsWith("-natives-windows.jar")) {
-                return new String[]{url, path};
+                return new NativeArtifact(url, path,
+                        VersionProfile.librarySha1(lib), VersionProfile.librarySize(lib));
             }
         } catch (Exception ignored) {
             // 结构异常的库直接当没有原生文件

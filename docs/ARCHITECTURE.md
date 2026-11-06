@@ -26,9 +26,9 @@ src/main/java/com/example/demo/
 │   ├── ai/         2   DeepSeekClient, LocalAiAssistant
 │   ├── app/        8   AppPaths, AppVersion, LauncherConfig, SingleInstance, ConfigHistory, UpdateChecker, SupportBundle, Bootstrap
 │   ├── auth/       6   AuthManager, AccountStore, MicrosoftAuth, AuthlibInjectorManager, SessionStore, SecretStore
-│   ├── download/   8   DownloadManager, Downloader, Aria2Downloader, Integrity, SourcePinger, CurseForgeClient, IconProxy, ZipUtil
+│   ├── download/   9   DownloadManager, GameFiles, Downloader, Aria2Downloader, Integrity, SourcePinger, CurseForgeClient, IconProxy, ZipUtil
 │   ├── game/       5   JavaManager, JavaScanner, LoaderInstaller, PortableExporter, CrashAnalyzer
-│   ├── launch/     5   LaunchPlan, LaunchPlanner, NativeExtractor, LaunchCancelledException, GameCommandSender
+│   ├── launch/    12   LaunchPlan, LaunchPlanner, LaunchContext, LaunchTask, LaunchPipeline, ClientJarTask, LibrariesTask, AssetsTask, NativesTask, NativeExtractor, LaunchCancelledException, GameCommandSender
 │   ├── meta/       2   VersionProfile, VersionManager
 │   ├── mod/        5   ModDependencyScanner, ModConflictChecker, ModpackImport, ModpackExporter, ServerPackExporter
 │   ├── model/     16   Instance, InstanceDirs, InstanceMeta, InstanceOverrides, MinecraftVersion, VersionDetails, VersionManifest, AssetIndex, Library, Modpack, ModpackProject, UserSession, LoginCardData, Favorites, Playtime, LaunchHistory
@@ -110,6 +110,33 @@ src/main/java/com/example/demo/
 - `hello-view.fxml` 里的 `fx:controller` 已同步改成 `com.example.demo.ui.shell.HelloController`
 - 插件 ABI（`NekoPlugin`）跟着挪进 `core.plugin`，`plugins/` 目录当前为空，无兼容负担
 
+### Phase 2b：启动准备管线
+
+`ensureInstalled` 里「下客户端 jar → 补依赖库 → 补资源 → 解压 natives」四段过程式代码变成可组合的任务链：
+
+```java
+new LaunchPipeline()
+    .add(new ClientJarTask(config.getDownloadSource()))
+    .add(new LibrariesTask())
+    .add(new AssetsTask())
+    .add(new NativesTask(config.isIsolation()))
+    .run(context);          // 每步前查取消，每步后打「⏱ 名字 xx ms」
+```
+
+| 新类 | 职责 |
+|---|---|
+| `GameFiles`（core.download） | 客户端 jar / 依赖库 / 资源 / 原生库 的增量补齐，纯逻辑、可单测 |
+| `LaunchContext` | 版本档案 + 目录 + 日志 + 进度 + 取消信号，UI 与 core 的唯一接缝 |
+| `LaunchTask` / `LaunchPipeline` | 任务链：顺序执行、快速失败、逐步计时 |
+| 四个 Task | 把上面四件事各包一层，名字直接进日志 |
+
+验证：
+
+- 真实启动 1.12.2，日志出现 `⏱ 客户端 jar 1 ms`、`依赖库就绪：新下载 0，已存在 34`、`资源索引未变化，跳过逐文件校验`、`⏱ 原生库 9 ms`，随后 `✅ 游戏进程已启动 (pid …)`
+- 单测 21 → **26 通过**（新增 `LaunchPipelineTest` 5 个：顺序、计时、失败即停、取消）
+- 主类 8888 → **8434 行**（累计删掉下载/解压相关 ~450 行）
+- `-Xlint:all` 0 告警；冒烟 PASS
+
 ## 5. 迁移手法
 
 1. 脚本按「域 → 新包」映射移动文件，改 `package` 行。
@@ -125,6 +152,7 @@ src/main/java/com/example/demo/
 |---|---|---|
 | ~~**Phase 2**~~ ✅ | 启动管线对象化：`LaunchPlan` + `LaunchPlanner` + `NativeExtractor` 已落地 | 8 个新单测；14 实例全量生成命令；实机进游戏 |
 | ~~**Phase 5a**~~ ✅ | `ui/*` + `core/mod` 包结构闭环，入口只剩 `Launcher` | 守卫 PASS；编译/单测/冒烟全绿 |
+| ~~**Phase 2b**~~ ✅ | 启动准备管线：`LaunchPipeline` + `LaunchContext` + 4 个 Task，`GameFiles` 承接下载/校验 | 5 个管线单测；实机启动成功 |
 | **Phase 2b** | 把 `startGame` 的编排（检查 Java → 校验 → 下载 → 解压 → 起进程）抽成 `LaunchTask` 链 + `LaunchPipeline`，UI 只订阅进度 | 主类再减 ~300 行；断点续跑可测 |
 | **Phase 3** | 实例一等公民：`InstanceSettings`（内存 / JVM 参数 / Java 路径 / 是否隔离 / 游戏目录）落到 `versions/<id>/instance.json`；实例设置页读写 | 两个实例用不同内存启动成功 |
 | **Phase 4** | 下载引擎统一：`DownloadEngine` 统一入口，所有下载带 SHA1 校验、并发上限、失败重试与镜像回退；`DownloadManager` 退化为其实现 | 强制断网/坏源测试通过 |

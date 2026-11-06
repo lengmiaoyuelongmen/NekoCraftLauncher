@@ -221,6 +221,12 @@ import com.example.demo.ui.page.InstancesPanel;
 import com.example.demo.ui.page.LogsPanel;
 import com.example.demo.ui.page.SettingsPanel;
 import com.example.demo.ui.page.ToolsPanel;
+import com.example.demo.core.launch.AssetsTask;
+import com.example.demo.core.launch.ClientJarTask;
+import com.example.demo.core.launch.LaunchContext;
+import com.example.demo.core.launch.LaunchPipeline;
+import com.example.demo.core.launch.LibrariesTask;
+import com.example.demo.core.launch.NativesTask;
 public class HelloApplication extends Application {
   private static final Set<String> CLONE_DATA_DIRS =
       Set.of(
@@ -7162,8 +7168,6 @@ public class HelloApplication extends Application {
 
   private VersionProfile ensureInstalled(String id, String jsonUrl, Consumer<String> log)
       throws Exception {
-    File childDir;
-    File childJar;
     File gameDir = new File(this.config.getGameDir());
     File jsonFile = VersionProfile.jsonFile(gameDir, id);
     if (!jsonFile.isFile()) {
@@ -7178,198 +7182,39 @@ public class HelloApplication extends Application {
     }
     VersionProfile profile = VersionProfile.load(gameDir, id);
     log.accept("🧩 版本 " + profile.getId() + "（基于 " + profile.getRootId() + "）");
-    File versionDir = new File(new File(gameDir, "versions"), profile.getRootId());
-    File clientJar = new File(versionDir, profile.getRootId() + ".jar");
-    String clientUrl = profile.getClientUrl();
-    if (!(clientJar.isFile() && clientJar.length() != 0L || clientUrl == null)) {
-      boolean mirrorFirst;
-      String mirrorUrl =
-          "https://bmclapi2.bangbang93.com/version/" + profile.getRootId() + "/client";
-      boolean bl = mirrorFirst = !"official".equals(this.config.getDownloadSource());
-      if (mirrorFirst) {
-        log.accept("📥 通过 BMCLAPI 镜像下载客户端 jar...");
-        DownloadManager.Stats mirrorStats =
-            DownloadManager.downloadRanged(
-                new DownloadManager.Task(
-                    mirrorUrl, clientJar, profile.getClientSha1(), profile.getClientSize()),
-                4,
-                (done, total, bytes) -> this.updateProgress(done, total, bytes));
-        if (mirrorStats.failed > 0 || !clientJar.isFile() || clientJar.length() == 0L) {
-          log.accept("⚠ 镜像下载失败，切换 Mojang 官方源…");
-        }
-      }
-      if (!clientJar.isFile() || clientJar.length() == 0L) {
-        log.accept("📥 通过 Mojang 官方源下载客户端 jar...");
-        DownloadManager.Stats stats =
-            DownloadManager.downloadRanged(
-                new DownloadManager.Task(
-                    clientUrl, clientJar, profile.getClientSha1(), profile.getClientSize()),
-                4,
-                (done, total, bytes) -> this.updateProgress(done, total, bytes));
-        if (stats.failed > 0 || !clientJar.isFile()) {
-          throw new Exception("客户端 jar 下载失败，请检查网络后重试");
-        }
-      }
-    }
-    long tLib = System.nanoTime();
-    this.downloadLibraries(profile, gameDir, log);
-    long libMs = (System.nanoTime() - tLib) / 1_000_000L;
-    long tAssets = System.nanoTime();
-    this.ensureAssets(profile, gameDir, log);
-    long assetMs = (System.nanoTime() - tAssets) / 1_000_000L;
-    long tNatives = System.nanoTime();
-    int dllCount =
-        NativeExtractor.extract(
+    File instanceDir = InstanceDirs.root(gameDir, profile.getId(), this.config.isIsolation());
+    LaunchContext context =
+        new LaunchContext(
             profile,
-            new File(gameDir, "libraries"),
-            InstanceDirs.natives(gameDir, profile.getId(), this.config.isIsolation()));
-    if (dllCount > 0) {
-      log.accept("[natives] 解压出 " + dllCount + " 个 dll");
+            gameDir,
+            instanceDir,
+            log,
+            (done, total, bytes) -> this.updateProgress(done, total, bytes),
+            () -> this.launchCancelled);
+    // 启动准备管线：客户端 jar → 依赖库 → 资源 → 原生库（每一步都会打耗时）
+    new LaunchPipeline()
+        .add(new ClientJarTask(this.config.getDownloadSource()))
+        .add(new LibrariesTask())
+        .add(new AssetsTask())
+        .add(new NativesTask(this.config.isIsolation()))
+        .run(context);
+    // 加载器实例需要一份和父版本同名的 client jar（Forge 的 ignoreList 依赖这个文件名）
+    File clientJar = new File(new File(new File(gameDir, "versions"), profile.getRootId()),
+        profile.getRootId() + ".jar");
+    File childDir = new File(new File(gameDir, "versions"), profile.getId());
+    File childJar = new File(childDir, profile.getId() + ".jar");
+    if (profile.getId().equals(profile.getRootId()) || !clientJar.isFile()) {
+      return profile;
     }
-    long nativeMs = (System.nanoTime() - tNatives) / 1_000_000L;
-    log.accept(
-        "⏱ 准备耗时：依赖库 " + libMs + " ms / 资源 " + assetMs + " ms / 原生库 " + nativeMs + " ms");
-    if (!(profile.getId().equals(profile.getRootId())
-        || !clientJar.isFile()
-        || (childJar =
-                    new File(
-                        childDir = new File(new File(gameDir, "versions"), profile.getId()),
-                        profile.getId() + ".jar"))
-                .isFile()
-            && childJar.length() == clientJar.length())) {
+    if (!childJar.isFile() || childJar.length() != clientJar.length()) {
       try {
         Files.createDirectories(childDir.toPath(), new FileAttribute<?>[0]);
         Files.copy(clientJar.toPath(), childJar.toPath(), StandardCopyOption.REPLACE_EXISTING);
-      } catch (Exception exception) {
-        // empty catch block
+      } catch (Exception ignored) {
+        // 复制失败时游戏会自己报缺文件，不阻塞启动
       }
     }
     return profile;
-  }
-
-  private void downloadLibraries(VersionProfile profile, File gameDir, Consumer<String> log)
-      throws Exception {
-    File libsDir = new File(gameDir, "libraries");
-    ArrayList<DownloadManager.Task> tasks = new ArrayList<DownloadManager.Task>();
-    for (JsonObject lib : profile.classpathLibraries()) {
-      String path = VersionProfile.libraryPath(lib);
-      String url = VersionProfile.libraryUrl(lib);
-      if (path == null || url == null) continue;
-      tasks.add(
-          new DownloadManager.Task(
-              url,
-              new File(libsDir, path),
-              VersionProfile.librarySha1(lib),
-              VersionProfile.librarySize(lib)));
-    }
-    for (JsonObject lib : profile.nativeLibraries()) {
-      String[] artifact = NativeExtractor.nativeArtifact(lib);
-      if (artifact == null) continue;
-      tasks.add(new DownloadManager.Task(artifact[0], new File(libsDir, artifact[1]), null, -1L));
-    }
-    log.accept("📦 依赖库 " + tasks.size() + " 个，校验中...");
-    DownloadManager.Stats stats =
-        DownloadManager.downloadAll(
-            tasks, 16, (done, total, bytes) -> this.updateProgress(done, total, bytes));
-    String summary = "   依赖库就绪：新下载 " + stats.downloaded + "，已存在 " + stats.skipped;
-    if (stats.failed > 0) {
-      summary = summary + "，失败 " + stats.failed;
-    }
-    log.accept(summary);
-    if (stats.failed > 0) {
-      List<String> list = stats.failures;
-      synchronized (list) {
-        for (String failedUrl : stats.failures) {
-          log.accept("   ✗ " + failedUrl);
-        }
-      }
-      throw new Exception("有 " + stats.failed + " 个依赖库没下载成功，请检查网络后重试（已下载的会保留）");
-    }
-  }
-
-  private void ensureAssets(VersionProfile profile, File gameDir, Consumer<String> log)
-      throws Exception {
-    String indexId = profile.getAssetIndexId();
-    File indexFile = new File(gameDir, "assets/indexes/" + indexId + ".json");
-    File objectsDir = new File(gameDir, "assets/objects");
-    // 索引没变就跳过整轮逐文件校验：5147 个资源逐个 stat + 建任务要 1 秒多，
-    // 而索引和对象目录都还在时，重复校验几乎没有收益。
-    File stampFile = new File(gameDir, "assets/.verified-" + indexId + ".stamp");
-    String signature =
-        indexId + ":" + indexFile.length() + ":" + indexFile.lastModified() + ":" + objectsDir.isDirectory();
-    if (stampFile.isFile() && objectsDir.isDirectory()) {
-      try {
-        if (signature.equals(Files.readString(stampFile.toPath(), StandardCharsets.UTF_8).trim())) {
-          log.accept("   资源索引未变化，跳过逐文件校验（" + indexId + "）");
-          return;
-        }
-      } catch (Exception ignored) {
-        // 读不到 stamp 就当没校验过，走完整流程
-      }
-    }
-    boolean validIndex = false;
-    if (indexFile.isFile() && indexFile.length() > 2L) {
-      try (InputStream in2 = Files.newInputStream(indexFile.toPath(), new OpenOption[0]); ) {
-        int b;
-        while ((b = in2.read()) == 32 || b == 10 || b == 13 || b == 9) {}
-        validIndex = b == 123;
-      } catch (Exception in2) {
-        // empty catch block
-      }
-    }
-    if (!validIndex && indexFile.exists()) {
-      log.accept("索引文件损坏，正在重新下载: " + indexId);
-      indexFile.delete();
-    }
-    if (!indexFile.isFile()) {
-      String indexUrl = profile.getAssetIndexUrl();
-      if (indexUrl == null) {
-        return;
-      }
-      log.accept("📄 下载资源索引 " + indexId + "...");
-      DownloadManager.downloadAll(
-          List.of(new DownloadManager.Task(indexUrl, indexFile, null, -1L)), 1, null);
-    }
-    if (!indexFile.isFile()) {
-      return;
-    }
-    AssetIndex index = new Gson().fromJson((Reader) new FileReader(indexFile), AssetIndex.class);
-    if (index == null || index.getObjects() == null || index.getObjects().isEmpty()) {
-      return;
-    }
-    ArrayList<DownloadManager.Task> tasks = new ArrayList<DownloadManager.Task>();
-    for (AssetIndex.AssetObject object : index.getObjects().values()) {
-      String hash = object.getHash();
-      if (hash == null || hash.length() < 2) continue;
-      File target = new File(objectsDir, hash.substring(0, 2) + "/" + hash);
-      tasks.add(
-          new DownloadManager.Task(
-              "https://resources.download.minecraft.net/" + hash.substring(0, 2) + "/" + hash,
-              target,
-              hash,
-              object.getSize()));
-    }
-    if (tasks.isEmpty()) {
-      return;
-    }
-    log.accept("🎨 资源文件 " + tasks.size() + " 个，校验中（首次会比较久）...");
-    DownloadManager.Stats stats =
-        DownloadManager.downloadAll(
-            tasks, 32, (done, total, bytes) -> this.updateProgress(done, total, bytes));
-    String summary = "   资源就绪：新下载 " + stats.downloaded + "，已存在 " + stats.skipped;
-    if (stats.failed > 0) {
-      summary = summary + "，失败 " + stats.failed;
-    }
-    log.accept(summary);
-    if (stats.failed > 0) {
-      log.accept("   ⚠️ 部分资源没下载成功，游戏仍可启动（可能缺音效/语言文件）");
-    } else {
-      try {
-        Files.writeString(stampFile.toPath(), signature, StandardCharsets.UTF_8);
-      } catch (Exception ignored) {
-        // 写不了 stamp 只是下次还会再校验一遍，不影响启动
-      }
-    }
   }
 
   private void updateProgress(int done, int total, long bytes) {
