@@ -546,6 +546,19 @@ powershell -ExecutionPolicy Bypass -File scripts\smoke-test.ps1 -SkipBuild
 - 不用 PowerShell `Get-Content`/`Set-Content` 改源码。
 - 每次改动后：0 告警 + 单测 + 冒烟，缺一不可。
 
+## 13. 账户管理对话框独立（Phase 5h）
+
+| 归属 | 内容 |
+|---|---|
+| `ui.component.AccountManagerDialog` | 已保存账户列表（名字 / 登录类型 / 验证服务器 / 皮肤披风标记）+ 切换 / 删除 / 添加账户 |
+| `HelloApplication` | 只传三个回调：切换账户、删除账户、添加账户（退出登录） |
+
+主类 **7,405 → 7,355 行**。删除账户后对话框自己重建列表，不再由调用方递归重开。
+
+**实机验证**（全屏截图，因为对话框是独立窗口，PrintWindow 拍不到）：
+点「账户管理」弹窗正常，显示 `Aurora_From_the / 第三方外置登录 · https://littleskin.cn/api/yggdrasil`
+与「切换 / 删除 / 添加账户 / 关闭」。
+
 ## 12. Minecraft 版本页独立（Phase 5g）
 
 | 归属 | 内容 |

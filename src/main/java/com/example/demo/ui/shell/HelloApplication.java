@@ -243,6 +243,7 @@ import com.example.demo.core.meta.ReleaseTime;
 import com.example.demo.ui.page.VersionDetailPage;
 import com.example.demo.ui.page.InstallerPage;
 import com.example.demo.ui.page.MinecraftVersionsPage;
+import com.example.demo.ui.component.AccountManagerDialog;
 public class HelloApplication extends Application {
   private static final Set<String> CLONE_DATA_DIRS =
       Set.of(
@@ -5557,61 +5558,11 @@ public class HelloApplication extends Application {
   }
 
   private void showAccountManager() {
-    Dialog<ButtonType> dialog = new Dialog<>();
-    dialog.initOwner(this.stageRef);
-    dialog.setTitle("账户管理");
-    dialog.setHeaderText("已保存的账户");
-    VBox list = new VBox(8.0);
-    List<AccountStore.Account> accounts = AccountStore.list();
-    if (accounts.isEmpty()) {
-      Label empty = new Label("还没有保存的账户，登录后会自动保存。");
-      empty.setStyle("-fx-text-fill: -app-text-muted;");
-      list.getChildren().add(empty);
-    }
-    for (AccountStore.Account account : accounts) {
-      Label name = new Label(account.username());
-      name.setStyle("-fx-text-fill: -app-text; -fx-font-size: 13px; -fx-font-weight: bold;");
-      String texture =
-          (account.skinPath().isBlank() ? "" : " · 有皮肤")
-              + (account.capePath().isBlank() ? "" : " · 有披风");
-      Label meta =
-          new Label(
-              account.loginType()
-                  + (account.server().isBlank() ? "" : " · " + account.server())
-                  + texture);
-      meta.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 10px;");
-      VBox info = new VBox(2.0, name, meta);
-      HBox.setHgrow(info, Priority.ALWAYS);
-      Button use = new Button("切换");
-      use.setOnAction(
-          e -> {
-            this.switchAccount(account);
-            dialog.close();
-          });
-      Button remove = new Button("删除");
-      remove.setStyle(
-          "-fx-background-color: transparent; -fx-text-fill: #f87171; -fx-cursor: hand;");
-      remove.setOnAction(
-          e -> {
-            AccountStore.remove(account.username());
-            dialog.close();
-            this.showAccountManager();
-          });
-      HBox row = new HBox(10.0, info, use, remove);
-      row.setAlignment(Pos.CENTER_LEFT);
-      row.setPadding(new Insets(8.0, 10.0, 8.0, 10.0));
-      row.setStyle("-fx-background-color: -app-row2; -fx-background-radius: 9;");
-      list.getChildren().add(row);
-    }
-    Button add = new Button("添加账户");
-    add.setOnAction(
-        e -> {
-          dialog.close();
-          this.logout();
-        });
-    dialog.getDialogPane().setContent(new VBox(12.0, list, add));
-    dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
-    dialog.showAndWait();
+    AccountManagerDialog.show(
+        this.stageRef,
+        this::switchAccount,
+        account -> AccountStore.remove(account.username()),
+        this::logout);
   }
 
   private void switchAccount(AccountStore.Account account) {
