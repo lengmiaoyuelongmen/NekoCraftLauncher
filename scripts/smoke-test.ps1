@@ -39,6 +39,8 @@ public class SmokeWin {
   [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int c);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, IntPtr extra);
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
   public static IntPtr Find(string title) {
     IntPtr found = IntPtr.Zero;
@@ -59,9 +61,22 @@ public class SmokeWin {
         $h = [SmokeWin]::Find($Title)
         if ($h -eq [IntPtr]::Zero) { return $false }
         [SmokeWin]::ShowWindow($h, 9) | Out-Null   # SW_RESTORE
+        # Windows 会拦住后台进程抢前台：先点一下 ALT 解锁，否则 SendKeys 会打到别的窗口上
+        [SmokeWin]::keybd_event(0x12, 0, 0, [IntPtr]::Zero)
+        Start-Sleep -Milliseconds 40
         [SmokeWin]::SetForegroundWindow($h) | Out-Null
-        Start-Sleep -Milliseconds 400
-        return $true
+        [SmokeWin]::keybd_event(0x12, 0, 2, [IntPtr]::Zero)
+        Start-Sleep -Milliseconds 300
+        return ([SmokeWin]::GetForegroundWindow() -eq $h)
+    }
+
+    function Wait-Launcher([int]$timeoutSec) {
+        $deadline = (Get-Date).AddSeconds($timeoutSec)
+        while ((Get-Date) -lt $deadline) {
+            if ([SmokeWin]::Find($Title) -ne [IntPtr]::Zero) { return $true }
+            Start-Sleep -Milliseconds 500
+        }
+        return $false
     }
 
     function Capture-Window([string]$name) {
@@ -101,11 +116,17 @@ public class SmokeWin {
         } |
         ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
     Start-Sleep -Seconds 1
-    Start-Process -FilePath (Join-Path $JavaHome "bin\java.exe") `
+    # 用 javaw 启动：java.exe 会带一个控制台窗口，抢焦点还会把截图挡掉
+    $javaExe = Join-Path $JavaHome "bin\javaw.exe"
+    if (-not (Test-Path $javaExe)) { $javaExe = Join-Path $JavaHome "bin\java.exe" }
+    Start-Process -FilePath $javaExe `
         -ArgumentList '-jar', $Jar -WorkingDirectory $root `
         -RedirectStandardOutput $stdout -RedirectStandardError $stderr -WindowStyle Hidden
-    Start-Sleep -Seconds $StartupWaitSec
-    if (-not (Focus-Launcher)) { throw "启动器窗口没有出现（$Title）" }
+    # 轮询等窗口出现，不要用固定 sleep（冷启动/杀毒扫描会拖慢）
+    if (-not (Wait-Launcher ([Math]::Max(30, $StartupWaitSec + 20)))) {
+        throw "启动器窗口没有出现（$Title，等待 $([Math]::Max(30, $StartupWaitSec + 20)) 秒）"
+    }
+    if (-not (Focus-Launcher)) { throw "无法把启动器窗口切到前台（$Title）" }
     Capture-Window "01-launch"
 
     # ---------- 逐页 ----------
