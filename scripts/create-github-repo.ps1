@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$RepoName = "NekoCraftLauncher",
     [ValidateSet("public", "private")]
     [string]$Visibility = "public"
