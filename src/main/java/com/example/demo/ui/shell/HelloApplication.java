@@ -238,6 +238,7 @@ import com.example.demo.core.mod.ProjectFormat;
 import com.example.demo.core.model.InstanceId;
 import com.example.demo.core.launch.ServerAddress;
 import com.example.demo.ui.page.DownloadPage;
+import com.example.demo.ui.component.DownloadTasksDialog;
 public class HelloApplication extends Application {
   private static final Set<String> CLONE_DATA_DIRS =
       Set.of(
@@ -6511,39 +6512,11 @@ public class HelloApplication extends Application {
   }
 
   private void showDownloadTasks() {
-    DownloadManager.Status status = DownloadManager.status();
-    Dialog<ButtonType> dialog = new Dialog<>();
-    dialog.initOwner(this.stageRef);
-    dialog.setTitle("下载任务");
-    dialog.setHeaderText(
-        status.total() > 0 && status.done() < status.total() ? "正在下载" : "下载任务与最近文件");
-    Label current =
-        new Label(
-            status.total() > 0 && status.done() < status.total()
-                ? (status.file() == null || status.file().isBlank() ? "正在准备下载…" : status.file())
-                : "当前没有进行中的下载任务。");
-    current.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 12px;");
-    Label last =
-        new Label(
-            (this.lastDownloadedFile == null
-                ? "还没有已完成的下载。"
-                : "最近完成：\n" + this.lastDownloadedFile.getAbsolutePath()));
-    last.setWrapText(true);
-    last.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
-    Button open = new Button("打开所在文件夹");
-    open.setStyle(
-        "-fx-background-color: -app-btn-2; -fx-text-fill: -app-text-2; -fx-background-radius: 8;"
-            + " -fx-padding: 7 14; -fx-cursor: hand;");
-    open.setDisable(this.lastDownloadedFile == null);
-    open.setOnAction(
-        e -> {
-          if (this.lastDownloadedFile != null && this.lastDownloadedFile.getParentFile() != null) {
-            this.openDir(this.lastDownloadedFile.getParentFile());
-          }
-        });
-    dialog.getDialogPane().setContent(new VBox(10.0, current, last, open));
-    dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
-    dialog.showAndWait();
+    DownloadTasksDialog.show(
+        this.stageRef,
+        DownloadManager.status(),
+        this.lastDownloadedFile,
+        this::openDir);
   }
 
   private static void clampStagePosition(Stage stage) {
