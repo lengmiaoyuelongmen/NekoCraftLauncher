@@ -233,6 +233,7 @@ import com.example.demo.core.launch.LaunchPreflight;
 import com.example.demo.core.model.GameDirDetector;
 import com.example.demo.core.model.LanguageConfig;
 import com.example.demo.core.launch.LaunchState;
+import com.example.demo.core.download.ModrinthSearch;
 public class HelloApplication extends Application {
   private static final Set<String> CLONE_DATA_DIRS =
       Set.of(
@@ -4315,14 +4316,7 @@ public class HelloApplication extends Application {
     String gameVer = this.filterBar.gameVersionCombo().getValue();
     String loader = this.filterBar.loaderCombo().getValue();
     String sort = this.filterBar.sortCombo().getValue();
-    String pType =
-        this.currentProjectType.equals("模组")
-            ? "mod"
-            : (this.currentProjectType.equals("资源包")
-                ? "resourcepack"
-                : (this.currentProjectType.equals("光影包")
-                    ? "shader"
-                    : (this.currentProjectType.equals("数据包") ? "datapack" : "modpack")));
+    String pType = ModrinthSearch.projectType(this.currentProjectType);
     String pageKey = pType + "|" + query + "|" + gameVer + "|" + loader + "|" + sort + "|" + offset;
     List<ModpackProject> cachedPage = this.searchPageCache.get(pageKey);
     if (cachedPage != null && cachedPage.isEmpty()) {
@@ -4344,42 +4338,9 @@ public class HelloApplication extends Application {
       this.prefetchIcons(addedCache);
       return;
     }
-    JsonArray facets = new JsonArray();
-    JsonArray typeArr = new JsonArray();
-    typeArr.add("project_type:" + pType);
-    facets.add(typeArr);
-    if (gameVer != null && !gameVer.equals("任意")) {
-      JsonArray verArr = new JsonArray();
-      verArr.add("versions:" + gameVer);
-      facets.add(verArr);
-    }
-    if (!this.currentProjectType.equals("数据包") && loader != null && !loader.equals("任意")) {
-      JsonArray loaderArr = new JsonArray();
-      loaderArr.add("categories:" + loader.toLowerCase());
-      facets.add(loaderArr);
-    }
-    String index = "relevance";
-    if ("下载量".equals(sort)) {
-      index = "downloads";
-    } else if ("更新时间".equals(sort)) {
-      index = "updated";
-    }
     try {
-      String encodedFacets =
-          URLEncoder.encode(facets.toString(), StandardCharsets.UTF_8.toString());
-      String encodedQuery = URLEncoder.encode(query, StandardCharsets.UTF_8.toString());
-      String urlStr =
-          "https://api.modrinth.com/v2/search?query="
-              + encodedQuery
-              + "&facets="
-              + encodedFacets
-              + "&index="
-              + index
-              + "&limit=40&offset="
-              + offset;
-      String mirrorUrl =
-          urlStr.replace("https://api.modrinth.com/v2", "https://mod.mcimirror.top/modrinth/v2");
-      String effectiveMirror = "mod".equals(pType) || "modpack".equals(pType) ? mirrorUrl : urlStr;
+      String urlStr = ModrinthSearch.buildUrl(query, pType, gameVer, loader, sort, offset);
+      String effectiveMirror = ModrinthSearch.mirrorUrl(urlStr, pType);
 
       this.alternateSearchBodies(urlStr, effectiveMirror, offset)
           .orTimeout(10L, TimeUnit.SECONDS)
@@ -4413,11 +4374,23 @@ public class HelloApplication extends Application {
                           this.resultView.status().setRetry(() -> this.loadSearchPage(true));
                           return;
                         }
-                        JsonArray hits = json.getAsJsonArray("hits");
-                        if (json.has("total_hits") && !json.get("total_hits").isJsonNull()) {
-                          this.searchTotal = json.get("total_hits").getAsInt();
+                        ModrinthSearch.Page page;
+                        try {
+                          java.util.Set<String> existingIds = new java.util.HashSet<>();
+                          for (ModpackProject known : this.modpackData) {
+                            existingIds.add(known.getId());
+                          }
+                          page = ModrinthSearch.parse(body, pType, existingIds);
+                        } catch (Exception parseError) {
+                          this.loadingMoreResults = false;
+                          this.resultView.status().showText("资源数据解析失败，点击重试");
+                          this.resultView.status().setRetry(() -> this.loadSearchPage(true));
+                          return;
                         }
-                        if (hits == null || hits.size() == 0) {
+                        if (page.totalHits() >= 0) {
+                          this.searchTotal = page.totalHits();
+                        }
+                        if (page.rawHits() == 0) {
                           this.loadingMoreResults = false;
                           if (this.searchWatchdog != null) {
                             this.searchWatchdog.stop();
@@ -4426,45 +4399,10 @@ public class HelloApplication extends Application {
                           this.updateLoadMoreButton();
                           return;
                         }
-                        ArrayList<ModpackProject> pageProjects = new ArrayList<ModpackProject>();
-                        for (int i = 0; i < hits.size(); ++i) {
-                          JsonObject hit = hits.get(i).getAsJsonObject();
-                          String id = hit.get("project_id").getAsString();
-                          boolean exists =
-                              this.modpackData.stream().anyMatch(p -> id.equals(p.getId()));
-                          if (exists) continue;
-                          String title = hit.get("title").getAsString();
-                          String desc = hit.get("description").getAsString();
-                          String author = hit.get("author").getAsString();
-                          String iconUrl =
-                              hit.has("icon_url") && !hit.get("icon_url").isJsonNull()
-                                  ? hit.get("icon_url").getAsString()
-                                  : null;
-                          long downloads = hit.get("downloads").getAsLong();
-                          String updated = hit.get("date_modified").getAsString().substring(0, 10);
-                          ModpackProject project =
-                              new ModpackProject(
-                                  id,
-                                  title,
-                                  desc,
-                                  author,
-                                  iconUrl,
-                                  downloads,
-                                  updated,
-                                  "Modrinth",
-                                  pType);
-                          pageProjects.add(project);
-                        }
-                        for (ModpackProject project : pageProjects) {
-                          boolean duplicate =
-                              this.modpackData.stream()
-                                  .anyMatch(p -> project.getId().equals(p.getId()));
-                          if (duplicate) continue;
-                          this.modpackData.add(project);
-                        }
-                        this.searchPageCache.put(pageKey, pageProjects);
-                        this.searchOffset = offset + hits.size();
-                        if (this.searchTotal < 0 && hits.size() < 40) {
+                        this.modpackData.addAll(page.projects());
+                        this.searchPageCache.put(pageKey, page.projects());
+                        this.searchOffset = offset + page.rawHits();
+                        if (this.searchTotal < 0 && page.rawHits() < 40) {
                           this.searchTotal = this.searchOffset;
                         }
                         this.resultView.status().hide();
@@ -4473,7 +4411,7 @@ public class HelloApplication extends Application {
                         }
                         this.loadingMoreResults = false;
                         this.updateLoadMoreButton();
-                        this.prefetchIcons(pageProjects);
+                        this.prefetchIcons(page.projects());
                       }))
           .exceptionally(
               ex -> {

@@ -22,11 +22,11 @@
 ```
 src/main/java/com/example/demo/
 ├── Launcher.java            # 进程入口（唯一留在默认包的类）
-├── core/                    # 85 个类，0 处 import javafx / 0 处 import ui.*
+├── core/                    # 87 个类，0 处 import javafx / 0 处 import ui.*
 │   ├── ai/         2   DeepSeekClient, LocalAiAssistant
 │   ├── app/        8   AppPaths, AppVersion, LauncherConfig, SingleInstance, ConfigHistory, UpdateChecker, SupportBundle, Bootstrap
 │   ├── auth/       7   AuthManager, AccountStore, MicrosoftAuth, AuthlibInjectorManager, SessionStore, SecretStore, LoginCardParser
-│   ├── download/   9   DownloadManager, GameFiles, Downloader, Aria2Downloader, Integrity, SourcePinger, CurseForgeClient, IconProxy, ZipUtil
+│   ├── download/  10   DownloadManager, GameFiles, ModrinthSearch, Downloader, Aria2Downloader, Integrity, SourcePinger, CurseForgeClient, IconProxy, ZipUtil
 │   ├── game/       9   JavaManager, JavaRuntimeIndex, JavaRuntimeInstaller, JavaVersionProbe, JavaScanner, LoaderInstaller, PortableExporter, CrashAnalyzer, ImportErrors
 │   ├── instance/   2   InstanceFiles, InstanceCloner
 │   ├── launch/    14   LaunchPlan, LaunchPlanner, LaunchContext, LaunchTask, LaunchPipeline, ClientJarTask, LibrariesTask, AssetsTask, NativesTask, NativeExtractor, LaunchScriptExporter, LaunchPreflight, LaunchCancelledException, GameCommandSender
@@ -303,6 +303,25 @@ IDLE --beginPrepare()--> PREPARING --markRunning()--> RUNNING --finish()--> IDLE
 | `Integrity` 增加原生库检查 | 之前只查 classpath 库、客户端 jar、资源索引；现在 `downloads.classifiers` 里的 natives jar 也查（缺了游戏起不来），失败提示显示「原生库」 |
 
 主类 **8,428 → 8,359 行**；单测 75 → **76 通过**（新增「缺失原生库必须报出来」）。
+### Phase 5b-7：搜索协议进 core
+
+下载页的搜索原来把「筛选条件 → URL」和「响应 JSON → 项目列表」写在 UI 方法里（约 90 行），
+现在抽成 `core.download.ModrinthSearch`：
+
+| API | 职责 |
+|---|---|
+| `projectType(uiType)` | 中文类型 → `mod / resourcepack / shader / datapack / modpack` |
+| `indexFor(sortLabel)` | 排序下拉 → `relevance / downloads / updated` |
+| `buildUrl(...)` | facets 拼装（类型 / 游戏版本 / 加载器）+ URL 编码 |
+| `mirrorUrl(url, type)` | 只有模组/整合包走 MCIM 镜像，其余保持官方源 |
+| `parse(body, type, existingIds)` | 解析 hits、跳过已存在项目、保留原始条数用于分页 |
+
+验证：
+
+- 单测 76 → **84 通过**（类型映射、facets、镜像规则、去重解析、空结果、坏 JSON）
+- **真实 API 实跑**：query=sodium + 1.20.1 + Fabric + 按下载量 → HTTP 200、40 条、解析 40 个项目，
+  Top3 是 Sodium / Sodium Extra / Reese's Sodium Options
+
 
 ## 5. 迁移手法
 
