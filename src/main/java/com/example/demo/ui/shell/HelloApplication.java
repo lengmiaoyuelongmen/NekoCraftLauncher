@@ -162,6 +162,7 @@ import com.example.demo.core.model.ModpackProject;
 import com.example.demo.core.model.Playtime;
 import com.example.demo.core.model.UserSession;
 import com.example.demo.core.ai.DeepSeekClient;
+import com.example.demo.core.app.LauncherCommands;
 import com.example.demo.core.app.LauncherConfig;
 import com.example.demo.core.app.SingleInstance;
 import com.example.demo.core.auth.AuthlibInjectorManager;
@@ -1903,139 +1904,102 @@ private static void setFlexible(Node node, boolean on) {
   }
 
   private void executeCommand(String raw) {
-    String text = raw.trim();
-    if (text.isEmpty()) {
+    String text = raw == null ? "" : raw.trim();
+    LauncherCommands.Parsed parsed = LauncherCommands.parse(text);
+    if (parsed instanceof LauncherCommands.Empty) {
       return;
     }
     if (this.commandBar != null) {
       this.commandBar.pushHistory(text);
     }
     this.logArea.appendText("⌘ " + text + "\n");
-    if (text.startsWith("/")) {
-      this.sendCommandToGame(text.substring(1).trim());
+    switch (parsed) {
+      case LauncherCommands.Empty ignored -> {
+        // 上面已提前返回，这里只是让 switch 覆盖全部情况
+      }
+      case LauncherCommands.GameCommand game -> this.sendCommandToGame(game.command());
+      case LauncherCommands.Help ignored -> this.logArea.appendText(LauncherCommands.helpText());
+      case LauncherCommands.Launch ignored -> {
+        if (this.launchBtn != null) {
+          this.launchBtn.fire();
+        }
+      }
+      case LauncherCommands.Kill ignored -> this.killGameProcess();
+      case LauncherCommands.Versions ignored -> this.logInstalledVersions();
+      case LauncherCommands.Java ignored -> this.logJavaInfo();
+      case LauncherCommands.Memory memory -> {
+        this.config.setMemoryMb(memory.mb());
+        this.config.save();
+        this.logArea.appendText("✅ 最大内存已设为 " + memory.mb() + " MB（下次启动生效）\n");
+      }
+      case LauncherCommands.InvalidMemory ignored ->
+          this.logArea.appendText(LauncherCommands.memoryUsage());
+      case LauncherCommands.Open open -> this.openGameSubdir(open.sub());
+      case LauncherCommands.Import item -> {
+        File file = new File(item.path());
+        if (!file.isFile()) {
+          this.logArea.appendText("找不到整合包：" + item.path() + "\n");
+        } else {
+          this.importModpack(file);
+        }
+      }
+      case LauncherCommands.Crash ignored -> this.showCrashReport();
+      case LauncherCommands.Clear ignored -> this.logArea.clear();
+      case LauncherCommands.Unknown unknown ->
+          this.logArea.appendText("未知命令：" + unknown.name() + "（输入 help 查看）\n");
+    }
+  }
+
+  /** versions 命令：列出已安装版本。 */
+  private void logInstalledVersions() {
+    File dir = new File(this.config.getGameDir(), "versions");
+    File[] dirs = dir.listFiles(File::isDirectory);
+    if (dirs == null || dirs.length == 0) {
+      this.logArea.appendText("没有已安装的版本\n");
       return;
     }
-    String[] parts = text.split("\\s+", 2);
-    String command = parts[0].toLowerCase(Locale.ROOT);
-    String arg = parts.length > 1 ? parts[1].trim() : "";
-    switch (command) {
-      case "help":
-      case "?":
-        {
-          this.logArea.appendText(
-              "⌘ 启动器命令：\n"
-                  + "  help                显示本帮助\n"
-                  + "  launch              启动当前实例\n"
-                  + "  kill                结束当前游戏进程\n"
-                  + "  versions            列出已安装版本\n"
-                  + "  java                显示 Java 路径\n"
-                  + "  memory <MB>         修改最大内存（下次启动生效）\n"
-                  + "  open [子目录]        打开游戏目录 / 指定子目录\n"
-                  + "  crash               诊断最近一次崩溃\n"
-                  + "  import <文件>        导入 .zip / .mrpack 整合包\n"
-                  + "  clear               清空日志\n"
-                  + "  /<命令>             发送到游戏聊天（需游戏窗口，单人需开作弊）\n");
-          break;
-        }
-      case "launch":
-        {
-          if (this.launchBtn == null) break;
-          this.launchBtn.fire();
-          break;
-        }
-      case "kill":
-        {
-          this.killGameProcess();
-          break;
-        }
-      case "versions":
-        {
-          File dir = new File(this.config.getGameDir(), "versions");
-          File[] dirs = dir.listFiles(File::isDirectory);
-          if (dirs == null || dirs.length == 0) {
-            this.logArea.appendText("没有已安装的版本\n");
-            break;
-          }
-          Arrays.sort(dirs, Comparator.comparing(File::getName));
-          StringBuilder list = new StringBuilder("已安装 ").append(dirs.length).append(" 个版本：");
-          for (File d : dirs) {
-            list.append("\n  · ").append(d.getName());
-          }
-          this.logArea.appendText(list.append("\n").toString());
-          break;
-        }
-      case "java":
-        {
-          this.logArea.appendText(
-              "Java 路径："
-                  + this.config.getJavaPath()
-                  + "\n启动器 Java："
-                  + System.getProperty("java.version")
-                  + "（"
-                  + System.getProperty("java.vendor")
-                  + "）\n");
-          break;
-        }
-      case "memory":
-        {
-          try {
-            int mb = Integer.parseInt(arg);
-            if (mb < 512 || mb > 32768) {
-              throw new NumberFormatException();
-            }
-            this.config.setMemoryMb(mb);
-            this.config.save();
-            this.logArea.appendText("✅ 最大内存已设为 " + mb + " MB（下次启动生效）\n");
-          } catch (NumberFormatException ex) {
-            this.logArea.appendText("用法：memory 4096（512–32768 MB）\n");
-          }
-          break;
-        }
-      case "import":
-        {
-          File file = new File(arg);
-          if (!file.isFile()) {
-            this.logArea.appendText("找不到整合包：" + arg + "\n");
-            break;
-          }
-          this.importModpack(file);
-          break;
-        }
-      case "crash":
-        {
-          CrashAnalyzer.Report report = CrashAnalyzer.analyze(new File(this.config.getGameDir()));
-          this.logArea.appendText(CrashAnalyzer.toText(report));
-          CrashReportDialog.show(this.stageRef, report);
-          break;
-        }
-      case "open":
-        {
-          File target =
-              arg.isEmpty()
-                  ? new File(this.config.getGameDir())
-                  : new File(this.config.getGameDir(), arg);
-          try {
-            if (!target.exists() && !target.mkdirs()) {
-              this.logArea.appendText("目录不存在：" + target.getAbsolutePath() + "\n");
-              return;
-            }
-            Desktop.getDesktop().open(target);
-            this.logArea.appendText("📂 已打开 " + target.getAbsolutePath() + "\n");
-          } catch (Exception ex) {
-            this.logArea.appendText("打开失败：" + ex.getMessage() + "\n");
-          }
-          break;
-        }
-      case "clear":
-        {
-          this.logArea.clear();
-          break;
-        }
-      default:
-        {
-          this.logArea.appendText("未知命令：" + command + "（输入 help 查看）\n");
-        }
+    Arrays.sort(dirs, Comparator.comparing(File::getName));
+    StringBuilder list = new StringBuilder("已安装 ").append(dirs.length).append(" 个版本：");
+    for (File d : dirs) {
+      list.append("\n  · ").append(d.getName());
     }
+    this.logArea.appendText(list.append("\n").toString());
+  }
+
+  /** java 命令：显示配置里的 Java 路径与启动器自身版本。 */
+  private void logJavaInfo() {
+    this.logArea.appendText(
+        "Java 路径："
+            + this.config.getJavaPath()
+            + "\n启动器 Java："
+            + System.getProperty("java.version")
+            + "（"
+            + System.getProperty("java.vendor")
+            + "）\n");
+  }
+
+  /** open 命令：打开游戏目录或其中的子目录。 */
+  private void openGameSubdir(String sub) {
+    File target = sub.isEmpty()
+        ? new File(this.config.getGameDir())
+        : new File(this.config.getGameDir(), sub);
+    try {
+      if (!target.exists() && !target.mkdirs()) {
+        this.logArea.appendText("目录不存在：" + target.getAbsolutePath() + "\n");
+        return;
+      }
+      Desktop.getDesktop().open(target);
+      this.logArea.appendText("📂 已打开 " + target.getAbsolutePath() + "\n");
+    } catch (Exception ex) {
+      this.logArea.appendText("打开失败：" + ex.getMessage() + "\n");
+    }
+  }
+
+  /** crash 命令：诊断最近一次崩溃并弹出报告。 */
+  private void showCrashReport() {
+    CrashAnalyzer.Report report = CrashAnalyzer.analyze(new File(this.config.getGameDir()));
+    this.logArea.appendText(CrashAnalyzer.toText(report));
+    CrashReportDialog.show(this.stageRef, report);
   }
 
   private void sendCommandToGame(String command) {
