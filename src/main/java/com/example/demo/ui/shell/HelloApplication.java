@@ -252,6 +252,7 @@ import com.example.demo.core.launch.ServerAddress;
 import com.example.demo.ui.page.CommunityBrowser;
 import com.example.demo.ui.page.DownloadPage;
 import com.example.demo.ui.component.DownloadTasksDialog;
+import com.example.demo.ui.component.ExportInstanceDialog;
 import com.example.demo.core.meta.ReleaseTime;
 import com.example.demo.ui.page.VersionDetailPage;
 import com.example.demo.ui.page.InstallerPage;
@@ -1162,7 +1163,7 @@ public class HelloApplication extends Application {
                   this.openInstanceSettings("overview");
                 },
                 this::importModpackDialog,
-                this::exportInstance,
+                this::showExportDialog,
                 () -> this.switchPage("launch"));
         yield this.instancesPanel;
       }
@@ -3673,209 +3674,6 @@ private static void setFlexible(Node node, boolean on) {
     this.logLine(message);
   }
 
-  private void exportInstance(Instance instance) {
-    if (instance == null) {
-      return;
-    }
-    CheckBox includeSaves = new CheckBox("同时包含存档");
-    CheckBox includeLauncher = new CheckBox("带启动器（导出为便携文件夹，启动器和 .minecraft 放在同一目录）");
-    CheckBox serverPack = new CheckBox("导出服务端文件包（mods / config / scripts，自动过滤常见客户端模组）");
-    InAppDialog.custom(
-        this.dialogLayer,
-        "导出整合包",
-        new VBox(
-            10.0,
-            new Label("默认导出 .mrpack，可直接拖入 PCL 安装。"),
-            new Label("勾选「带启动器」后会导出文件夹：启动器 + .minecraft + 启动脚本。"),
-            includeSaves,
-            includeLauncher,
-            serverPack),
-        List.of(
-            InAppDialog.Action.secondary("取消", null),
-            InAppDialog.Action.primary(
-                "导出",
-                () -> {
-    File out;
-    boolean withLauncher = includeLauncher.isSelected();
-    boolean withSaves = includeSaves.isSelected();
-    String safeName = instance.id.replaceAll("[^0-9A-Za-z._-]", "_");
-    if (serverPack.isSelected()) {
-      File instanceRoot =
-          InstanceDirs.root(
-              new File(this.config.getGameDir()), instance.id, this.isIsolated(instance.id));
-      FileChooser chooser = new FileChooser();
-      chooser.setTitle("导出服务端文件包");
-      chooser
-          .getExtensionFilters()
-          .add(new FileChooser.ExtensionFilter("ZIP 压缩包 (*.zip)", "*.zip"));
-      chooser.setInitialFileName(safeName + "-server.zip");
-      File target = chooser.showSaveDialog(this.stageRef);
-      if (target == null) {
-        return;
-      }
-      if (!target.getName().toLowerCase(Locale.ROOT).endsWith(".zip")) {
-        target = new File(target.getParentFile(), target.getName() + ".zip");
-      }
-      File output = target;
-      Toast.info("正在导出服务端文件包…");
-      CompletableFuture.runAsync(
-          () -> {
-            try {
-              ServerPackExporter.Result result =
-                  ServerPackExporter.export(
-                      instanceRoot, output, true, msg -> this.logLine(msg), null);
-              Platform.runLater(
-                  () -> {
-                    Toast.ok(
-                        "服务端包完成："
-                            + result.files()
-                            + " 个文件，过滤 "
-                            + result.skippedClientMods()
-                            + " 个客户端模组");
-                    this.logLine("✅ 服务端包: " + output.getAbsolutePath());
-                    this.openDir(output.getParentFile());
-                  });
-            } catch (Exception ex) {
-              Platform.runLater(
-                  () -> {
-                    Toast.error("服务端包导出失败：" + ex.getMessage());
-                    this.logLine("❌ 服务端包导出失败: " + ex.getMessage());
-                  });
-            }
-          });
-      return;
-    }
-    if (withLauncher) {
-      DirectoryChooser dirChooser = new DirectoryChooser();
-      dirChooser.setTitle("选择导出位置");
-      File parent = dirChooser.showDialog(this.stageRef);
-      if (parent == null) {
-        return;
-      }
-      out = new File(parent, safeName + "-portable");
-      int suffix = 2;
-      while (out.exists()) {
-        out = new File(parent, safeName + "-portable-" + suffix++);
-      }
-    } else {
-      FileChooser chooser = new FileChooser();
-      chooser.setTitle("导出整合包");
-      chooser
-          .getExtensionFilters()
-          .add(new FileChooser.ExtensionFilter("Modrinth 整合包 (*.mrpack)", "*.mrpack"));
-      chooser.setInitialFileName(safeName + ".mrpack");
-      out = chooser.showSaveDialog(this.stageRef);
-      if (out == null) {
-        return;
-      }
-      if (!out.getName().toLowerCase(Locale.ROOT).endsWith(".mrpack")) {
-        out = new File(out.getParentFile(), out.getName() + ".mrpack");
-      }
-    }
-    File target = out;
-    ProgressBar exportProgress = new ProgressBar(0.0);
-    exportProgress.setMaxWidth(Double.MAX_VALUE);
-    Label exportStatus = new Label("正在准备导出…");
-    exportStatus.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 12px;");
-    Dialog<?> progressDialog = new Dialog<>();
-    progressDialog.initOwner(this.stageRef);
-    progressDialog.initModality(Modality.APPLICATION_MODAL);
-    progressDialog.setTitle("正在导出");
-    progressDialog.setHeaderText(withLauncher ? "正在导出便携整合包" : "正在导出 Modrinth 整合包");
-    progressDialog.getDialogPane().setContent(new VBox(12.0, exportStatus, exportProgress));
-    progressDialog.getDialogPane().setPrefWidth(440.0);
-    AtomicBoolean exportDone = new AtomicBoolean(false);
-    progressDialog.setOnCloseRequest(
-        ev -> {
-          if (!exportDone.get()) {
-            ev.consume();
-          }
-        });
-    progressDialog
-        .getDialogPane()
-        .addEventFilter(
-            KeyEvent.KEY_PRESSED,
-            ev -> {
-              if (ev.getCode() == KeyCode.ESCAPE && !exportDone.get()) {
-                ev.consume();
-              }
-            });
-    progressDialog.show();
-    DoubleConsumer onProgress =
-        p ->
-            Platform.runLater(
-                () -> {
-                  exportProgress.setProgress(Math.max(0.0, Math.min(1.0, p)));
-                  exportStatus.setText("正在导出… " + (int) Math.round(p * 100.0) + "%");
-                });
-    this.logMessage(
-        withLauncher ? "正在导出便携整合包: " + target.getName() : "正在导出整合包: " + target.getName());
-
-    CompletableFuture.runAsync(
-            () -> {
-              try {
-                if (withLauncher) {
-                  PortableExporter.export(
-                      new File(this.config.getGameDir()), instance, target, withSaves, onProgress);
-                } else {
-                  ModpackExporter.export(
-                      new File(this.config.getGameDir()), instance, target, withSaves, onProgress);
-                }
-              } catch (Exception ex) {
-                throw new CompletionException(ex);
-              }
-            })
-        .thenAccept(
-            v ->
-                Platform.runLater(
-                    () -> {
-                      exportDone.set(true);
-                      progressDialog.setOnCloseRequest(null);
-                      try {
-                        if (progressDialog.getDialogPane().getScene() != null
-                            && progressDialog.getDialogPane().getScene().getWindow() != null) {
-                          progressDialog.getDialogPane().getScene().getWindow().hide();
-                        }
-                      } catch (Exception exception) {
-                        // empty catch block
-                      }
-                      progressDialog.close();
-                      InAppDialog.alert(
-                          "导出完成",
-                          (withLauncher ? "便携整合包已生成：\n" : "Modrinth 整合包已生成：\n")
-                              + target.getAbsolutePath());
-                      this.logMessage("✅ 导出完成: " + target.getAbsolutePath());
-                    }))
-        .exceptionally(
-            ex -> {
-              Throwable cause = ex;
-              while (cause.getCause() != null) {
-                cause = cause.getCause();
-              }
-              Throwable root = cause;
-              Platform.runLater(
-                  () -> {
-                    exportDone.set(true);
-                    progressDialog.setOnCloseRequest(null);
-                    try {
-                      if (progressDialog.getDialogPane().getScene() != null
-                          && progressDialog.getDialogPane().getScene().getWindow() != null) {
-                        progressDialog.getDialogPane().getScene().getWindow().hide();
-                      }
-                    } catch (Exception exception) {
-                      // empty catch block
-                    }
-                    progressDialog.close();
-                    Toast.error(
-                        "导出失败: " + (root.getMessage() == null ? "未知错误" : root.getMessage()));
-                    this.logMessage("❌ 导出失败: " + root.getMessage());
-                  });
-              return null;
-            });
-                  })),
-        null);
-  }
-
   private File firstModJar(Dragboard board) {
     List<File> jars = this.modJars(board);
     return jars.isEmpty() ? null : jars.get(0);
@@ -3939,6 +3737,35 @@ private static void setFlexible(Node node, boolean on) {
       return file;
     }
     return null;
+  }
+
+  /** 导出整合包对话框（无状态，按需创建）。 */
+  private void showExportDialog(Instance instance) {
+    new ExportInstanceDialog(
+            this.stageRef,
+            this.dialogLayer,
+            new ExportInstanceDialog.Host() {
+              @Override
+              public java.io.File gameDir() {
+                return new java.io.File(HelloApplication.this.config.getGameDir());
+              }
+
+              @Override
+              public boolean isolated(String instanceId) {
+                return HelloApplication.this.isIsolated(instanceId);
+              }
+
+              @Override
+              public void log(String text) {
+                HelloApplication.this.logLine(text);
+              }
+
+              @Override
+              public void openDir(java.io.File dir) {
+                HelloApplication.this.openDir(dir);
+              }
+            })
+        .show(instance);
   }
 
   private void importModpackDialog() {
