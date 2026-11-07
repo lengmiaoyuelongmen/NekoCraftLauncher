@@ -768,6 +768,27 @@ public class HelloApplication extends Application {
       });
   }
 
+  /** 创建场景：样式表、拖放/尺寸/快捷键、主题绑定与 Toast 宿主。 */
+  private Scene createScene(StackPane rootWrap, Stage stage) {
+    Scene scene = new Scene(rootWrap, 1060.0, 792.0);
+    scene.setFill(javafx.scene.paint.Color.TRANSPARENT);
+    this.installDragAndDrop(scene);
+    this.installStageBounds(stage);
+    this.installKeyBindings(scene, stage);
+    try {
+      URL cssUrl = HelloApplication.class.getResource("/com/example/demo/app.css");
+      if (cssUrl != null) {
+        scene.getStylesheets().add(cssUrl.toExternalForm());
+        THEME_URL = cssUrl.toExternalForm();
+      }
+    } catch (Exception e2) {
+      System.err.println("[theme] 全局样式加载失败，界面会回退到默认样式");
+    }
+    Theme.bindScene(scene);
+    Toast.install(rootWrap);
+    return scene;
+  }
+
   public void start(Stage stage) {
     List<MinecraftVersion> cachedVersions;
     this.stageRef = stage;
@@ -844,22 +865,7 @@ public class HelloApplication extends Application {
     this.dialogLayer.setVisible(true);
     // 弹窗层直接叠在原根节点上：外面再包一层 StackPane 会破坏窗口圆角与描边
     rootWrap.getChildren().add(this.dialogLayer);
-    Scene scene = new Scene(rootWrap, 1060.0, 792.0);
-    scene.setFill(javafx.scene.paint.Color.TRANSPARENT);
-    this.installDragAndDrop(scene);
-    this.installStageBounds(stage);
-    this.installKeyBindings(scene, stage);
-    try {
-      URL cssUrl = HelloApplication.class.getResource("/com/example/demo/app.css");
-      if (cssUrl != null) {
-        scene.getStylesheets().add(cssUrl.toExternalForm());
-        THEME_URL = cssUrl.toExternalForm();
-      }
-    } catch (Exception e2) {
-      System.err.println("[theme] 全局样式加载失败，界面会回退到默认样式");
-    }
-    Theme.bindScene(scene);
-    Toast.install(rootWrap);
+    Scene scene = this.createScene(rootWrap, stage);
     Platform.setImplicitExit(false);
     stage.setOpacity(Math.max(0.7, Math.min(1.0, this.config.getUiOpacity())));
     stage.setTitle("Neko Craft Launcher");
