@@ -263,6 +263,7 @@ import com.example.demo.ui.page.LaunchPage;
 import com.example.demo.ui.page.MinecraftVersionsPage;
 import com.example.demo.ui.component.AccountManagerDialog;
 import com.example.demo.ui.page.ModDetailPage;
+import com.example.demo.ui.page.ModpackVersionLoader;
 import com.example.demo.ui.page.ModpackVersionPage;
 public class HelloApplication extends Application {
   private static final Set<String> CLONE_DATA_DIRS =
@@ -317,16 +318,9 @@ public class HelloApplication extends Application {
   private long launchPrepareStart;
   private long lastLaunchPrepMs;
   /** 最近一次预览请求，供加载页的「重试」真正重新拉取。 */
-  private String lastVersionProjectId;
-  private String lastVersionProjectTitle;
-  private String lastVersionProjectType;
   /** 版本列表加载页的重试按钮（失败时才显示）。 */
-  private Button versionRetryBtn;
   /** 版本列表加载页的提示文字（点下载后先出页面，再填内容）。 */
-  private Label versionLoadingLabel;
   /** 版本列表内存缓存：同一个项目 10 分钟内不重复请求。 */
-  private final Map<String, JsonArray> versionListCache = new java.util.concurrent.ConcurrentHashMap<>();
-  private final Map<String, Long> versionListCacheAt = new java.util.concurrent.ConcurrentHashMap<>();
   /** 集成式弹窗宿主层。 */
   private StackPane dialogLayer;
   /** 启动准备是否正在进行 / 是否被用户要求停止。 */
@@ -428,6 +422,7 @@ public class HelloApplication extends Application {
   private TopBar topBar;
   private FavoritesRenderer favoritesRenderer;
   private ModpackVersionPage modpackVersionPage;
+  private ModpackVersionLoader modpackVersionLoader;
   private PauseTransition searchWatchdog;
   private ObservableList<MinecraftVersion> allMinecraftVersions =
       FXCollections.observableArrayList();
@@ -2896,6 +2891,48 @@ private static void setFlexible(Node node, boolean on) {
     }
   }
 
+  /** 版本列表加载器（缓存 + 加载页 + 重试）。 */
+  private ModpackVersionLoader modpackVersionLoader() {
+    if (this.modpackVersionLoader == null) {
+      this.modpackVersionLoader =
+          new ModpackVersionLoader(
+              new ModpackVersionLoader.Host() {
+                @Override
+                public javafx.scene.layout.StackPane contentArea() {
+                  return HelloApplication.this.downloadContentArea();
+                }
+
+                @Override
+                public void showPage(Node page) {
+                  HelloApplication.this.showDownloadPanel(page);
+                }
+
+                @Override
+                public void backToCommunity() {
+                  HelloApplication.this.showDownloadPanel(
+                      HelloApplication.this.communityPanelNode());
+                }
+
+                @Override
+                public void openVersions(String title, JsonArray versions, java.util.function.IntConsumer onChosen) {
+                  HelloApplication.this.modpackVersionPage().show(title, versions, onChosen);
+                }
+
+                @Override
+                public void downloadChosen(
+                    String title, String projectType, JsonArray versions, int index) {
+                  HelloApplication.this.downloadChosenVersion(title, projectType, versions, index);
+                }
+
+                @Override
+                public void log(String message) {
+                  HelloApplication.this.logArea.appendText(message);
+                }
+              });
+    }
+    return this.modpackVersionLoader;
+  }
+
   /** 整合包版本选择页（第一次用到时创建）。 */
   private ModpackVersionPage modpackVersionPage() {
     if (this.modpackVersionPage == null) {
@@ -3139,147 +3176,8 @@ private static void setFlexible(Node node, boolean on) {
   }
 
   /** 点卡片/下载后立刻显示的版本页骨架，避免网络慢时看起来"没反应"。 */
-  private void showVersionLoadingPage(String title) {
-    Button back = new Button("‹  返回");
-    back.getStyleClass().addAll("btn-secondary", "btn-sm");
-    Label heading = new Label(title);
-    heading.setStyle("-fx-text-fill: -app-text; -fx-font-size: 16px; -fx-font-weight: bold;");
-    Label subtitle = new Label("正在读取可安装的版本…");
-    subtitle.setStyle("-fx-text-fill: -app-text-dim; -fx-font-size: 11px;");
-    VBox headingBox = new VBox(2, heading, subtitle);
-    Region spacer = new Region();
-    HBox.setHgrow(spacer, Priority.ALWAYS);
-    HBox header = new HBox(12, back, headingBox, spacer);
-    header.setAlignment(Pos.CENTER_LEFT);
-
-    versionLoadingLabel = new Label("正在读取版本列表…");
-    versionLoadingLabel.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 13px;");
-    Button retry = new Button("重新获取");
-    retry.getStyleClass().addAll("btn-secondary", "btn-sm");
-    retry.setVisible(false);
-    retry.setManaged(false);
-    retry.setOnAction(
-        e -> {
-          if (this.lastVersionProjectId == null) {
-            this.showDownloadPanel(this.communityPanel);
-            return;
-          }
-          // 清掉缓存，真正重新访问数据源
-          this.versionListCache.remove(this.lastVersionProjectId);
-          this.versionListCacheAt.remove(this.lastVersionProjectId);
-          this.fetchVersionsAndDownload(
-              this.lastVersionProjectId, this.lastVersionProjectTitle, this.lastVersionProjectType);
-        });
-    versionRetryBtn = retry;
-    VBox center = new VBox(12, versionLoadingLabel, retry);
-    center.setAlignment(Pos.CENTER);
-    VBox.setVgrow(center, Priority.ALWAYS);
-
-    VBox page = new VBox(10, header, center);
-    page.setPadding(new Insets(6, 10, 6, 6));
-    page.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-    page.getStyleClass().add("version-page");
-    this.downloadContentArea().getChildren().removeIf(n -> n.getStyleClass().contains("version-page"));
-    back.setOnAction(e -> this.showDownloadPanel(this.communityPanel));
-    this.showDownloadPanel(page);
-  }
-
   private void fetchVersionsAndDownload(String projectId, String projectTitle, String projectType) {
-    this.lastVersionProjectId = projectId;
-    this.lastVersionProjectTitle = projectTitle;
-    this.lastVersionProjectType = projectType;
-    // 先把页面顶出来，网络慢也立刻有反馈；失败时页面里可以重试
-    this.showVersionLoadingPage(projectTitle);
-    JsonArray cachedVersions = this.versionListCache.get(projectId);
-    Long cachedAt = this.versionListCacheAt.get(projectId);
-    if (cachedVersions != null && cachedAt != null && System.currentTimeMillis() - cachedAt < 10 * 60 * 1000L) {
-      Platform.runLater(
-          () ->
-              this.modpackVersionPage().show(
-                  projectTitle,
-                  cachedVersions,
-                  chosen -> {
-                    if (chosen >= 0) {
-                      this.downloadChosenVersion(projectTitle, projectType, cachedVersions, chosen);
-                    }
-                  }));
-      return;
-    }
-    String urlStr = "https://api.modrinth.com/v2/project/" + projectId + "/version";
-    String mirrorStr = urlStr.replace("https://api.modrinth.com/v2", "https://mod.mcimirror.top/modrinth/v2");
-    // 镜像和官方并行竞速：谁先返回有效 JSON 就用谁，避免串行等待拖慢
-    java.util.function.Supplier<String> fetchOne =
-        () -> {
-          java.util.concurrent.CompletableFuture<String> winner = new java.util.concurrent.CompletableFuture<>();
-          for (String url : new String[] {mirrorStr, urlStr}) {
-            CompletableFuture.runAsync(
-                () -> {
-                  try {
-                    HttpRequest req =
-                        HttpRequest.newBuilder(URI.create(url))
-                            .header("User-Agent", "PCL-CE-Launcher/1.0")
-                            .GET()
-                            .timeout(java.time.Duration.ofSeconds(15L))
-                            .build();
-                    HttpResponse<String> resp =
-                        httpClient.send(req, HttpResponse.BodyHandlers.ofString());
-                    if (resp.statusCode() == 200
-                        && resp.body() != null
-                        && resp.body().startsWith("[")) {
-                      winner.complete(resp.body());
-                    }
-                  } catch (Exception ignored) {
-                    // 另一个源还有机会
-                  }
-                });
-          }
-          try {
-            return winner.get(20L, java.util.concurrent.TimeUnit.SECONDS);
-          } catch (Exception e) {
-            return null;
-          }
-        };
-    CompletableFuture.supplyAsync(fetchOne)
-        .thenAccept(
-            body ->
-                Platform.runLater(
-                    () -> {
-                      if (body == null || !body.startsWith("[")) {
-                        this.logArea.appendText("❌ 获取 " + projectTitle + " 版本列表失败。\n");
-                        if (this.versionLoadingLabel != null) {
-                          this.versionLoadingLabel.setText("读取版本列表失败，检查网络后点「重新获取」");
-                        }
-                        if (this.versionRetryBtn != null) {
-                          this.versionRetryBtn.setVisible(true);
-                          this.versionRetryBtn.setManaged(true);
-                        }
-                        return;
-                      }
-                      JsonArray arr = new Gson().fromJson(body, JsonArray.class);
-                      if (arr.size() > 0) {
-                        this.versionListCache.put(projectId, arr);
-                        this.versionListCacheAt.put(projectId, System.currentTimeMillis());
-                      }
-                      if (arr.size() == 0) {
-                        this.logArea.appendText("❌ " + projectTitle + " 暂无可用版本。\n");
-                        if (this.versionLoadingLabel != null) {
-                          this.versionLoadingLabel.setText("这个项目暂时没有可下载的版本");
-                        }
-                        if (this.versionRetryBtn != null) {
-                          this.versionRetryBtn.setVisible(true);
-                          this.versionRetryBtn.setManaged(true);
-                        }
-                        return;
-                      }
-                      this.modpackVersionPage().show(
-                          projectTitle,
-                          arr,
-                          chosen -> {
-                            if (chosen >= 0) {
-                              this.downloadChosenVersion(projectTitle, projectType, arr, chosen);
-                            }
-                          });
-                    }));
+    this.modpackVersionLoader().open(projectId, projectTitle, projectType);
   }
 
   private String installDirFor(String projectType) {
