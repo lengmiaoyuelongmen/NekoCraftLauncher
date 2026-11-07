@@ -3626,7 +3626,12 @@ private static void setFlexible(Node node, boolean on) {
                       + archive.getAbsolutePath()
                       + "\n",
                   StandardCharsets.UTF_8);
-              InstanceMeta.set(gameDir, instanceId, pack.name(), pack.format() + " 导入");
+              // 复用已存在实例时不要改它的显示名，只更新描述
+              InstanceMeta.set(
+                  gameDir,
+                  instanceId,
+                  createdInstance != null ? pack.name() : null,
+                  pack.format() + " 导入");
               sink.accept(
                   "导入完成: " + pack.name() + " → " + target.getAbsolutePath() + "（" + count + " 个文件）");
 
