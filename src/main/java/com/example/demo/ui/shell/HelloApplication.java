@@ -242,6 +242,7 @@ import com.example.demo.core.model.LanguageConfig;
 import com.example.demo.core.launch.AutoRepair;
 import com.example.demo.core.launch.IntegrityCachePolicy;
 import com.example.demo.core.launch.GameExit;
+import com.example.demo.core.launch.LaunchCompatibility;
 import com.example.demo.core.launch.LaunchGuards;
 import com.example.demo.core.launch.LaunchState;
 import com.example.demo.core.download.ModrinthSearch;
@@ -5146,20 +5147,44 @@ private static void setFlexible(Node node, boolean on) {
   private record LaunchEnv(File injector, String javaPath) {}
 
   /** 环境就绪后组启动命令并 spawn（在 JavaFX 线程上执行）。 */
+  /** 客户端 jar 是否就位（继承版本里 jar 在 rootId 目录下）。 */
+  private boolean hasClientJar(File gameDir, VersionProfile profile) {
+    String rootId = profile.getRootId();
+    File versions = new File(gameDir, "versions");
+    if (rootId != null && !rootId.isBlank()
+        && new File(new File(versions, rootId), rootId + ".jar").isFile()) {
+      return true;
+    }
+    String id = profile.getId();
+    return new File(new File(versions, id), id + ".jar").isFile();
+  }
+
   private void launchWithEnv(
       VersionProfile profile, File gameDir, boolean isolated, File nativesDir, LaunchEnv env) {
                 try {
                   String javaPath = env.javaPath();
                   int actual = this.javaMajorVersion(javaPath);
                   int required = profile.getJavaMajorVersion();
-                  if (actual > 0 && actual < required) {
-                    this.logArea.appendText(
-                        "⚠️ 该版本需要 Java "
-                            + required
-                            + "，当前用的是 Java "
-                            + actual
-                            + "，大概率会崩；可在「设置」里指定 Java 路径\n");
-                  } else if (actual > 0) {
+                  java.util.List<LaunchCompatibility.Issue> issues =
+                      LaunchCompatibility.check(
+                          required,
+                          actual,
+                          javaPath,
+                          this.hasClientJar(gameDir, profile),
+                          VersionProfile.isInstalled(gameDir, profile.getId()));
+                  for (LaunchCompatibility.Issue issue : issues) {
+                    this.logLine("⚠ " + issue.message());
+                  }
+                  LaunchCompatibility.Issue blocker =
+                      LaunchCompatibility.firstBlocking(issues);
+                  if (blocker != null) {
+                    this.logLine("⛔ 启动已取消：" + blocker.message());
+                    this.showLaunchFailureHint("启动已取消：" + blocker.message());
+                    this.launchBtn.setDisable(false);
+                    this.finishLaunching();
+                    return;
+                  }
+                  if (actual > 0) {
                     this.logArea.appendText("☕ Java " + actual + "（需要 " + required + "）\n");
                   }
                   InstanceSettings.Settings override =
