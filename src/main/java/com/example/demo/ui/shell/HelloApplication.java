@@ -3545,7 +3545,7 @@ private static void setFlexible(Node node, boolean on) {
                         HttpRequest.newBuilder(URI.create(url))
                             .header("User-Agent", "PCL-CE-Launcher/1.0")
                             .GET()
-                            .timeout(java.time.Duration.ofSeconds(6L))
+                            .timeout(java.time.Duration.ofSeconds(15L))
                             .build();
                     HttpResponse<String> resp =
                         httpClient.send(req, HttpResponse.BodyHandlers.ofString());
@@ -3560,7 +3560,7 @@ private static void setFlexible(Node node, boolean on) {
                 });
           }
           try {
-            return winner.get(9L, java.util.concurrent.TimeUnit.SECONDS);
+            return winner.get(20L, java.util.concurrent.TimeUnit.SECONDS);
           } catch (Exception e) {
             return null;
           }
