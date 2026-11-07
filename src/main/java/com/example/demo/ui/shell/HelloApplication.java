@@ -243,6 +243,7 @@ import com.example.demo.core.launch.LaunchGuards;
 import com.example.demo.core.launch.LaunchState;
 import com.example.demo.core.download.ModrinthSearch;
 import com.example.demo.core.download.SearchFetcher;
+import com.example.demo.core.download.SearchPages;
 import com.example.demo.core.download.SearchSession;
 import com.example.demo.core.mod.ProjectFormat;
 import com.example.demo.core.model.InstanceId;
@@ -416,19 +417,8 @@ public class HelloApplication extends Application {
       Map.of("launch", 0, "download", 1, "settings", 2, "tools", 3);
   private volatile String lastSearchSource = "Modrinth";
   private ObservableList<ModpackProject> modpackData = FXCollections.observableArrayList();
-  private int searchOffset;
-  private int searchTotal = -1;
-  private boolean loadingMoreResults;
+  private final SearchPages searchPages = new SearchPages();
   private PauseTransition searchWatchdog;
-  private final Map<String, List<ModpackProject>> searchPageCache =
-      Collections.synchronizedMap(
-          new LinkedHashMap<String, List<ModpackProject>>(64, 0.75f, true) {
-
-            @Override
-            protected boolean removeEldestEntry(Map.Entry<String, List<ModpackProject>> eldest) {
-              return this.size() > 80;
-            }
-          });
   private ObservableList<MinecraftVersion> allMinecraftVersions =
       FXCollections.observableArrayList();
   private static final HttpClient httpClient =
@@ -3323,17 +3313,13 @@ private static void setFlexible(Node node, boolean on) {
         ready = defaultFilters ? this.prewarmedCommunity.get(warmedType) : null;
     if (ready != null && !ready.isEmpty()) {
       this.modpackData.setAll((Collection<ModpackProject>) ready);
-      this.searchOffset = ready.size();
-      this.searchTotal = -1;
-      this.loadingMoreResults = false;
+      this.searchPages.resetForPrewarm(ready.size());
       this.resultView.status().hide();
       this.setLoadMoreHint();
       this.prefetchIcons(ready);
       return;
     }
-    this.searchOffset = 0;
-    this.searchTotal = -1;
-    this.loadingMoreResults = false;
+    this.searchPages.reset();
     this.modpackData.clear();
     if (this.resultView != null) {
       this.resultView.setLoadMoreHintText("");
@@ -3375,21 +3361,21 @@ private static void setFlexible(Node node, boolean on) {
   }
 
   private void loadSearchPage(boolean first) {
-    if (this.loadingMoreResults) {
+    if (this.searchPages.isLoading()) {
       return;
     }
-    if (!SearchSession.hasMore(this.searchOffset, this.searchTotal)) {
+    if (!this.searchPages.hasMore()) {
       return;
     }
-    this.loadingMoreResults = true;
+    this.searchPages.beginLoad();
     if (this.searchWatchdog == null) {
       this.searchWatchdog = new PauseTransition(Duration.seconds(12.0));
       this.searchWatchdog.setOnFinished(
           e -> {
-            if (!this.loadingMoreResults) {
+            if (!this.searchPages.isLoading()) {
               return;
             }
-            this.loadingMoreResults = false;
+            this.searchPages.endLoad();
             this.resultView.status().showText("获取超时，请检查网络后点击重试");
             this.resultView
                 .status()
@@ -3402,7 +3388,7 @@ private static void setFlexible(Node node, boolean on) {
           });
     }
     this.searchWatchdog.playFromStart();
-    int offset = this.searchOffset;
+    int offset = this.searchPages.offset();
     String query =
         this.filterBar.searchField().getText() == null
             ? ""
@@ -3412,17 +3398,13 @@ private static void setFlexible(Node node, boolean on) {
     String sort = this.filterBar.sortCombo().getValue();
     String pType = ModrinthSearch.projectType(this.currentProjectType);
     String pageKey = pType + "|" + query + "|" + gameVer + "|" + loader + "|" + sort + "|" + offset;
-    List<ModpackProject> cachedPage = this.searchPageCache.get(pageKey);
-    if (cachedPage != null && cachedPage.isEmpty()) {
-      this.searchPageCache.remove(pageKey);
-      cachedPage = null;
-    }
+    List<ModpackProject> cachedPage = this.searchPages.cached(pageKey);
     if (cachedPage != null) {
-      this.loadingMoreResults = false;
+      this.searchPages.endLoad();
       this.resultView.status().hide();
       List<ModpackProject> addedCache =
           SearchSession.mergeUnique(this.modpackData, cachedPage);
-      this.searchOffset = offset + cachedPage.size();
+      this.searchPages.setOffset(offset + cachedPage.size());
       this.updateLoadMoreButton();
       this.prefetchIcons(addedCache);
       return;
@@ -3441,7 +3423,7 @@ private static void setFlexible(Node node, boolean on) {
                         if (this.searchWatchdog != null) {
                           this.searchWatchdog.stop();
                         }
-                        this.loadingMoreResults = false;
+                        this.searchPages.endLoad();
                         if (body == null || !body.startsWith("{")) {
                           this.resultView.status().showText("加载失败：资源站不可用，点击这里重试");
                           this.resultView
@@ -3458,7 +3440,7 @@ private static void setFlexible(Node node, boolean on) {
                         try {
                           json = new Gson().fromJson(body, JsonObject.class);
                         } catch (Exception parseError) {
-                          this.loadingMoreResults = false;
+                          this.searchPages.endLoad();
                           this.resultView.status().showText("资源数据解析失败，点击重试");
                           this.resultView.status().setRetry(() -> this.loadSearchPage(true));
                           return;
@@ -3471,16 +3453,16 @@ private static void setFlexible(Node node, boolean on) {
                           }
                           page = ModrinthSearch.parse(body, pType, existingIds);
                         } catch (Exception parseError) {
-                          this.loadingMoreResults = false;
+                          this.searchPages.endLoad();
                           this.resultView.status().showText("资源数据解析失败，点击重试");
                           this.resultView.status().setRetry(() -> this.loadSearchPage(true));
                           return;
                         }
                         if (page.totalHits() >= 0) {
-                          this.searchTotal = page.totalHits();
+                          this.searchPages.setTotal(page.totalHits());
                         }
                         if (page.rawHits() == 0) {
-                          this.loadingMoreResults = false;
+                          this.searchPages.endLoad();
                           if (this.searchWatchdog != null) {
                             this.searchWatchdog.stop();
                           }
@@ -3489,16 +3471,16 @@ private static void setFlexible(Node node, boolean on) {
                           return;
                         }
                         this.modpackData.addAll(page.projects());
-                        this.searchPageCache.put(pageKey, page.projects());
-                        this.searchOffset = offset + page.rawHits();
-                        if (this.searchTotal < 0 && page.rawHits() < 40) {
-                          this.searchTotal = this.searchOffset;
+                        this.searchPages.cache(pageKey, page.projects());
+                        this.searchPages.setOffset(offset + page.rawHits());
+                        if (this.searchPages.total() < 0 && page.rawHits() < 40) {
+                          this.searchPages.setTotal(this.searchPages.offset());
                         }
                         this.resultView.status().hide();
                         if (this.searchWatchdog != null) {
                           this.searchWatchdog.stop();
                         }
-                        this.loadingMoreResults = false;
+                        this.searchPages.endLoad();
                         this.updateLoadMoreButton();
                         this.prefetchIcons(page.projects());
                       }))
@@ -3509,13 +3491,13 @@ private static void setFlexible(Node node, boolean on) {
                       if (this.searchWatchdog != null) {
                         this.searchWatchdog.stop();
                       }
-                      this.loadingMoreResults = false;
+                      this.searchPages.endLoad();
                       this.resultView.status().showText("请求失败：" + ex.getMessage() + "（点击重试）");
                       this.resultView
                           .status()
                           .setRetry(
                               () -> {
-                                this.loadingMoreResults = false;
+                                this.searchPages.endLoad();
                                 this.resultView.status().showLoading("正在重新加载...");
                                 this.loadSearchPage(true);
                               });
@@ -3524,7 +3506,7 @@ private static void setFlexible(Node node, boolean on) {
                 return null;
               });
     } catch (Exception e2) {
-      this.loadingMoreResults = false;
+      this.searchPages.endLoad();
       this.resultView.status().showText("请求参数构建失败: " + e2.getMessage());
     }
   }
@@ -3553,7 +3535,7 @@ private static void setFlexible(Node node, boolean on) {
     if (this.resultView == null) {
       return;
     }
-    boolean hasMore = this.searchTotal < 0 || this.searchOffset < this.searchTotal;
+    boolean hasMore = this.searchPages.hasMore();
     if (this.modpackData.isEmpty()) {
       this.resultView.setLoadMoreHintText("");
       return;
@@ -3562,7 +3544,7 @@ private static void setFlexible(Node node, boolean on) {
         hasMore
             ? "已显示 "
                 + this.modpackData.size()
-                + (this.searchTotal >= 0 ? " / " + this.searchTotal : "")
+                + (this.searchPages.total() >= 0 ? " / " + this.searchPages.total() : "")
                 + " · 滚动到底自动加载"
             : "已加载全部 · 共 " + this.modpackData.size() + " 个");
   }
