@@ -870,6 +870,44 @@ clean package     0 告警
 `createOverviewPane()`（概览面板 + 透明滚动容器）。类里最长的方法现在是
 `start(Stage)` 138 行。
 
+### 业务判断：按「能不能用」来选，而不是「最新就行」
+
+这一阶段按 Prism / HMCL / PCL 的通行做法补了三类判断，全部放在 core 里配单测。
+
+**1. 版本适配（`core.mod.VersionFit`）**
+
+```java
+Loader detectLoader(mainClass, libraryNames)   // NeoForge/Quilt 先判，避免被 Forge/Fabric 库误判
+Target(gameVersion, loader)
+boolean compatible(candidate, target)
+int bestMatch(candidates, target)              // 版本页默认选中它
+String fitLabel(candidate, target)             // 「适配当前实例」/「需要 MC 26.3」
+```
+
+版本页据此：默认**只列适配当前实例的版本**，标题栏给「显示全部版本」开关；
+没有适配版本时全列并在副标题说明「没有适配 1.12.2 · 原版 的版本」。
+
+真机证据：1.12.2 下打开 VeinMiner（无 1.12.2 构建）→ 全列 + 提示；
+用离线 harness 喂四个构造版本（26.3-neoforge / 1.20.1-forge / 1.12.2-release /
+1.12.2-beta）→ 列表只剩两条 1.12.2（release + beta）。
+
+**2. 启动前兼容性（`core.launch.LaunchCompatibility`）**
+
+| 检查 | 级别 | 处理 |
+|---|---|---|
+| Java 版本低于要求 | BLOCK | 弹「启动失败」并取消启动 |
+| 没有可用 Java / 客户端 jar 缺失 / 版本 JSON 缺失 | BLOCK | 同上 |
+| 缺库文件（classpath 统计） | BLOCK | 提示去「工具 → 校验库文件」 |
+| Java 版本识别不出 | WARN | 记日志后照常启动 |
+
+真机证据：把 1.12.2 的需求改成 Java 21、同时固定用 Java 8 → 启动被拦，
+弹窗文案「启动已取消：该版本需要 Java 21，当前是 Java 8…」。
+另有一条正向证据：不指定 Java 路径时启动器会自动拉取所需运行时（日志
+`准备 Azul Zulu 高性能运行时… ☕ Java 21（需要 21）`）再启动。
+
+**缺库那条没能真机复现**：把 `patchy-1.3.9.jar` 改名后启动，前置完整性检查已经把文件
+补回来了，所以拦截分支只有单测覆盖——这本身是比「拦住」更好的结果。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：
