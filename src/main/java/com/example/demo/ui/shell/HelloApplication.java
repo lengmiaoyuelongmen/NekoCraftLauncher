@@ -3463,6 +3463,67 @@ private static void setFlexible(Node node, boolean on) {
   }
 
   /** 真正的导入：下载器状态接到进度条，失败自动重试一次，两次都失败则清理半成品。 */
+  /** 解包一个整合包到实例目录（先解到临时目录再合并），并写入来源与显示信息。 */
+  private int installPackInto(
+      File archive,
+      File gameDir,
+      String instanceId,
+      ModpackImport.Pack pack,
+      InstallProgressPage window,
+      Consumer<String> sink,
+      File staging,
+      boolean createdInstance)
+      throws Exception {
+      // 导入：加载器实例依赖原版父版本，缺了后面必然起不来
+      this.ensureParentVersion(gameDir, instanceId, sink);
+      this.checkImportCancelled();
+      File target = InstanceDirs.root(gameDir, instanceId, true);
+      // 先解到临时目录，全部成功后再合并：中途失败不会污染实例目录
+      File stageRoot = new File(gameDir, "cache");
+      stageRoot.mkdirs();
+      staging = java.nio.file.Files.createTempDirectory(stageRoot.toPath(), "modpack-").toFile();
+      Platform.runLater(
+          () -> {
+            window.setStep(3, "run");
+            window.setStatus("正在解包 " + archive.getName() + "…");
+          });
+      int count = ModpackImport.extract(archive, staging, sink);
+      this.checkImportCancelled();
+      count += ModpackImport.installIndexedFiles(archive, staging, sink);
+      ModpackImport.flattenMods(staging, sink);
+      this.checkImportCancelled();
+
+      // 合并到实例目录
+      if (!target.isDirectory() && !target.mkdirs()) {
+        throw new RuntimeException("无法创建实例目录: " + target.getAbsolutePath());
+      }
+      copyTree(staging, target);
+      Platform.runLater(() -> window.setStep(3, "ok"));
+
+      Files.writeString(
+          new File(target, "modpack-source.txt").toPath(),
+          "name="
+              + pack.name()
+              + "\nformat="
+              + pack.format()
+              + "\narchive="
+              + archive.getAbsolutePath()
+              + "\n",
+          StandardCharsets.UTF_8);
+      // 复用已存在实例时不要改它的显示名，只更新描述
+      InstanceMeta.set(
+          gameDir,
+          instanceId,
+          createdInstance ? pack.name() : null,
+          pack.format() + " 导入");
+      sink.accept(
+          "导入完成: " + pack.name() + " → " + target.getAbsolutePath() + "（" + count + " 个文件）");
+
+      // 安装成功后删掉安装包（只删启动器自己下载目录里的，不动用户自己的文件）
+      deletePackArchive(archive);
+    return count;
+  }
+
   private void runImportAsync(File archive, InstallProgressPage window) {
     // 把下载器的实时状态接到页面的「下载进度」条上（文件数 / 字节 / 速度 / 当前文件）
     final java.util.function.Consumer<DownloadManager.Status> dlListener =
@@ -3615,58 +3676,18 @@ private static void setFlexible(Node node, boolean on) {
                 Platform.runLater(() -> window.setStep(2, "skip"));
               }
 
-              // 导入：加载器实例依赖原版父版本，缺了后面必然起不来
-              this.ensureParentVersion(gameDir, instanceId, sink);
-              this.checkImportCancelled();
               File target = InstanceDirs.root(gameDir, instanceId, true);
-              // 先解到临时目录，全部成功后再合并：中途失败不会污染实例目录
               File stageRoot = new File(gameDir, "cache");
               stageRoot.mkdirs();
-              staging = java.nio.file.Files.createTempDirectory(stageRoot.toPath(), "modpack-").toFile();
-              Platform.runLater(
-                  () -> {
-                    window.setStep(3, "run");
-                    window.setStatus("正在解包 " + archive.getName() + "…");
-                  });
-              int count = ModpackImport.extract(archive, staging, sink);
-              this.checkImportCancelled();
-              count += ModpackImport.installIndexedFiles(archive, staging, sink);
-              ModpackImport.flattenMods(staging, sink);
-              this.checkImportCancelled();
-
-              // 合并到实例目录
-              if (!target.isDirectory() && !target.mkdirs()) {
-                throw new RuntimeException("无法创建实例目录: " + target.getAbsolutePath());
-              }
-              copyTree(staging, target);
-              fileCount = count;
-              Platform.runLater(() -> window.setStep(3, "ok"));
-
-              Files.writeString(
-                  new File(target, "modpack-source.txt").toPath(),
-                  "name="
-                      + pack.name()
-                      + "\nformat="
-                      + pack.format()
-                      + "\narchive="
-                      + archive.getAbsolutePath()
-                      + "\n",
-                  StandardCharsets.UTF_8);
-              // 复用已存在实例时不要改它的显示名，只更新描述
-              InstanceMeta.set(
-                  gameDir,
-                  instanceId,
-                  createdInstance != null ? pack.name() : null,
-                  pack.format() + " 导入");
-              sink.accept(
-                  "导入完成: " + pack.name() + " → " + target.getAbsolutePath() + "（" + count + " 个文件）");
-
-              // 安装成功后删掉安装包（只删启动器自己下载目录里的，不动用户自己的文件）
-              deletePackArchive(archive);
+              staging =
+                  java.nio.file.Files.createTempDirectory(stageRoot.toPath(), "modpack-").toFile();
+              fileCount =
+                  this.installPackInto(
+                      archive, gameDir, instanceId, pack, window, sink, staging, createdInstance != null);
 
               String importedId = instanceId;
               String packName = pack.name();
-              int installedFiles = count;
+              int installedFiles = fileCount;
               Platform.runLater(
                   () -> {
                     stopDlListener.run();
