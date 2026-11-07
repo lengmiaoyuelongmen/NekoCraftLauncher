@@ -115,15 +115,32 @@ public final class ModpackVersionPage {
   }
 
   javafx.scene.control.ListView<Integer> list = new javafx.scene.control.ListView<>();
-  for (int i = 0; i < labels.size(); i++) {
-    list.getItems().add(i);
-  }
   int bestMatch = VersionFit.bestMatch(candidates, target);
-  if (bestMatch >= 0) {
-    list.getSelectionModel().select(bestMatch);
-  } else {
-    list.getSelectionModel().selectFirst();
+  java.util.List<Integer> compatibleIndices = new java.util.ArrayList<>();
+  for (int i = 0; i < labels.size(); i++) {
+    if (target != null && VersionFit.compatible(candidates.get(i), target)) {
+      compatibleIndices.add(i);
+    }
   }
+  // 有适配版本时默认只列它们（Prism/HMCL 的做法），没有就全列
+  final boolean[] onlyFit = {!compatibleIndices.isEmpty()};
+  Runnable fillList =
+      () -> {
+        list.getItems().clear();
+        if (onlyFit[0]) {
+          list.getItems().addAll(compatibleIndices);
+        } else {
+          for (int i = 0; i < labels.size(); i++) {
+            list.getItems().add(i);
+          }
+        }
+        if (bestMatch >= 0 && list.getItems().contains(Integer.valueOf(bestMatch))) {
+          list.getSelectionModel().select(Integer.valueOf(bestMatch));
+        } else {
+          list.getSelectionModel().selectFirst();
+        }
+      };
+  fillList.run();
   // 版本行：类型徽章带颜色，悬停高亮由 CSS 的 .version-row:hover 负责
   list.setCellFactory(
       view ->
@@ -276,7 +293,18 @@ public final class ModpackVersionPage {
   VBox headingBox = new VBox(2, heading, subtitle);
   Region headerSpacer = new Region();
   HBox.setHgrow(headerSpacer, Priority.ALWAYS);
-  HBox header = new HBox(12, back, headingBox, headerSpacer);
+  javafx.scene.control.CheckBox showAll = new javafx.scene.control.CheckBox("显示全部版本");
+  showAll.setSelected(!onlyFit[0]);
+  showAll.setStyle("-fx-text-fill: -app-text-dim; -fx-font-size: 11px;");
+  showAll.setVisible(!compatibleIndices.isEmpty());
+  showAll.setManaged(!compatibleIndices.isEmpty());
+  showAll.selectedProperty()
+      .addListener(
+          (obs, was, now) -> {
+            onlyFit[0] = !now.booleanValue();
+            fillList.run();
+          });
+  HBox header = new HBox(12, back, headingBox, headerSpacer, showAll);
   header.setAlignment(Pos.CENTER_LEFT);
   header.setPadding(new Insets(0, 0, 6, 0));
 
