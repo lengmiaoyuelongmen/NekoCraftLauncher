@@ -199,6 +199,7 @@ import com.example.demo.ui.component.AccountInfoCard;
 import com.example.demo.ui.component.BlockIcons;
 import com.example.demo.ui.component.CommandBar;
 import com.example.demo.ui.component.ConsoleContainer;
+import com.example.demo.ui.component.CommandPalette;
 import com.example.demo.ui.component.ConsoleToolbar;
 import com.example.demo.ui.component.CrashReportDialog;
 import com.example.demo.ui.component.DownloadFilterBar;
@@ -2003,45 +2004,22 @@ private static void setFlexible(Node node, boolean on) {
       return;
     }
     Parent parent = this.stageRef.getScene().getRoot();
-    if (!(parent instanceof StackPane)) {
+    if (!(parent instanceof StackPane layer)) {
       return;
     }
-    StackPane layer = (StackPane) parent;
-    StackPane overlay = new StackPane();
-    overlay.setStyle("-fx-background-color: rgba(4,7,12,0.62);");
-    StackPane.setAlignment(overlay, Pos.CENTER);
-    VBox card = new VBox(10.0);
-    card.setPrefWidth(560.0);
-    card.setMaxWidth(560.0);
-    card.setMaxHeight(Double.NEGATIVE_INFINITY);
-    card.setPadding(new Insets(14.0));
-    card.setStyle(
-        "-fx-background-color: linear-gradient(to bottom, -app-card-top, -app-card-alt2);"
-            + " -fx-background-radius: 18; -fx-border-color: -app-border-soft; -fx-border-radius:"
-            + " 18; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.45), 40, 0.2, 0, 12);");
-    TextField search = new TextField();
-    search.setPromptText("搜索命令、页面、操作…");
-    search.setPrefHeight(40.0);
-    search.setStyle(
-        "-fx-background-color: -app-input; -fx-text-fill: -app-text; -fx-prompt-text-fill:"
-            + " -app-text-muted; -fx-background-radius: 12; -fx-border-color: -app-border-3;"
-            + " -fx-border-radius: 12; -fx-padding: 8 12; -fx-font-size: 13px;");
-    VBox list = new VBox(4.0);
-    Label hint = new Label("↑↓ 选择 · Enter 执行 · Esc 关闭");
-    hint.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 10.5px;");
-    ArrayList<PaletteAction> all = new ArrayList<PaletteAction>();
+    ArrayList<CommandPalette.Action> all = new ArrayList<CommandPalette.Action>();
     for (PluginContext.Command command : PluginManager.commands()) {
-      all.add(new PaletteAction("sparkles", command.title(), command.hint(), command.action()));
+      all.add(new CommandPalette.Action("sparkles", command.title(), command.hint(), command.action()));
     }
-    all.add(new PaletteAction("play", "启动游戏", "立即启动当前实例", this::handleLaunch));
-    all.add(new PaletteAction("layers", "实例选择", "切换、收藏或导入实例", () -> this.switchPage("instances")));
+    all.add(new CommandPalette.Action("play", "启动游戏", "立即启动当前实例", this::handleLaunch));
+    all.add(new CommandPalette.Action("layers", "实例选择", "切换、收藏或导入实例", () -> this.switchPage("instances")));
     all.add(
-        new PaletteAction(
+        new CommandPalette.Action(
             "gear", "实例设置", "打开当前实例的概览", () -> this.openInstanceSettings("overview")));
     all.add(
-        new PaletteAction("download", "下载中心", "模组 / 整合包 / 资源", () -> this.switchPage("download")));
+        new CommandPalette.Action("download", "下载中心", "模组 / 整合包 / 资源", () -> this.switchPage("download")));
     all.add(
-        new PaletteAction(
+        new CommandPalette.Action(
             "download",
             "版本列表",
             "Minecraft 版本下载与安装",
@@ -2050,10 +2028,10 @@ private static void setFlexible(Node node, boolean on) {
               this.showDownloadPanel(this.minecraftPanel);
               this.loadMinecraftVersions();
             }));
-    all.add(new PaletteAction("gear", "启动器设置", "Java、内存、外观", () -> this.switchPage("settings")));
-    all.add(new PaletteAction("tools", "工具", "环境、缓存、诊断", () -> this.switchPage("tools")));
+    all.add(new CommandPalette.Action("gear", "启动器设置", "Java、内存、外观", () -> this.switchPage("settings")));
+    all.add(new CommandPalette.Action("tools", "工具", "环境、缓存、诊断", () -> this.switchPage("tools")));
     all.add(
-        new PaletteAction(
+        new CommandPalette.Action(
             "tools",
             "启动记录",
             "启动耗时、异常率、会话历史",
@@ -2064,7 +2042,7 @@ private static void setFlexible(Node node, boolean on) {
               }
             }));
     all.add(
-        new PaletteAction(
+        new CommandPalette.Action(
             "sparkles",
             "性能优化",
             "打开可逆优化工具页",
@@ -2075,19 +2053,19 @@ private static void setFlexible(Node node, boolean on) {
               }
             }));
     all.add(
-        new PaletteAction(
+        new CommandPalette.Action(
             "folder",
             "打开游戏目录",
             this.config.getGameDir(),
             () -> this.openDir(new File(this.config.getGameDir()))));
     all.add(
-        new PaletteAction(
+        new CommandPalette.Action(
             "terminal",
             "打开日志目录",
             "查看 latest.log / launcher.log",
             () -> this.openDir(new File(this.config.getGameDir(), "logs"))));
     all.add(
-        new PaletteAction(
+        new CommandPalette.Action(
             "sparkles",
             "切换 AI 模式",
             "命令栏切换 DeepSeek / 本地助手",
@@ -2098,7 +2076,7 @@ private static void setFlexible(Node node, boolean on) {
               Toast.info(this.config.isAiEnabled() ? "AI 模式已开启" : "AI 模式已关闭");
             }));
     all.add(
-        new PaletteAction(
+        new CommandPalette.Action(
             "warning",
             "崩溃诊断",
             "分析最近一次崩溃",
@@ -2108,118 +2086,9 @@ private static void setFlexible(Node node, boolean on) {
               this.logArea.appendText(CrashAnalyzer.toText(report));
               CrashReportDialog.show(this.stageRef, report);
             }));
-    int[] selected = new int[] {0};
-    ArrayList<HBox> rows = new ArrayList<>();
-    Runnable paintSelection =
-        () -> {
-          for (int i = 0; i < rows.size(); ++i) {
-            boolean active = i == selected[0];
-            rows.get(i)
-                .setStyle(
-                    "-fx-background-color: "
-                        + (active ? "-app-hover-2" : "transparent")
-                        + "; -fx-background-radius: 9;");
-          }
-        };
-    Runnable runSelected =
-        () -> {
-          if (rows.isEmpty()) {
-            return;
-          }
-          int index = Math.max(0, Math.min(selected[0], rows.size() - 1));
-          PaletteAction action = (PaletteAction) rows.get(index).getUserData();
-          this.closeCommandPalette();
-          if (action != null && action.action() != null) {
-            action.action().run();
-          }
-        };
-    Runnable refresh =
-        () -> {
-          String query = search.getText() == null ? "" : search.getText().trim().toLowerCase();
-          list.getChildren().clear();
-          rows.clear();
-          for (PaletteAction action : all) {
-            String haystack = (action.title() + " " + action.hint()).toLowerCase();
-            if (!query.isEmpty() && !haystack.contains(query)) continue;
-            HBox row = new HBox(10.0);
-            row.setAlignment(Pos.CENTER_LEFT);
-            row.setPadding(new Insets(8.0, 10.0, 8.0, 10.0));
-            row.setUserData(action);
-            row.setCursor(Cursor.HAND);
-            StackPane icon = Icons.node(action.icon(), 15.0, "#c7ccd4");
-            Label title = new Label(action.title());
-            title.setStyle(
-                "-fx-text-fill: -app-text-2; -fx-font-size: 12.5px; -fx-font-weight: bold;");
-            Label sub = new Label(action.hint());
-            sub.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 10.5px;");
-            Region sp = new Region();
-            HBox.setHgrow(sp, Priority.ALWAYS);
-            row.getChildren().addAll(icon, title, sub, sp);
-            row.setOnMouseEntered(
-                e -> {
-                  selected[0] = rows.indexOf(row);
-                  paintSelection.run();
-                });
-            row.setOnMouseClicked(
-                e -> {
-                  this.closeCommandPalette();
-                  action.action().run();
-                });
-            rows.add(row);
-            list.getChildren().add(row);
-            if (rows.size() < 9) continue;
-            break;
-          }
-          selected[0] = 0;
-          paintSelection.run();
-        };
-    search.textProperty().addListener((o, a, b) -> refresh.run());
-    search.setOnKeyPressed(
-        e -> {
-          if (e.getCode() == KeyCode.DOWN) {
-            if (!rows.isEmpty()) {
-              selected[0] = (selected[0] + 1) % rows.size();
-            }
-            paintSelection.run();
-            e.consume();
-          } else if (e.getCode() == KeyCode.UP) {
-            if (!rows.isEmpty()) {
-              selected[0] = (selected[0] - 1 + rows.size()) % rows.size();
-            }
-            paintSelection.run();
-            e.consume();
-          } else if (e.getCode() == KeyCode.ENTER) {
-            runSelected.run();
-            e.consume();
-          } else if (e.getCode() == KeyCode.ESCAPE) {
-            this.closeCommandPalette();
-            e.consume();
-          }
-        });
-    card.getChildren().addAll(search, list, hint);
-    overlay.getChildren().add(card);
-    card.setOnMouseClicked(e -> e.consume());
-    overlay.setOnMouseClicked(
-        e -> {
-          if (e.getTarget() == overlay) {
-            this.closeCommandPalette();
-          }
-        });
+    StackPane overlay = CommandPalette.create(all, this::closeCommandPalette);
     layer.getChildren().add(overlay);
     this.commandPaletteOverlay = overlay;
-    refresh.run();
-    overlay.setOpacity(0.0);
-    card.setScaleX(0.97);
-    card.setScaleY(0.97);
-    FadeTransition fade = new FadeTransition(Duration.millis(160.0), overlay);
-    fade.setToValue(1.0);
-    ScaleTransition scale = new ScaleTransition(Duration.millis(180.0), card);
-    scale.setToX(1.0);
-    scale.setToY(1.0);
-    scale.setInterpolator(Motion.SPRING);
-    fade.play();
-    scale.play();
-    Platform.runLater(search::requestFocus);
   }
 
   private void closeCommandPalette() {
@@ -6559,8 +6428,6 @@ private static void setFlexible(Node node, boolean on) {
     RESTORE,
     CLOSE;
   }
-
-  private record PaletteAction(String icon, String title, String hint, Runnable action) {}
 
   private static final class ImportCancelledException extends RuntimeException {
     private static final long serialVersionUID = 1L;
