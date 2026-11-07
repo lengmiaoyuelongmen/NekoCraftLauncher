@@ -254,6 +254,7 @@ import com.example.demo.ui.page.CommunityBrowser;
 import com.example.demo.ui.page.DownloadPage;
 import com.example.demo.ui.component.DownloadTasksDialog;
 import com.example.demo.ui.component.ExportInstanceDialog;
+import com.example.demo.ui.component.FavoritesRenderer;
 import com.example.demo.core.meta.ReleaseTime;
 import com.example.demo.ui.page.VersionDetailPage;
 import com.example.demo.ui.page.InstallerPage;
@@ -424,6 +425,7 @@ public class HelloApplication extends Application {
   private ObservableList<ModpackProject> modpackData = FXCollections.observableArrayList();
   private CommunityBrowser communityBrowser;
   private TopBar topBar;
+  private FavoritesRenderer favoritesRenderer;
   private ModpackVersionPage modpackVersionPage;
   private PauseTransition searchWatchdog;
   private ObservableList<MinecraftVersion> allMinecraftVersions =
@@ -2595,129 +2597,47 @@ private static void setFlexible(Node node, boolean on) {
     return guide;
   }
 
-  private void renderFavoriteResources() {
-    String sort;
-    if (this.favoritesResourceList == null) {
-      return;
+  private FavoritesRenderer favoritesRenderer() {
+    if (this.favoritesRenderer == null) {
+      this.favoritesRenderer =
+          new FavoritesRenderer(
+              new FavoritesRenderer.Host() {
+                @Override
+                public boolean groupOpen(String group) {
+                  return HelloApplication.this.config.getFavoriteGroups().getOrDefault(group, true);
+                }
+
+                @Override
+                public void setGroupOpen(String group, boolean open) {
+                  HelloApplication.this.config.getFavoriteGroups().put(group, open);
+                  HelloApplication.this.config.save();
+                }
+
+                @Override
+                public void download(Favorites.Fav fav) {
+                  HelloApplication.this.fetchVersionsAndDownload(
+                      fav.id(), fav.title(), fav.type());
+                }
+
+                @Override
+                public void refresh() {
+                  HelloApplication.this.renderFavoriteResources();
+                }
+              });
     }
-    this.favoritesResourceList.getChildren().clear();
-    ArrayList<Favorites.Fav> favs =
-        new ArrayList<Favorites.Fav>(
-            Favorites.list().stream()
-                .filter(
-                    fav ->
-                        this.favoritesQuery.isEmpty()
-                            || fav.title() != null
-                                && fav.title().toLowerCase().contains(this.favoritesQuery)
-                            || fav.type() != null
-                                && fav.type().toLowerCase().contains(this.favoritesQuery))
-                .toList());
-    switch (sort =
+    return this.favoritesRenderer;
+  }
+
+  private void renderFavoriteResources() {
+    String sort =
         this.favoritesSortCombo == null || this.favoritesSortCombo.getValue() == null
             ? "最近收藏"
-            : this.favoritesSortCombo.getValue()) {
-      case "名称":
-        {
-          favs.sort(
-              Comparator.comparing(fav -> fav.title() == null ? "" : fav.title().toLowerCase()));
-          break;
-        }
-      case "下载量":
-        {
-          favs.sort(Comparator.comparingLong(Favorites.Fav::downloads).reversed());
-          break;
-        }
-      default:
-        {
-          favs.sort(Comparator.comparingLong(Favorites.Fav::time).reversed());
-        }
-    }
-    if (favs.isEmpty()) {
-      Label empty =
-          new Label(Favorites.list().isEmpty() ? "还没有收藏的资源。在下载页的卡片上点 ☆ 即可收藏。" : "没有匹配的收藏资源。");
-      empty.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 12px;");
-      empty.setWrapText(true);
-      this.favoritesResourceList.getChildren().add(empty);
-      return;
-    }
-    LinkedHashMap<String, List<Favorites.Fav>> grouped =
-        new LinkedHashMap<String, List<Favorites.Fav>>();
-    for (String label : new String[] {"整合包", "模组", "资源包", "光影包", "数据包", "世界", "资源"}) {
-      List<Favorites.Fav> group =
-          favs.stream().filter(fav -> this.typeLabel(fav.type()).equals(label)).toList();
-      if (group.isEmpty()) continue;
-      grouped.put(label, group);
-    }
-    for (Map.Entry<String, List<Favorites.Fav>> entry : grouped.entrySet()) {
-      String groupKey = entry.getKey();
-      boolean open = this.config.getFavoriteGroups().getOrDefault(groupKey, true);
-      Label groupLabel =
-          new Label((open ? "▾ " : "▸ ") + groupKey + "（" + entry.getValue().size() + "）");
-      groupLabel.setStyle(
-          "-fx-text-fill: -app-text-dim-2; -fx-font-size: 11px; -fx-font-weight: bold; -fx-padding:"
-              + " 8 0 2 0; -fx-cursor: hand;");
-      groupLabel.setOnMouseClicked(
-          e -> {
-            this.config.getFavoriteGroups().put(groupKey, !open);
-            this.config.save();
-            this.renderFavoriteResources();
-          });
-      VBox groupBody = new VBox(8.0);
-      groupBody.setVisible(open);
-      groupBody.setManaged(open);
-      this.favoritesResourceList.getChildren().addAll(groupLabel, groupBody);
-      for (Favorites.Fav fav2 : entry.getValue()) {
-        HBox row = new HBox(12.0);
-        row.setAlignment(Pos.CENTER_LEFT);
-        row.setPadding(new Insets(10.0, 14.0, 10.0, 14.0));
-        row.getStyleClass().add("instance-row");
-        Label icon = new Label(this.typeLabel(fav2.type()).substring(0, 1));
-        icon.setStyle(
-            "-fx-text-fill: white; -fx-font-size: 13px; -fx-font-weight: bold;"
-                + " -fx-background-color: -app-text-dim-2; -fx-background-radius: 8; -fx-padding: 7"
-                + " 9;");
-        VBox info = new VBox(2.0);
-        Label name = new Label(fav2.title());
-        name.setStyle("-fx-text-fill: -app-text; -fx-font-size: 13px;");
-        Label sub =
-            new Label(
-                this.typeLabel(fav2.type())
-                    + " · ⬇ "
-                    + HelloApplication.formatCount(fav2.downloads())
-                    + " · Modrinth");
-        sub.setStyle("-fx-text-fill: -app-text-dim-3; -fx-font-size: 11px;");
-        info.getChildren().addAll(name, sub);
-        HBox.setHgrow(info, Priority.ALWAYS);
-        Button download = new Button("下载");
-        download.setStyle(
-            "-fx-background-color: #9ca3af; -fx-text-fill: #111827; -fx-font-weight: bold;"
-                + " -fx-background-radius: 8; -fx-padding: 6 16; -fx-cursor: hand;");
-        download.setMinWidth(Double.NEGATIVE_INFINITY);
-        download.setOnAction(
-            e -> this.fetchVersionsAndDownload(fav2.id(), fav2.title(), fav2.type()));
-        Button remove = new Button();
-        remove.setGraphic(Icons.node("star", 16.0, "#eab308"));
-        remove.setStyle(
-            "-fx-background-color: transparent; -fx-text-fill: #eab308; -fx-font-size: 17px;"
-                + " -fx-cursor: hand; -fx-padding: 2 6;");
-        remove.setOnAction(
-            e -> {
-              Favorites.remove(fav2.id());
-              this.renderFavoriteResources();
-              Toast.info("已取消收藏 " + fav2.title());
-            });
-        row.getChildren().addAll(icon, info, remove, download);
-        groupBody.getChildren().add(row);
-      }
-    }
+            : this.favoritesSortCombo.getValue();
+    this.favoritesRenderer().render(this.favoritesResourceList, this.favoritesQuery, sort);
   }
 
   private String typeLabel(String type) {
     return ProjectFormat.typeLabel(type);
-  }
-
-  private static String formatCount(long count) {
-    return ProjectFormat.count(count);
   }
 
   private void showInstaller(String loader) {
