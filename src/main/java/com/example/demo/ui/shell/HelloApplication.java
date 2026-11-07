@@ -249,6 +249,7 @@ import com.example.demo.core.download.SearchFetcher;
 import com.example.demo.core.download.SearchPages;
 import com.example.demo.core.download.SearchSession;
 import com.example.demo.core.mod.ProjectFormat;
+import com.example.demo.core.mod.VersionFit;
 import com.example.demo.core.model.InstanceId;
 import com.example.demo.core.launch.ServerAddress;
 import com.example.demo.ui.page.CommunityBrowser;
@@ -2948,6 +2949,26 @@ private static void setFlexible(Node node, boolean on) {
     }
   }
 
+  /** 当前实例的适配目标：MC 版本 + 加载器（给社区资源的版本筛选与推荐用）。 */
+  private VersionFit.Target currentVersionTarget() {
+    String instanceId = this.currentInstanceId();
+    if (instanceId == null || instanceId.isBlank()) {
+      return VersionFit.Target.of("", VersionFit.Loader.VANILLA);
+    }
+    try {
+      VersionProfile profile =
+          VersionProfile.load(new File(this.config.getGameDir()), instanceId);
+      java.util.List<String> libraries =
+          profile.classpathLibraries().stream()
+              .map(lib -> lib.has("name") ? lib.get("name").getAsString() : "")
+              .toList();
+      return VersionFit.Target.of(
+          profile.getRootId(), VersionFit.detectLoader(profile.getMainClass(), libraries));
+    } catch (Exception e) {
+      return VersionFit.Target.of("", VersionFit.Loader.VANILLA);
+    }
+  }
+
   /** 版本列表加载器（缓存 + 加载页 + 重试）。 */
   private ModpackVersionLoader modpackVersionLoader() {
     if (this.modpackVersionLoader == null) {
@@ -2972,7 +2993,7 @@ private static void setFlexible(Node node, boolean on) {
 
                 @Override
                 public void openVersions(String title, JsonArray versions, java.util.function.IntConsumer onChosen) {
-                  HelloApplication.this.modpackVersionPage().show(title, versions, onChosen);
+                  HelloApplication.this.modpackVersionPage().show(title, versions, HelloApplication.this.currentVersionTarget(), onChosen);
                 }
 
                 @Override

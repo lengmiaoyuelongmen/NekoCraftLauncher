@@ -1,5 +1,6 @@
 package com.example.demo.ui.page;
 
+import com.example.demo.core.mod.VersionFit;
 import com.example.demo.ui.shell.Dialogs;
 import com.example.demo.ui.shell.InAppDialog;
 import com.google.gson.JsonArray;
@@ -47,8 +48,19 @@ public final class ModpackVersionPage {
         this.host = host;
     }
 
-    /** 打开版本选择页；用户选中后通过 {@code onChosen} 回传索引（-1 表示取消）。 */
-    public void show(String title, JsonArray versions, IntConsumer onChosen) {
+    /** 版本页顶部提示：有适配版本就说已选中，没有就说明本次都需手动挑。 */
+  private static String fitHint(VersionFit.Target target, int bestMatch) {
+    if (target == null || target.gameVersion().isBlank()) {
+      return "选择要安装的版本 · 右侧是该版本的更新内容";
+    }
+    if (bestMatch >= 0) {
+      return "已选中适配 " + target.label() + " 的版本 · 右侧是该版本的更新内容";
+    }
+    return "没有适配 " + target.label() + " 的版本，请自行选择（右侧会说明差异）";
+  }
+
+  /** 打开版本选择页；用户选中后通过 {@code onChosen} 回传索引（-1 表示取消）。 */
+    public void show(String title, JsonArray versions, VersionFit.Target target, IntConsumer onChosen) {
   int limit = Math.min(60, versions.size());
   ArrayList<String> labels = new ArrayList<>();
   ArrayList<String> numbers = new ArrayList<>();
@@ -57,6 +69,7 @@ public final class ModpackVersionPage {
   ArrayList<String> dates = new ArrayList<>();
   ArrayList<Long> downloadsList = new ArrayList<>();
   ArrayList<String> changelogs = new ArrayList<>();
+  ArrayList<VersionFit.Candidate> candidates = new ArrayList<>();
   for (int i = 0; i < limit; ++i) {
     JsonObject version = versions.get(i).getAsJsonObject();
     String number =
@@ -75,6 +88,19 @@ public final class ModpackVersionPage {
     if (date.length() > 10) date = date.substring(0, 10);
     long downloads = version.has("downloads") ? version.get("downloads").getAsLong() : 0L;
     String changelog = version.has("changelog") ? version.get("changelog").getAsString() : "";
+    java.util.List<String> loaderIds = new java.util.ArrayList<>();
+    if (version.has("loaders") && version.get("loaders").isJsonArray()) {
+      for (com.google.gson.JsonElement element : version.getAsJsonArray("loaders")) {
+        loaderIds.add(element.getAsString());
+      }
+    }
+    java.util.List<String> gameIds = new java.util.ArrayList<>();
+    if (version.has("game_versions") && version.get("game_versions").isJsonArray()) {
+      for (com.google.gson.JsonElement element : version.getAsJsonArray("game_versions")) {
+        gameIds.add(element.getAsString());
+      }
+    }
+    candidates.add(new VersionFit.Candidate(number, type, gameIds, loaderIds));
     numbers.add(number);
     types.add(type);
     gamesList.add(games);
@@ -92,7 +118,12 @@ public final class ModpackVersionPage {
   for (int i = 0; i < labels.size(); i++) {
     list.getItems().add(i);
   }
-  list.getSelectionModel().selectFirst();
+  int bestMatch = VersionFit.bestMatch(candidates, target);
+  if (bestMatch >= 0) {
+    list.getSelectionModel().select(bestMatch);
+  } else {
+    list.getSelectionModel().selectFirst();
+  }
   // 版本行：类型徽章带颜色，悬停高亮由 CSS 的 .version-row:hover 负责
   list.setCellFactory(
       view ->
@@ -181,13 +212,15 @@ public final class ModpackVersionPage {
         }
         String type = types.get(index);
         detailTitle.setText(numbers.get(index) + "  (" + (type.isBlank() ? "release" : type) + ")");
+        String fit = target == null ? "" : VersionFit.fitLabel(candidates.get(index), target);
         detailMeta.setText(
             "游戏版本："
                 + (gamesList.get(index).isBlank() ? "未标注" : gamesList.get(index))
                 + "\n发布："
                 + (dates.get(index).isBlank() ? "未知" : dates.get(index))
                 + "   ·   下载 "
-                + String.format(Locale.ROOT, "%,d", downloadsList.get(index)));
+                + String.format(Locale.ROOT, "%,d", downloadsList.get(index))
+                + (fit.isEmpty() ? "" : "\n适配：" + fit));
         String changelog = changelogs.get(index);
         if (changelog == null || changelog.isBlank()) {
           detailLog.setText("这个版本没有提供更新说明。");
@@ -238,7 +271,7 @@ public final class ModpackVersionPage {
   back.getStyleClass().addAll("btn-secondary", "btn-sm");
   Label heading = new Label(title);
   heading.setStyle("-fx-text-fill: -app-text; -fx-font-size: 16px; -fx-font-weight: bold;");
-  Label subtitle = new Label("选择要安装的版本 · 右侧是该版本的更新内容");
+  Label subtitle = new Label(fitHint(target, bestMatch));
   subtitle.setStyle("-fx-text-fill: -app-text-dim; -fx-font-size: 11px;");
   VBox headingBox = new VBox(2, heading, subtitle);
   Region headerSpacer = new Region();
