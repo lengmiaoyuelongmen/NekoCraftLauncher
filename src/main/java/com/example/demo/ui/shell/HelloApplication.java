@@ -1303,13 +1303,8 @@ private static void setFlexible(Node node, boolean on) {
     this.versionComboBox.setManaged(false);
   }
 
-  private VBox createLaunchPanel() {
-    HBox logActions;
-    VBox downloadBar;
-    this.createAccountColumn();
-    this.createVersionSelector();
-    VBox userArea = this.accountColumn;
-    VBox logContainer;
+  /** 启动页右列：日志区、下载状态条、概览、命令栏与控制台容器。 */
+  private VBox createConsoleSection() {
     this.logArea = new TextArea();
     // 下载器的源站提示（慢源切换、CDN 源站错误）直接写进日志
     DownloadManager.setMessageSink(this::logLine);
@@ -1339,7 +1334,7 @@ private static void setFlexible(Node node, boolean on) {
     this.downloadProgress = downloadStatusBar.progress();
     this.geekTelemetry = downloadStatusBar.telemetry();
     this.importCancelButton = downloadStatusBar.cancelButton();
-    this.downloadBarPanel = downloadBar = downloadStatusBar.node();
+    this.downloadBarPanel = downloadStatusBar.node();
     this.downloadBarView =
         new DownloadBarView(
             this.downloadProgress, this.downloadFileLabel, this.downloadStatsLabel,
@@ -1422,9 +1417,7 @@ private static void setFlexible(Node node, boolean on) {
         "-fx-background: transparent; -fx-background-color: transparent;"
             + " -fx-border-color: transparent; -fx-padding: 0;");
     VBox.setVgrow(this.launchOverviewScroll, Priority.ALWAYS);
-    this.logActionsBar =
-        logActions =
-            this.consoleToolbar.node();
+    this.logActionsBar = this.consoleToolbar.node();
     this.commandBar = new CommandBar(this.config, this::handleCommandInput, this::onAiModeToggled);
     HBox commandBar = this.commandBar;
     this.launchInsightBar =
@@ -1445,13 +1438,21 @@ private static void setFlexible(Node node, boolean on) {
             this.consoleBox,
             this.logPane,
             this.consoleToolbar,
-            downloadBar);
-    logContainer = this.consoleContainer.node();
+            this.downloadBarPanel);
+    VBox logContainer = this.consoleContainer.node();
     logContainer.setStyle(
         "-fx-background-color: -app-card; -fx-background-radius: 16; -fx-padding: 6;"
             + " -fx-border-color: -app-border-2; -fx-border-width: 1; -fx-border-radius: 16;"
             + " -fx-effect: dropshadow(gaussian, rgba(15,23,42,0.07), 20, 0.08, 0, 6);");
     HBox.setHgrow(logContainer, Priority.ALWAYS);
+    return logContainer;
+  }
+
+  private VBox createLaunchPanel() {
+    this.createAccountColumn();
+    this.createVersionSelector();
+    VBox userArea = this.accountColumn;
+    VBox logContainer = this.createConsoleSection();
     // 默认收起日志，先把「启动概览」露出来；想看实时输出点一下「展开日志」
     this.applyLogExpanded(false);
     // 黄金比例分栏与模块标题在 ui.page.LaunchPage：这里只准备两列内容
