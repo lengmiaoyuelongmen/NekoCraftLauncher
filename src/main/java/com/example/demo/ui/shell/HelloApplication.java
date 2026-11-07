@@ -248,6 +248,7 @@ import com.example.demo.core.download.SearchSession;
 import com.example.demo.core.mod.ProjectFormat;
 import com.example.demo.core.model.InstanceId;
 import com.example.demo.core.launch.ServerAddress;
+import com.example.demo.ui.page.CommunityBrowser;
 import com.example.demo.ui.page.DownloadPage;
 import com.example.demo.ui.component.DownloadTasksDialog;
 import com.example.demo.core.meta.ReleaseTime;
@@ -417,7 +418,7 @@ public class HelloApplication extends Application {
       Map.of("launch", 0, "download", 1, "settings", 2, "tools", 3);
   private volatile String lastSearchSource = "Modrinth";
   private ObservableList<ModpackProject> modpackData = FXCollections.observableArrayList();
-  private final SearchPages searchPages = new SearchPages();
+  private CommunityBrowser communityBrowser;
   private PauseTransition searchWatchdog;
   private ObservableList<MinecraftVersion> allMinecraftVersions =
       FXCollections.observableArrayList();
@@ -1210,7 +1211,7 @@ public class HelloApplication extends Application {
       this.ensureCommunityPrewarm();
       Platform.runLater(
           () -> {
-            this.performSearch();
+            this.communityBrowser.search();
             this.alignDownloadNavIndicator();
           });
     }
@@ -2503,6 +2504,10 @@ private static void setFlexible(Node node, boolean on) {
       this.showDownloadPanel(this.favoritesPanelNode());
     } else {
       this.currentProjectType = text;
+      // 搜索流水线在 CommunityBrowser 里，分类要同步过去，否则永远按整合包搜
+      if (this.communityBrowser != null) {
+        this.communityBrowser.setProjectType(text);
+      }
       this.showDownloadPanel(this.communityPanelNode());
       this.filterBar.setSearchPrompt("搜索 " + text + "...");
       this.filterBar.setSuppressSearch(true);
@@ -2514,7 +2519,7 @@ private static void setFlexible(Node node, boolean on) {
       } finally {
         this.filterBar.setSuppressSearch(false);
       }
-      this.performSearch();
+      this.communityBrowser.search();
     }
   }
 
@@ -2545,21 +2550,23 @@ private static void setFlexible(Node node, boolean on) {
   }
 
   private VBox createCommunityPanel() {
-    VBox panel = new VBox(10.0);
-    panel.setAlignment(Pos.TOP_LEFT);
-    VBox.setVgrow(panel, Priority.ALWAYS);
     this.filterBar =
         new DownloadFilterBar(
-            this.config, this::performSearch, this::showDownloadTasks, this::logLine);
+            this.config, () -> this.communityBrowser.search(), this::showDownloadTasks, this::logLine);
     // 面板还没建完（状态浮层等在后面），先屏蔽下拉变化触发的搜索
     this.filterBar.setSuppressSearch(true);
     this.configureVersionLoaderFilters();
-    this.resultView =
-        new DownloadResultView(
-            new ModpackCell.Host() {
+    this.communityBrowser =
+        new CommunityBrowser(
+            new CommunityBrowser.Host() {
+              @Override
+              public com.example.demo.core.app.LauncherConfig config() {
+                return HelloApplication.this.config;
+              }
+
               @Override
               public java.util.Map<String, javafx.scene.image.Image> iconCache() {
-                return iconMemoryCache;
+                return HelloApplication.this.iconMemoryCache;
               }
 
               @Override
@@ -2578,6 +2585,11 @@ private static void setFlexible(Node node, boolean on) {
               }
 
               @Override
+              public void showDownloadTasks() {
+                HelloApplication.this.showDownloadTasks();
+              }
+
+              @Override
               public void download(ModpackProject project) {
                 HelloApplication.this.fetchVersionsAndDownload(
                     project.getId(), project.getTitle(), project.getProjectType());
@@ -2587,12 +2599,23 @@ private static void setFlexible(Node node, boolean on) {
               public void openDetail(ModpackProject project) {
                 HelloApplication.this.openCommunityModDetail(project);
               }
+
+              @Override
+              public void prefetchIcons(java.util.List<ModpackProject> projects) {
+                HelloApplication.this.prefetchIcons(projects);
+              }
+
+              @Override
+              public java.util.List<ModpackProject> prewarmed(String projectType) {
+                return HelloApplication.this.prewarmedCommunity.get(projectType);
+              }
             },
-            this.modpackData,
-            () -> this.loadSearchPage(false));
-    panel.getChildren().addAll(this.filterBar, this.resultView);
+            this.filterBar);
+    Node panel = this.communityBrowser.build();
+    this.resultView = this.communityBrowser.resultView();
+    this.modpackData = this.communityBrowser.modpackData();
     this.filterBar.setSuppressSearch(false);
-    return panel;
+    return (VBox) panel;
   }
 
   private VBox createMinecraftPanel() {
@@ -3296,38 +3319,6 @@ private static void setFlexible(Node node, boolean on) {
     return this.searchFetcher;
   }
 
-  private void performSearch() {
-    List<ModpackProject> ready;
-    String warmedType = this.apiProjectType();
-    String loaderFilter = this.filterBar.loaderCombo().getValue();
-    boolean loaderDefault =
-        "任意".equals(loaderFilter)
-            || "datapack".equals(warmedType) && "DataPack".equals(loaderFilter);
-    boolean defaultFilters =
-        (this.filterBar.searchField().getText() == null
-                || this.filterBar.searchField().getText().trim().isEmpty())
-            && "任意".equals(this.filterBar.gameVersionCombo().getValue())
-            && loaderDefault
-            && "默认".equals(this.filterBar.sortCombo().getValue());
-    List<ModpackProject> list =
-        ready = defaultFilters ? this.prewarmedCommunity.get(warmedType) : null;
-    if (ready != null && !ready.isEmpty()) {
-      this.modpackData.setAll((Collection<ModpackProject>) ready);
-      this.searchPages.resetForPrewarm(ready.size());
-      this.resultView.status().hide();
-      this.setLoadMoreHint();
-      this.prefetchIcons(ready);
-      return;
-    }
-    this.searchPages.reset();
-    this.modpackData.clear();
-    if (this.resultView != null) {
-      this.resultView.setLoadMoreHintText("");
-    }
-    this.resultView.status().showLoading("正在从 Modrinth 获取数据…（失败自动切 MCIM 镜像）");
-    this.loadSearchPage(true);
-  }
-
   private void prepareIconsAndRun(List<ModpackProject> projects, Runnable onReady) {
     ArrayList<ModpackProject> missing = new ArrayList<ModpackProject>();
     for (ModpackProject project : projects) {
@@ -3358,195 +3349,6 @@ private static void setFlexible(Node node, boolean on) {
       CompletableFuture.runAsync(
           () -> this.fetchIconForPrepare(remaining, finish, urlStr, key, total));
     }
-  }
-
-  private void loadSearchPage(boolean first) {
-    if (this.searchPages.isLoading()) {
-      return;
-    }
-    if (!this.searchPages.hasMore()) {
-      return;
-    }
-    this.searchPages.beginLoad();
-    if (this.searchWatchdog == null) {
-      this.searchWatchdog = new PauseTransition(Duration.seconds(12.0));
-      this.searchWatchdog.setOnFinished(
-          e -> {
-            if (!this.searchPages.isLoading()) {
-              return;
-            }
-            this.searchPages.endLoad();
-            this.resultView.status().showText("获取超时，请检查网络后点击重试");
-            this.resultView
-                .status()
-                .setRetry(
-                    () -> {
-                      this.resultView.status().showLoading("正在重新加载...");
-                      this.loadSearchPage(true);
-                    });
-            this.updateLoadMoreButton();
-          });
-    }
-    this.searchWatchdog.playFromStart();
-    int offset = this.searchPages.offset();
-    String query =
-        this.filterBar.searchField().getText() == null
-            ? ""
-            : this.filterBar.searchField().getText().trim();
-    String gameVer = this.filterBar.gameVersionCombo().getValue();
-    String loader = this.filterBar.loaderCombo().getValue();
-    String sort = this.filterBar.sortCombo().getValue();
-    String pType = ModrinthSearch.projectType(this.currentProjectType);
-    String pageKey = pType + "|" + query + "|" + gameVer + "|" + loader + "|" + sort + "|" + offset;
-    List<ModpackProject> cachedPage = this.searchPages.cached(pageKey);
-    if (cachedPage != null) {
-      this.searchPages.endLoad();
-      this.resultView.status().hide();
-      List<ModpackProject> addedCache =
-          SearchSession.mergeUnique(this.modpackData, cachedPage);
-      this.searchPages.setOffset(offset + cachedPage.size());
-      this.updateLoadMoreButton();
-      this.prefetchIcons(addedCache);
-      return;
-    }
-    try {
-      String urlStr = ModrinthSearch.buildUrl(query, pType, gameVer, loader, sort, offset);
-      String effectiveMirror = ModrinthSearch.mirrorUrl(urlStr, pType);
-
-      this.searchFetcher().alternate(urlStr, effectiveMirror, offset)
-          .orTimeout(10L, TimeUnit.SECONDS)
-          .thenAccept(
-              body ->
-                  Platform.runLater(
-                      () -> {
-                        JsonObject json;
-                        if (this.searchWatchdog != null) {
-                          this.searchWatchdog.stop();
-                        }
-                        this.searchPages.endLoad();
-                        if (body == null || !body.startsWith("{")) {
-                          this.resultView.status().showText("加载失败：资源站不可用，点击这里重试");
-                          this.resultView
-                              .status()
-                              .setRetry(
-                                  () -> {
-                                    this.resultView.status().showLoading("正在重新加载...");
-                                    this.loadSearchPage(true);
-                                  });
-                          this.updateLoadMoreButton();
-                          return;
-                        }
-                        this.resultView.status().showLoading("正在准备社区资源…");
-                        try {
-                          json = new Gson().fromJson(body, JsonObject.class);
-                        } catch (Exception parseError) {
-                          this.searchPages.endLoad();
-                          this.resultView.status().showText("资源数据解析失败，点击重试");
-                          this.resultView.status().setRetry(() -> this.loadSearchPage(true));
-                          return;
-                        }
-                        ModrinthSearch.Page page;
-                        try {
-                          java.util.Set<String> existingIds = new java.util.HashSet<>();
-                          for (ModpackProject known : this.modpackData) {
-                            existingIds.add(known.getId());
-                          }
-                          page = ModrinthSearch.parse(body, pType, existingIds);
-                        } catch (Exception parseError) {
-                          this.searchPages.endLoad();
-                          this.resultView.status().showText("资源数据解析失败，点击重试");
-                          this.resultView.status().setRetry(() -> this.loadSearchPage(true));
-                          return;
-                        }
-                        if (page.totalHits() >= 0) {
-                          this.searchPages.setTotal(page.totalHits());
-                        }
-                        if (page.rawHits() == 0) {
-                          this.searchPages.endLoad();
-                          if (this.searchWatchdog != null) {
-                            this.searchWatchdog.stop();
-                          }
-                          this.resultView.status().showText(first ? "未找到匹配的项目，请调整筛选条件" : "没有更多结果");
-                          this.updateLoadMoreButton();
-                          return;
-                        }
-                        this.modpackData.addAll(page.projects());
-                        this.searchPages.cache(pageKey, page.projects());
-                        this.searchPages.setOffset(offset + page.rawHits());
-                        if (this.searchPages.total() < 0 && page.rawHits() < 40) {
-                          this.searchPages.setTotal(this.searchPages.offset());
-                        }
-                        this.resultView.status().hide();
-                        if (this.searchWatchdog != null) {
-                          this.searchWatchdog.stop();
-                        }
-                        this.searchPages.endLoad();
-                        this.updateLoadMoreButton();
-                        this.prefetchIcons(page.projects());
-                      }))
-          .exceptionally(
-              ex -> {
-                Platform.runLater(
-                    () -> {
-                      if (this.searchWatchdog != null) {
-                        this.searchWatchdog.stop();
-                      }
-                      this.searchPages.endLoad();
-                      this.resultView.status().showText("请求失败：" + ex.getMessage() + "（点击重试）");
-                      this.resultView
-                          .status()
-                          .setRetry(
-                              () -> {
-                                this.searchPages.endLoad();
-                                this.resultView.status().showLoading("正在重新加载...");
-                                this.loadSearchPage(true);
-                              });
-                      this.updateLoadMoreButton();
-                    });
-                return null;
-              });
-    } catch (Exception e2) {
-      this.searchPages.endLoad();
-      this.resultView.status().showText("请求参数构建失败: " + e2.getMessage());
-    }
-  }
-
-  private String apiProjectType() {
-    if ("模组".equals(this.currentProjectType)) {
-      return "mod";
-    }
-    if ("资源包".equals(this.currentProjectType)) {
-      return "resourcepack";
-    }
-    if ("光影包".equals(this.currentProjectType)) {
-      return "shader";
-    }
-    if ("数据包".equals(this.currentProjectType)) {
-      return "datapack";
-    }
-    return "modpack";
-  }
-
-  private void setLoadMoreHint() {
-    this.updateLoadMoreButton();
-  }
-
-  private void updateLoadMoreButton() {
-    if (this.resultView == null) {
-      return;
-    }
-    boolean hasMore = this.searchPages.hasMore();
-    if (this.modpackData.isEmpty()) {
-      this.resultView.setLoadMoreHintText("");
-      return;
-    }
-    this.resultView.setLoadMoreHintText(
-        hasMore
-            ? "已显示 "
-                + this.modpackData.size()
-                + (this.searchPages.total() >= 0 ? " / " + this.searchPages.total() : "")
-                + " · 滚动到底自动加载"
-            : "已加载全部 · 共 " + this.modpackData.size() + " 个");
   }
 
   private void chooseModpackVersion(String title, JsonArray versions, java.util.function.IntConsumer onChosen) {
