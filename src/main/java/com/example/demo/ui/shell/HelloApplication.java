@@ -1162,9 +1162,8 @@ private static void setFlexible(Node node, boolean on) {
     VBox.setVgrow(node, on ? Priority.ALWAYS : Priority.NEVER);
   }
 
-  private VBox createLaunchPanel() {
-    HBox logActions;
-    VBox downloadBar;
+  /** 账户卡（登录 / 启动按钮 / 头像），并把它内部的控件挂到主类字段上。 */
+  private void createAccountColumn() {
     this.accountColumn =
         new LaunchAccountColumn(
             this.config,
@@ -1263,6 +1262,10 @@ private static void setFlexible(Node node, boolean on) {
     this.launchBtn = this.accountColumn.launchButton();
     this.launchVersionLabel = this.launchBtn.versionLabel();
     this.launchBottomRow = this.accountColumn.bottomRow();
+  }
+
+  /** 启动页的版本下拉（启动页/实例设置共用同一个选择）。 */
+  private void createVersionSelector() {
     this.versionComboBox = new ComboBox<>();
     this.versionComboBox.setPromptText("加载版本中...");
     this.versionComboBox.setMaxWidth(Double.MAX_VALUE);
@@ -1285,6 +1288,13 @@ private static void setFlexible(Node node, boolean on) {
     this.versionComboBox.setButtonCell(new MinecraftVersionCell());
     this.versionComboBox.setVisible(false);
     this.versionComboBox.setManaged(false);
+  }
+
+  private VBox createLaunchPanel() {
+    HBox logActions;
+    VBox downloadBar;
+    this.createAccountColumn();
+    this.createVersionSelector();
     VBox userArea = this.accountColumn;
     VBox logContainer;
     this.logArea = new TextArea();
