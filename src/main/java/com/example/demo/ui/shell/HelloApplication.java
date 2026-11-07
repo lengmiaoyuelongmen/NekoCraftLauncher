@@ -456,7 +456,114 @@ public class HelloApplication extends Application {
     return resolved;
   }
 
-  @Override
+  /** CRT 风格的扫描线 + 四角准星叠加层。 */
+  private void installCrtOverlay(StackPane rootWrap) {
+      Canvas crt = new Canvas();
+      crt.setMouseTransparent(true);
+      crt.widthProperty().bind(rootWrap.widthProperty());
+      crt.heightProperty().bind(rootWrap.heightProperty());
+      Runnable paintCrt =
+          () -> {
+            double w = crt.getWidth();
+            double h = crt.getHeight();
+            if (w < 4.0 || h < 4.0) {
+              return;
+            }
+            GraphicsContext g = crt.getGraphicsContext2D();
+            g.clearRect(0.0, 0.0, w, h);
+            g.setFill(javafx.scene.paint.Color.web("#ff3b30", 0.018));
+            for (double y = 0.0; y < h; y += 3.0) {
+              g.fillRect(0.0, y, w, 1.0);
+            }
+            g.setStroke(javafx.scene.paint.Color.web("#ff5a48", 0.22));
+            g.setLineWidth(1.0);
+            double inset = 12.0;
+            double len = 18.0;
+            g.strokeLine(inset, inset, inset + len, inset);
+            g.strokeLine(inset, inset, inset, inset + len);
+            g.strokeLine(w - inset, inset, w - inset - len, inset);
+            g.strokeLine(w - inset, inset, w - inset, inset + len);
+            g.strokeLine(inset, h - inset, inset + len, h - inset);
+            g.strokeLine(inset, h - inset, inset, h - inset - len);
+            g.strokeLine(w - inset, h - inset, w - inset - len, h - inset);
+            g.strokeLine(w - inset, h - inset, w - inset, h - inset - len);
+          };
+      crt.widthProperty().addListener((o, a, b) -> paintCrt.run());
+      crt.heightProperty().addListener((o, a, b) -> paintCrt.run());
+      rootWrap.getChildren().add(1, crt);
+  }
+
+  /** 启动后的后台工作：插件、日志接管、硬件/内存识别、版本列表与遥测。 */
+  private void startBackgroundServices() {
+    CompletableFuture.runAsync(() -> PluginManager.load(this::logMessage));
+    Bootstrap.ensureGameDir(
+        new File(this.config.getGameDir()),
+        message -> Platform.runLater(() -> this.logArea.appendText(message + "\n")));
+    LauncherLog.attach(new File(this.config.getGameDir()), this.logArea);
+    if (new File(AppPaths.baseDir(), ".portable").isFile()) {
+      this.logArea.appendText("便携模式：不读取本机账户注册表，请重新登录\n");
+    } else {
+      this.restoreSessionFromRegistry();
+    }
+    File detectGameDir = new File(this.config.getGameDir());
+    CompletableFuture.runAsync(
+        () -> {
+          HardwareInfo.Detect hardware = HardwareInfo.detect(detectGameDir);
+          MemoryAdvisor.Suggestion suggestion =
+              MemoryAdvisor.suggest(
+                  InstanceDirs.mods(
+                      detectGameDir,
+                      this.config.getLastInstance(),
+                      this.isIsolated(detectGameDir, this.config.getLastInstance())));
+          Platform.runLater(
+              () -> {
+                this.logArea.appendText("🖥 硬件识别：" + hardware.summary() + "\n");
+                this.logArea.appendText(
+                    "💡 智能推荐内存：" + suggestion.memoryMb() + " MB（" + suggestion.reason() + "）\n");
+              });
+        });
+    String autoImport = System.getProperty("mc.import");
+    if (autoImport != null && !autoImport.isBlank()) {
+      Platform.runLater(
+          () -> {
+            this.logArea.appendText("🧪 自动导入测试: " + autoImport + "\n");
+            this.importModpack(new File(autoImport));
+          });
+    }
+    DownloadManager.addStatusListener(
+        status -> Platform.runLater(() -> this.updateDownloadBar(status)));
+    this.updateGeekTelemetry();
+    Timeline telemetryTimer =
+        new Timeline(
+            new KeyFrame(Duration.seconds(3.0), e -> this.updateGeekTelemetry(), new KeyValue[0]));
+    telemetryTimer.setCycleCount(-1);
+    telemetryTimer.play();
+    this.refreshInstalledVersions();
+    if (!this.config.isHardwareAcceleration()) {
+      this.logArea.appendText("🖥 已按设置禁用硬件加速（软件渲染）。如果界面明显变卡，可在 设置 → 启动器 里重新开启。\n");
+    }
+    List<MinecraftVersion> cached = VersionManager.loadCachedList();
+    if (cached != null && !cached.isEmpty()) {
+      this.applyVersionList(cached, false);
+    }
+
+    VersionManager.fetchVersionListAsync()
+        .thenAccept(
+            versionList -> Platform.runLater(() -> this.applyVersionList(versionList, true)))
+        .exceptionally(
+            ex -> {
+              Platform.runLater(
+                  () -> {
+                    if (this.versionComboBox.getItems().isEmpty()) {
+                      this.versionComboBox.setPromptText("版本列表加载失败");
+                    }
+                    this.logArea.appendText("❌ 版本列表加载失败: " + ex.getMessage() + "\n");
+                    this.logArea.appendText("   已安装的版本仍然可以直接启动。\n");
+                  });
+              return null;
+            });
+  }
+
   public void start(Stage stage) {
     List<MinecraftVersion> cachedVersions;
     VBox root;
@@ -572,39 +679,7 @@ public class HelloApplication extends Application {
                   vb.getHeight(), Math.max(640.0, gripStart[3] + e.getScreenY() - gripStart[1])));
         });
     rootWrap.setStyle("-fx-background-color: transparent;");
-    Canvas crt = new Canvas();
-    crt.setMouseTransparent(true);
-    crt.widthProperty().bind(rootWrap.widthProperty());
-    crt.heightProperty().bind(rootWrap.heightProperty());
-    Runnable paintCrt =
-        () -> {
-          double w = crt.getWidth();
-          double h = crt.getHeight();
-          if (w < 4.0 || h < 4.0) {
-            return;
-          }
-          GraphicsContext g = crt.getGraphicsContext2D();
-          g.clearRect(0.0, 0.0, w, h);
-          g.setFill(javafx.scene.paint.Color.web("#ff3b30", 0.018));
-          for (double y = 0.0; y < h; y += 3.0) {
-            g.fillRect(0.0, y, w, 1.0);
-          }
-          g.setStroke(javafx.scene.paint.Color.web("#ff5a48", 0.22));
-          g.setLineWidth(1.0);
-          double inset = 12.0;
-          double len = 18.0;
-          g.strokeLine(inset, inset, inset + len, inset);
-          g.strokeLine(inset, inset, inset, inset + len);
-          g.strokeLine(w - inset, inset, w - inset - len, inset);
-          g.strokeLine(w - inset, inset, w - inset, inset + len);
-          g.strokeLine(inset, h - inset, inset + len, h - inset);
-          g.strokeLine(inset, h - inset, inset, h - inset - len);
-          g.strokeLine(w - inset, h - inset, w - inset - len, h - inset);
-          g.strokeLine(w - inset, h - inset, w - inset, h - inset - len);
-        };
-    crt.widthProperty().addListener((o, a, b) -> paintCrt.run());
-    crt.heightProperty().addListener((o, a, b) -> paintCrt.run());
-    rootWrap.getChildren().add(1, crt);
+    this.installCrtOverlay(rootWrap);
     // 集成式弹窗的宿主层：所有确认/输入/选择框都渲染在这一层，不再弹系统窗口
     this.dialogLayer = new StackPane();
     InAppDialog.setGlobalHost(this.dialogLayer);
@@ -799,72 +874,7 @@ public class HelloApplication extends Application {
     }
     stage.centerOnScreen();
     this.switchPage("launch");
-    CompletableFuture.runAsync(() -> PluginManager.load(this::logMessage));
-    Bootstrap.ensureGameDir(
-        new File(this.config.getGameDir()),
-        message -> Platform.runLater(() -> this.logArea.appendText(message + "\n")));
-    LauncherLog.attach(new File(this.config.getGameDir()), this.logArea);
-    if (new File(AppPaths.baseDir(), ".portable").isFile()) {
-      this.logArea.appendText("便携模式：不读取本机账户注册表，请重新登录\n");
-    } else {
-      this.restoreSessionFromRegistry();
-    }
-    File detectGameDir = new File(this.config.getGameDir());
-    CompletableFuture.runAsync(
-        () -> {
-          HardwareInfo.Detect hardware = HardwareInfo.detect(detectGameDir);
-          MemoryAdvisor.Suggestion suggestion =
-              MemoryAdvisor.suggest(
-                  InstanceDirs.mods(
-                      detectGameDir,
-                      this.config.getLastInstance(),
-                      this.isIsolated(detectGameDir, this.config.getLastInstance())));
-          Platform.runLater(
-              () -> {
-                this.logArea.appendText("🖥 硬件识别：" + hardware.summary() + "\n");
-                this.logArea.appendText(
-                    "💡 智能推荐内存：" + suggestion.memoryMb() + " MB（" + suggestion.reason() + "）\n");
-              });
-        });
-    String autoImport = System.getProperty("mc.import");
-    if (autoImport != null && !autoImport.isBlank()) {
-      Platform.runLater(
-          () -> {
-            this.logArea.appendText("🧪 自动导入测试: " + autoImport + "\n");
-            this.importModpack(new File(autoImport));
-          });
-    }
-    DownloadManager.addStatusListener(
-        status -> Platform.runLater(() -> this.updateDownloadBar(status)));
-    this.updateGeekTelemetry();
-    Timeline telemetryTimer =
-        new Timeline(
-            new KeyFrame(Duration.seconds(3.0), e -> this.updateGeekTelemetry(), new KeyValue[0]));
-    telemetryTimer.setCycleCount(-1);
-    telemetryTimer.play();
-    this.refreshInstalledVersions();
-    if (!this.config.isHardwareAcceleration()) {
-      this.logArea.appendText("🖥 已按设置禁用硬件加速（软件渲染）。如果界面明显变卡，可在 设置 → 启动器 里重新开启。\n");
-    }
-    if ((cachedVersions = VersionManager.loadCachedList()) != null && !cachedVersions.isEmpty()) {
-      this.applyVersionList(cachedVersions, false);
-    }
-
-    VersionManager.fetchVersionListAsync()
-        .thenAccept(
-            versionList -> Platform.runLater(() -> this.applyVersionList(versionList, true)))
-        .exceptionally(
-            ex -> {
-              Platform.runLater(
-                  () -> {
-                    if (this.versionComboBox.getItems().isEmpty()) {
-                      this.versionComboBox.setPromptText("版本列表加载失败");
-                    }
-                    this.logArea.appendText("❌ 版本列表加载失败: " + ex.getMessage() + "\n");
-                    this.logArea.appendText("   已安装的版本仍然可以直接启动。\n");
-                  });
-              return null;
-            });
+    this.startBackgroundServices();
   }
 
   private void applyVersionList(List<MinecraftVersion> versionList, boolean announce) {
