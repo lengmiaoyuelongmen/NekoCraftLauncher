@@ -205,6 +205,7 @@ import com.example.demo.ui.component.CrashReportDialog;
 import com.example.demo.ui.component.DownloadFilterBar;
 import com.example.demo.ui.component.DownloadNavItem;
 import com.example.demo.ui.component.DownloadStatusBar;
+import com.example.demo.ui.component.TopBar;
 import com.example.demo.ui.component.DownloadResultView;
 import com.example.demo.ui.component.LaunchAccountColumn;
 import com.example.demo.ui.component.LaunchAdvisorBar;
@@ -280,7 +281,7 @@ public class HelloApplication extends Application {
   private VBox launchPanel;
   private HBox downloadPanel;
   private final Map<String, Node> pages = new LinkedHashMap<String, Node>();
-  private final Map<String, Button> navButtons = new LinkedHashMap<String, Button>();
+  private Map<String, Button> navButtons;
   private Stage primaryStage;
   private String currentPage;
   private boolean downloadInitialized;
@@ -422,6 +423,7 @@ public class HelloApplication extends Application {
   private volatile String lastSearchSource = "Modrinth";
   private ObservableList<ModpackProject> modpackData = FXCollections.observableArrayList();
   private CommunityBrowser communityBrowser;
+  private TopBar topBar;
   private ModpackVersionPage modpackVersionPage;
   private PauseTransition searchWatchdog;
   private ObservableList<MinecraftVersion> allMinecraftVersions =
@@ -895,249 +897,64 @@ public class HelloApplication extends Application {
   }
 
   private HBox createTopBar() {
-    String[][] entries;
-    HBox topBar = new HBox(14.0);
-    topBar.setAlignment(Pos.CENTER_LEFT);
-    topBar.getStyleClass().add("app-topbar");
-    topBar.setPadding(new Insets(0.0, 6.0, 0.0, 18.0));
-    topBar.setPrefHeight(58.0);
-    topBar.setMinHeight(58.0);
-    Rectangle mark = new Rectangle(3.0, 18.0);
-    mark.setArcWidth(3.0);
-    mark.setArcHeight(3.0);
-    mark.setStyle("-fx-fill: #14b8a6;");
-    Label appTitle = new Label("Neko Craft Launcher");
-    appTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
-    appTitle.setTextFill(javafx.scene.paint.Color.web("#e8eaee"));
-    Label badge = new Label("NEKO");
-    badge.setStyle("-fx-font-size: 10.5px; -fx-font-weight: bold;");
-    badge.setTextFill(javafx.scene.paint.Color.web("#5eead4"));
-    Label liveClock = new Label();
-    liveClock.setStyle(
-        "-fx-text-fill: #7b818b; -fx-font-size: 10.5px; -fx-font-family: 'Cascadia Mono',"
-            + " 'Consolas', monospace;");
-    DateTimeFormatter clockFormat = DateTimeFormatter.ofPattern("HH:mm:ss");
-    liveClock.setText(LocalTime.now().format(clockFormat));
-    Timeline clockTimer =
-        new Timeline(
-            new KeyFrame(
-                Duration.seconds(1.0),
-                e -> {
-                  if (liveClock.isVisible()) {
-                    liveClock.setText(LocalTime.now().format(clockFormat));
-                  }
-                },
-                new KeyValue[0]));
-    clockTimer.setCycleCount(-1);
-    clockTimer.play();
-    this.gameStatusDot = new Circle(4.0, javafx.scene.paint.Color.web("#6b7280"));
-    this.gameStatusLabel = new Label("就绪");
-    this.gameStatusLabel.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 10px;");
-    HBox statusChip = new HBox(6.0, this.gameStatusDot, this.gameStatusLabel);
-    statusChip.setAlignment(Pos.CENTER_LEFT);
-    statusChip.setPadding(new Insets(3.0, 9.0, 3.0, 9.0));
-    statusChip.setStyle(
-        "-fx-background-color: rgba(255,255,255,0.045); -fx-background-radius: 10;"
-            + " -fx-border-color: rgba(255,255,255,0.06); -fx-border-radius: 10;");
-    this.stopGameButton = new Button("结束游戏");
-    this.stopGameButton.setStyle(
-        "-fx-background-color: rgba(248,113,113,0.16); -fx-text-fill: #fecaca; -fx-border-color:"
-            + " rgba(248,113,113,0.55); -fx-border-radius: 8; -fx-background-radius: 8;"
-            + " -fx-font-size: 10.5px; -fx-padding: 3 10; -fx-cursor: hand;");
-    this.stopGameButton.setVisible(false);
-    this.stopGameButton.setManaged(false);
-    this.stopGameButton.setOnAction(e -> this.killGameProcess());
-    this.cancelLaunchButton = new Button("取消启动");
-    this.cancelLaunchButton.setStyle(
-        "-fx-background-color: transparent; -fx-text-fill: -app-text-dim;"
-            + " -fx-border-color: rgba(148,163,184,0.45); -fx-border-radius: 8;"
-            + " -fx-background-radius: 8; -fx-font-size: 10.5px; -fx-padding: 3 10;"
-            + " -fx-cursor: hand;");
-    this.cancelLaunchButton.setVisible(false);
-    this.cancelLaunchButton.setManaged(false);
-    this.cancelLaunchButton.setOnAction(e -> this.stopLaunch());
-    HBox brand =
-        new HBox(
-            8.0,
-            mark,
-            appTitle,
-            Icons.node("star", 13.0, "#ffcf6a"),
-            badge,
-            liveClock,
-            statusChip,
-            this.cancelLaunchButton,
-            this.stopGameButton);
-    brand.setAlignment(Pos.CENTER_LEFT);
-    Region spacer = new Region();
-    HBox.setHgrow(spacer, Priority.ALWAYS);
-    this.navBox = new HBox(2.0);
-    this.navBox.setAlignment(Pos.CENTER);
-    this.navIndicator = new Rectangle(0.0, 2.0);
-    this.navIndicator.setArcWidth(2.0);
-    this.navIndicator.setArcHeight(2.0);
-    this.navIndicator.setStyle("-fx-fill: linear-gradient(to right, #d1d5db, #9ca3af);");
-    this.navIndicator.setMouseTransparent(true);
-    this.navIndicator.setVisible(false);
-    this.navIndicator.setManaged(false);
-    StackPane navPane = new StackPane(this.navIndicator, this.navBox);
-    navPane.setAlignment(Pos.CENTER);
-    StackPane.setAlignment(this.navIndicator, Pos.BOTTOM_LEFT);
-    navPane.setPickOnBounds(false);
-    for (String[] entry :
-        entries =
-            new String[][] {
-              {"launch", "启动", "play"},
-              {"download", "下载", "download"},
-              {"advisor", "顾问", "message"},
-              {"settings", "设置", "gear"},
-              {"tools", "工具", "tools"}
-            }) {
-      Button button = this.createTopButton(entry[1], entry[2]);
-      button.setUserData(entry[2]);
-      button.setOnAction(e -> this.switchPage(entry[0]));
-      this.navButtons.put(entry[0], button);
-      Motion.press(button);
-      this.navBox.getChildren().add(button);
-    }
-    Button minimize = this.windowButton(WindowIcon.MINIMIZE);
-    minimize.setOnAction(e -> this.primaryStage.setIconified(true));
-    Button close = this.windowButton(WindowIcon.CLOSE);
-    close.setOnAction(e -> this.requestClose());
-    HBox windowControls = new HBox(0.0, minimize, close);
-    windowControls.setAlignment(Pos.CENTER_RIGHT);
-    windowControls.getStyleClass().add("window-controls");
-    topBar
-        .widthProperty()
-        .addListener(
-            (obs, old, width) -> {
-              boolean compact = width.doubleValue() < 1080.0;
-              badge.setVisible(!compact);
-              badge.setManaged(!compact);
-              liveClock.setVisible(!compact);
-              liveClock.setManaged(!compact);
-              statusChip.setVisible(!compact);
-              statusChip.setManaged(!compact);
-              brand.setSpacing(compact ? 5.0 : 8.0);
-              this.navBox.setSpacing(compact ? 0.0 : 2.0);
+    this.topBar =
+        new TopBar(
+            new TopBar.Host() {
+              @Override
+              public void switchPage(String key) {
+                HelloApplication.this.switchPage(key);
+              }
+
+              @Override
+              public void killGame() {
+                HelloApplication.this.killGameProcess();
+              }
+
+              @Override
+              public void stopLaunch() {
+                HelloApplication.this.stopLaunch();
+              }
+
+              @Override
+              public void requestClose() {
+                HelloApplication.this.requestClose();
+              }
+
+              @Override
+              public void minimize() {
+                HelloApplication.this.primaryStage.setIconified(true);
+              }
+
+              @Override
+              public void moveWindow(double x, double y) {
+                if (HelloApplication.this.primaryStage.isMaximized()) {
+                  return;
+                }
+                HelloApplication.this.primaryStage.setX(x);
+                HelloApplication.this.primaryStage.setY(y);
+                HelloApplication.clampStagePosition(HelloApplication.this.primaryStage);
+              }
+
+              @Override
+              public void resetWindow() {
+                HelloApplication.this.primaryStage.setWidth(1060.0);
+                HelloApplication.this.primaryStage.setHeight(792.0);
+                HelloApplication.this.primaryStage.centerOnScreen();
+              }
+
+              @Override
+              public void showPalette() {
+                HelloApplication.this.showCommandPalette();
+              }
             });
-    double[] dragOffset = new double[2];
-    topBar.setOnMousePressed(
-        e -> {
-          dragOffset[0] = e.getSceneX();
-          dragOffset[1] = e.getSceneY();
-        });
-    topBar.setOnMouseDragged(
-        e -> {
-          if (this.primaryStage.isMaximized()) {
-            return;
-          }
-          this.primaryStage.setX(e.getScreenX() - dragOffset[0]);
-          this.primaryStage.setY(e.getScreenY() - dragOffset[1]);
-          HelloApplication.clampStagePosition(this.primaryStage);
-        });
-    topBar.setOnMouseClicked(
-        e -> {
-          if (e.getClickCount() == 2 && !(e.getTarget() instanceof Button)) {
-            this.primaryStage.setWidth(1060.0);
-            this.primaryStage.setHeight(792.0);
-            this.primaryStage.centerOnScreen();
-          }
-        });
-    Button paletteBtn = new Button();
-    paletteBtn.setGraphic(Icons.node("search", 14.0, "#c7ccd4"));
-    paletteBtn.setPrefSize(30.0, 30.0);
-    paletteBtn.setMinSize(30.0, 30.0);
-    paletteBtn.setMaxSize(30.0, 30.0);
-    paletteBtn.setStyle(
-        "-fx-background-color: transparent; -fx-cursor: hand; -fx-padding: 0;"
-            + " -fx-background-radius: 8;");
-    paletteBtn.setTooltip(new Tooltip("命令面板  Ctrl+K"));
-    paletteBtn.setOnMouseEntered(
-        e ->
-            paletteBtn.setStyle(
-                "-fx-background-color: rgba(255,255,255,0.10); -fx-cursor: hand; -fx-padding: 0;"
-                    + " -fx-background-radius: 8;"));
-    paletteBtn.setOnMouseExited(
-        e ->
-            paletteBtn.setStyle(
-                "-fx-background-color: transparent; -fx-cursor: hand; -fx-padding: 0;"
-                    + " -fx-background-radius: 8;"));
-    paletteBtn.setOnAction(e -> this.showCommandPalette());
-    topBar.getChildren().addAll(brand, spacer, navPane, paletteBtn, windowControls);
-    return topBar;
-  }
-
-  private String windowButtonStyle() {
-    return "-fx-background-color: transparent; -fx-text-fill: white; -fx-cursor: hand; -fx-padding:"
-        + " 0; -fx-background-radius: 0;";
-  }
-
-  private Button windowButton(WindowIcon icon) {
-    Button button = new Button();
-    button.setGraphic(this.windowIcon(icon));
-    button.setPrefSize(46.0, 32.0);
-    button.setMinSize(46.0, 32.0);
-    button.setMaxSize(46.0, 32.0);
-    button.setFocusTraversable(false);
-    button.setStyle(this.windowButtonStyle());
-    button.getStyleClass().add("window-control");
-    button.setOnMouseEntered(
-        e ->
-            button.setStyle(
-                "-fx-background-color: "
-                    + (icon == WindowIcon.CLOSE ? "#e81123" : "rgba(255,255,255,0.12)")
-                    + "; -fx-cursor: hand; -fx-padding: 0; -fx-background-radius: 0;"));
-    button.setOnMouseExited(e -> button.setStyle(this.windowButtonStyle()));
-    return button;
-  }
-
-  private Node windowIcon(WindowIcon icon) {
-    Pane pane = new Pane();
-    pane.setPrefSize(14.0, 14.0);
-    pane.setMinSize(14.0, 14.0);
-    pane.setMaxSize(14.0, 14.0);
-    Function<String, SVGPath> path =
-        content -> {
-          SVGPath svg = new SVGPath();
-          svg.setContent(content);
-          svg.setFill(javafx.scene.paint.Color.TRANSPARENT);
-          svg.setStroke(javafx.scene.paint.Color.WHITE);
-          svg.setStrokeWidth(1.1);
-          svg.setStrokeLineCap(StrokeLineCap.SQUARE);
-          return svg;
-        };
-    switch (icon.ordinal()) {
-      case 0:
-        {
-          pane.getChildren().add(path.apply("M2 7 H12"));
-          break;
-        }
-      case 1:
-        {
-          pane.getChildren().add(path.apply("M2.5 2.5 H11.5 V11.5 H2.5 Z"));
-          break;
-        }
-      case 2:
-        {
-          pane.getChildren().add(path.apply("M5 2.5 H11.5 V9"));
-          pane.getChildren().add(path.apply("M2.5 5 H9 V11.5 H2.5 Z"));
-          break;
-        }
-      case 3:
-        {
-          pane.getChildren().add(path.apply("M2.5 2.5 L11.5 11.5 M11.5 2.5 L2.5 11.5"));
-        }
-    }
-    return pane;
-  }
-
-  private Button createTopButton(String text, String icon) {
-    Button button = new Button(text);
-    button.setGraphic(Icons.node(icon, 14.0, "#c7ccd4"));
-    button.setContentDisplay(ContentDisplay.LEFT);
-    button.setGraphicTextGap(6.0);
-    button.getStyleClass().add("nav-btn");
-    return button;
+    this.navBox = this.topBar.navBox();
+    this.navButtons = this.topBar.navButtons();
+    this.navIndicator = this.topBar.navIndicator();
+    this.gameStatusDot = this.topBar.statusDot();
+    this.gameStatusLabel = this.topBar.statusLabel();
+    this.stopGameButton = this.topBar.stopGameButton();
+    this.cancelLaunchButton = this.topBar.cancelLaunchButton();
+    return this.topBar.node();
   }
 
   private Node createPage(String name) {
@@ -1195,7 +1012,7 @@ public class HelloApplication extends Application {
     }
     String highlight = this.navHighlight != null ? this.navHighlight : pageName;
     this.navHighlight = null;
-    this.applyNavHighlight(highlight);
+    this.topBar.highlight(highlight);
     if (this.currentPage != null && this.currentPage.equals(pageName) && target.isVisible()) {
       return;
     }
@@ -1268,44 +1085,6 @@ public class HelloApplication extends Application {
               + "'); -fx-background-size: cover; -fx-background-position: center center;";
     }
     panel.setStyle(style.trim());
-  }
-
-  private void applyNavHighlight(String highlight) {
-    for (Map.Entry<String, Button> entry : this.navButtons.entrySet()) {
-      Object object;
-      Button button = entry.getValue();
-      boolean active = entry.getKey().equals(highlight);
-      button.getStyleClass().remove("nav-btn-active");
-      if (active) {
-        button.getStyleClass().add("nav-btn-active");
-      }
-      if (!((object = button.getUserData()) instanceof String)) continue;
-      String iconName = (String) object;
-      button.setGraphic(Icons.node(iconName, 14.0, active ? "#5eead4" : "#b8c7d9"));
-    }
-    this.moveNavIndicator(highlight);
-  }
-
-  private void moveNavIndicator(String key) {
-    if (this.navIndicator == null || this.navBox == null) {
-      return;
-    }
-    Button active = this.navButtons.get(key);
-    if (active == null) {
-      return;
-    }
-    Platform.runLater(
-        () -> {
-          double targetX = active.getLayoutX();
-          double targetWidth = active.getWidth();
-          Timeline timeline =
-              new Timeline(
-                  new KeyFrame(
-                      Duration.millis(260.0),
-                      new KeyValue(this.navIndicator.translateXProperty(), targetX, Motion.SPRING),
-                      new KeyValue(this.navIndicator.widthProperty(), targetWidth, Motion.SPRING)));
-          timeline.play();
-        });
   }
 
   private void alignDownloadNavIndicator() {
@@ -6249,12 +6028,7 @@ private static void setFlexible(Node node, boolean on) {
     }
   }
 
-  private static enum WindowIcon {
-    MINIMIZE,
-    MAXIMIZE,
-    RESTORE,
-    CLOSE;
-  }
+
 
   private static final class ImportCancelledException extends RuntimeException {
     private static final long serialVersionUID = 1L;
