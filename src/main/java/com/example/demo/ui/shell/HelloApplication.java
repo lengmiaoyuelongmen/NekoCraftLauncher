@@ -3405,6 +3405,12 @@ private static void setFlexible(Node node, boolean on) {
   private void importModpack(File archive) {
     this.logLine("📦 开始导入整合包: " + archive.getName());
     this.importCancelled = false;
+    InstallProgressPage window = this.createImportProgressPage(archive);
+    this.runImportAsync(archive, window);
+  }
+
+  /** 导入进度页：挂在下载页里，取消/返回接好。 */
+  private InstallProgressPage createImportProgressPage(File archive) {
     InstallProgressPage window =
         new InstallProgressPage(
             "正在安装：" + archive.getName(),
@@ -3418,7 +3424,11 @@ private static void setFlexible(Node node, boolean on) {
     this.showDownloadPanel(window.node());
     window.setStep(0, "run");
     window.setProgress(-1);
+    return window;
+  }
 
+  /** 真正的导入：下载器状态接到进度条，失败自动重试一次，两次都失败则清理半成品。 */
+  private void runImportAsync(File archive, InstallProgressPage window) {
     // 把下载器的实时状态接到页面的「下载进度」条上（文件数 / 字节 / 速度 / 当前文件）
     final java.util.function.Consumer<DownloadManager.Status> dlListener =
         status ->
