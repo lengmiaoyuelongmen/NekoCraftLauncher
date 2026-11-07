@@ -74,8 +74,9 @@ public final class DependencyInstaller {
         if (modFile.isFile() && modFile.length() > 0) {
             return Result.ok(modId, artifact.filename() + "（已存在）");
         }
+        Path temp = null;
         try {
-            Path temp = Files.createTempFile(modsDir.toPath(), "dep-", ".part");
+            temp = Files.createTempFile(modsDir.toPath(), "dep-", ".part");
             HttpRequest request = HttpRequest.newBuilder(URI.create(artifact.url()))
                     .timeout(Duration.ofMinutes(5))
                     .GET()
@@ -92,6 +93,13 @@ public final class DependencyInstaller {
             }
             return Result.ok(modId, artifact.filename());
         } catch (Exception e) {
+            if (temp != null) {
+                try {
+                    Files.deleteIfExists(temp);
+                } catch (Exception ignored) {
+                    // 临时文件清理失败不影响结果
+                }
+            }
             return Result.fail(modId, "下载失败：" + e.getMessage());
         }
     }

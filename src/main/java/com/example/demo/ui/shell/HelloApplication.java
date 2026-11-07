@@ -193,6 +193,7 @@ import com.example.demo.core.runtime.NetworkBoost;
 import com.example.demo.core.app.Bootstrap;
 import com.example.demo.core.mod.ModConflictChecker;
 import com.example.demo.core.mod.DependencyInstaller;
+import com.example.demo.core.mod.DependencyResolver;
 import com.example.demo.core.mod.ModDependencyScanner;
 import com.example.demo.core.mod.ModpackExporter;
 import com.example.demo.core.mod.ModpackImport;
@@ -5199,27 +5200,26 @@ private static void setFlexible(Node node, boolean on) {
     this.logLine("📥 开始自动安装 " + modIds.size() + " 个前置…");
     CompletableFuture.runAsync(
         () -> {
-          int ok = 0;
-          for (String modId : modIds) {
-            DependencyInstaller.Result result =
-                DependencyInstaller.installOne(
-                    modId,
-                    modsDir,
-                    target,
-                    httpClient,
-                    msg -> Platform.runLater(() -> this.logLine(msg)));
-            if (result.ok()) {
-              ok++;
-            }
-            String line =
-                (result.ok() ? "✅ " : "❌ ") + result.modId() + "：" + result.message();
-            Platform.runLater(() -> this.logLine(line));
-          }
-          int installed = ok;
+          DependencyResolver.Summary summary =
+              DependencyResolver.resolve(
+                  modIds,
+                  modId ->
+                      DependencyInstaller.installOne(
+                          modId,
+                          modsDir,
+                          target,
+                          httpClient,
+                          msg -> Platform.runLater(() -> this.logLine(msg))),
+                  () ->
+                      ModDependencyScanner.findMissingDependencies(
+                          ModDependencyScanner.scan(modsDir)),
+                  24,
+                  line -> Platform.runLater(() -> this.logLine(line)));
           Platform.runLater(
               () -> {
-                Toast.ok("前置安装完成 " + installed + "/" + modIds.size() + "，重新启动即可");
-                this.logLine("🧩 前置安装完成：" + installed + "/" + modIds.size());
+                this.logLine("🧩 " + summary.message());
+                Toast.ok(
+                    summary.complete() ? "前置已补齐，重新启动即可" : "前置未全部装好：" + summary.message());
               });
         });
   }

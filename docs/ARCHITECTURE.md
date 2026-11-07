@@ -947,6 +947,30 @@ Fabric / Quilt 的 loader 与 MC 解耦。安装流程在真正调用 `LoaderIns
 弹出对话框；点「自动安装」后下载了 `jei_1.12.2-4.22.0.1034.jar`（715 KB）到实例 mods 目录，
 日志出现「✅ 已安装前置 jei → …」「🧩 前置安装完成：1/1」。验证后假模组与下载的 jar 均已删除。
 
+### 业务判断（续三）：递归补前置与两个小修
+
+`core.mod.DependencyResolver`（6 个单测）把「装完再扫、扫完再装」收敛成一个可测的循环：
+
+```java
+Summary resolve(initialIds, fetcher, scanner, maxInstalls, log)
+// Summary(installed, failed, skipped, passes, complete) + message()
+```
+
+- 新装的前置如果自己还缺前置，下一轮继续装；
+- 同一个 id 只尝试一次（失败的不会反复重试成死循环）；
+- 单次最多 `maxInstalls`（界面侧传 24），超出只提示不继续；
+- 每轮结束重新扫描，用扫描结果判断是否真的补齐。
+
+顺手修的两个缺陷：
+
+1. `DependencyInstaller` 下载失败时临时 `.part` 文件原先会残留，现在 catch 里清掉。
+2. 旧的「一键补前置」只装一层，装完也不复核；现在用 resolver，日志会给出
+   「安装 N 个，共 M 轮；依赖已补齐 / 仍有缺失」。
+
+真机：用一个依赖 `jei` 的假模组触发，点「自动安装」后 JEI 1.12.2 落盘
+（`jei_1.12.2-4.22.0.1034.jar`），行为与上一版一致；递归路径的多轮行为由单测覆盖
+（测试里构造了 a→b 的两级链、失败重试、上限与去重）。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：
