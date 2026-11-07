@@ -198,4 +198,22 @@ class ModDependencyScannerTest {
         }
         return path.toFile();
     }
+    @Test
+    void describeMissingSummarisesRequesters() {
+        Map<String, List<String>> missing = new java.util.LinkedHashMap<>();
+        missing.put("jei", List.of("Sodium Extra", "AppleSkin"));
+        missing.put("cloth-config", List.of("Sodium Extra"));
+        String text = ModDependencyScanner.describeMissing(missing);
+        assertTrue(text.contains("jei ← 由 Sodium Extra、AppleSkin 需要"));
+        assertTrue(text.contains("cloth-config ← 由 Sodium Extra 需要"));
+        assertTrue(text.contains("；"), "多个依赖之间用分号分隔");
+    }
+
+    @Test
+    void describeMissingHandlesEmptyInput() {
+        assertEquals("", ModDependencyScanner.describeMissing(null));
+        assertEquals("", ModDependencyScanner.describeMissing(Map.of()));
+        assertEquals("", ModDependencyScanner.describeMissing(new java.util.LinkedHashMap<>()));
+    }
+
 }

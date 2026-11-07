@@ -151,6 +151,25 @@ public final class ModDependencyScanner {
         return result;
     }
 
+    /** 把缺失依赖拼成一行可读文本：`jei ← 由 A、B 需要；…`，空表返回空串。 */
+    public static String describeMissing(Map<String, List<String>> missing) {
+        if (missing == null || missing.isEmpty()) {
+            return "";
+        }
+        StringBuilder text = new StringBuilder();
+        for (Map.Entry<String, List<String>> entry : missing.entrySet()) {
+            if (text.length() > 0) {
+                text.append("；");
+            }
+            text.append(entry.getKey());
+            List<String> requesters = entry.getValue();
+            if (requesters != null && !requesters.isEmpty()) {
+                text.append(" ← 由 ").append(String.join("、", requesters)).append(" 需要");
+            }
+        }
+        return text.toString();
+    }
+
     public static String displayName(ModInfo info) {
         if (info.name() != null && !info.name().isBlank()) return info.name();
         if (info.modId() != null && !info.modId().isBlank()) return info.modId();

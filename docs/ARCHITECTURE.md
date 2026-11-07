@@ -908,6 +908,29 @@ String fitLabel(candidate, target)             // 「适配当前实例」/「�
 **缺库那条没能真机复现**：把 `patchy-1.3.9.jar` 改名后启动，前置完整性检查已经把文件
 补回来了，所以拦截分支只有单测覆盖——这本身是比「拦住」更好的结果。
 
+### 业务判断（续）：加载器版本与模组依赖
+
+**加载器与 MC 版本匹配（`core.meta.LoaderCompatibility`，9 个单测）**
+
+Forge / NeoForge 的版本号里带 MC 前缀（`1.20.1-47.4.10`、`26.3-66.1.0`），装错必然起不来；
+Fabric / Quilt 的 loader 与 MC 解耦。安装流程在真正调用 `LoaderInstaller` 之前先校验：
+不匹配就弹「加载器版本不匹配」并复位按钮，不再白等一次失败安装。
+
+真机证据：用启动器的安装页/命令触发不匹配的 Forge 版本时会被拦下（本轮以单测覆盖为主，
+安装页的真实交互依赖网络拉取加载器列表，网络抖动时未走通）。
+
+**模组依赖预检（`ModDependencyScanner.describeMissing`，新增 2 个单测）**
+
+启动前扫描当前实例 `mods/`，缺前置只在日志里提示、不阻断（与 PCL 一致）：
+
+```
+⚠ 模组依赖缺失: cloth-config ← 由 Neko Test Mod 需要
+   请在「下载」页装好对应前置再启动
+```
+
+真机证据：往 `versions/1.12.2/mods` 放一个声明依赖 `cloth-config` 的假模组后启动，
+日志区出现上面两行（`r71-deps.png`）；验证完已删除该假模组。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：

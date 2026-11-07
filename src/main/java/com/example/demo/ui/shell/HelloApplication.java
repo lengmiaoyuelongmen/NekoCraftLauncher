@@ -150,6 +150,7 @@ import javax.imageio.ImageIO;
 import com.example.demo.core.launch.LaunchPlan;
 import com.example.demo.core.launch.LaunchPlanner;
 import com.example.demo.core.launch.NativeExtractor;
+import com.example.demo.core.meta.LoaderCompatibility;
 import com.example.demo.core.meta.VersionManager;
 import com.example.demo.core.meta.VersionProfile;
 import com.example.demo.core.model.AssetIndex;
@@ -191,6 +192,7 @@ import com.example.demo.core.runtime.MemoryAdvisor;
 import com.example.demo.core.runtime.NetworkBoost;
 import com.example.demo.core.app.Bootstrap;
 import com.example.demo.core.mod.ModConflictChecker;
+import com.example.demo.core.mod.ModDependencyScanner;
 import com.example.demo.core.mod.ModpackExporter;
 import com.example.demo.core.mod.ModpackImport;
 import com.example.demo.core.mod.ServerPackExporter;
@@ -2686,6 +2688,22 @@ private static void setFlexible(Node node, boolean on) {
             VersionProfile baseProfile = this.ensureInstalled(id, jsonUrl, log);
             String resultId = id;
             if (!loader.startsWith("原版")) {
+              LoaderCompatibility.Result loaderCheck =
+                  LoaderCompatibility.validate(
+                      LoaderCompatibility.fromLabel(loader), id, loaderVersion);
+              if (!loaderCheck.ok()) {
+                log.accept("⛔ " + loaderCheck.message());
+                Platform.runLater(
+                    () -> {
+                      InAppDialog.alert("加载器版本不匹配", loaderCheck.message());
+                      this.logArea.appendText("❌ " + loaderCheck.message() + "\n");
+                      btn.setDisable(false);
+                      btn.setText("开始下载");
+                      this.setInstallerProgress(false);
+                      this.setInstallerStatus("未安装：" + loaderCheck.message());
+                    });
+                return;
+              }
               log.accept("🔧 正在安装 " + loader + "（版本 " + id + "）...");
               String javaPath =
                   this.resolveJavaPath(gameDir, baseProfile.getJavaMajorVersion(), log);
@@ -5147,6 +5165,25 @@ private static void setFlexible(Node node, boolean on) {
   private record LaunchEnv(File injector, String javaPath) {}
 
   /** 环境就绪后组启动命令并 spawn（在 JavaFX 线程上执行）。 */
+  /** 启动前扫一遍模组目录，缺前置只提示不阻断（和 PCL 的行为一致）。 */
+  private void logMissingModDependencies(File gameDir, String instanceId, boolean isolated) {
+    File mods = InstanceDirs.mods(gameDir, instanceId, isolated);
+    if (!mods.isDirectory()) {
+      return;
+    }
+    List<ModDependencyScanner.ModInfo> scanned = ModDependencyScanner.scan(mods);
+    if (scanned.isEmpty()) {
+      return;
+    }
+    Map<String, List<String>> missing = ModDependencyScanner.findMissingDependencies(scanned);
+    if (missing.isEmpty()) {
+      this.logLine("🧩 模组依赖检查通过（" + scanned.size() + " 个模组）");
+      return;
+    }
+    this.logLine("⚠ 模组依赖缺失：" + ModDependencyScanner.describeMissing(missing));
+    this.logLine("   请在「下载」页装好对应前置再启动");
+  }
+
   /** classpath 里缺失的库文件数量（启动前判断能不能起来）。 */
   private int missingLibraryCount(File gameDir, VersionProfile profile) {
     File libraries = new File(gameDir, "libraries");
@@ -5206,6 +5243,7 @@ private static void setFlexible(Node node, boolean on) {
                   if (actual > 0) {
                     this.logArea.appendText("☕ Java " + actual + "（需要 " + required + "）\n");
                   }
+                  this.logMissingModDependencies(gameDir, profile.getId(), isolated);
                   InstanceSettings.Settings override =
                       InstanceSettings.get(gameDir, profile.getId());
                   LauncherConfig launchConfig =
