@@ -785,3 +785,59 @@ clean package     0 告警
 **守卫**：`scripts/check-architecture.ps1` 会拦下 `core` 里出现 JavaFX、`ui.*`、入口类的引用。
 
 **每次改动的最低门槛**：`mvnw -o -q package`（0 告警）→ 单测全绿 → `smoke-test.ps1` PASS。
+
+## 17. 收尾阶段：主类只做装配（2026-11-07 17:30）
+
+这一阶段把「主类里还剩的大块」清完，判定标准从「按页面拆」变成「按方法拆」：
+凡是能独立成方法、并且有明确入参的，都从 `HelloApplication` 里挪出来。
+
+### 新拆出的类
+
+| 类 | 职责 | 验证方式 |
+|---|---|---|
+| `ui.component.TopBar` | 品牌区（时钟 / 就绪状态 / 结束游戏 / 取消启动）、导航按钮与滑动指示器、命令面板入口、窗口按钮、拖动与双击复位 | 冒烟 5 页截图，顶栏与重构前一致 |
+| `ui.component.CommandPalette` | 命令面板 UI：搜索框、过滤列表、↑↓/Enter/Esc、进场动画、点背景关闭 | Ctrl+K 打开（11 条命令）、Esc 关闭 |
+| `ui.component.FavoritesRenderer` | 收藏夹列表：分组折叠、三种排序、搜索、行布局、取消收藏 | 收藏夹空状态实测（有收藏时的行渲染未覆盖） |
+| `ui.component.ExportInstanceDialog` | 导出整合包对话框与三条导出路径（mrpack / 便携 / 服务端包） | 实例选择 → 导出整合包，弹窗与取消 |
+| `ui.page.ModpackVersionLoader` | 版本列表缓存（10 分钟）、官方/镜像并行竞速、加载页与「重新获取」 | 点开 Fabulously Optimized，列表正常返回 |
+| `ui.component.WindowIcon` | 窗口按钮图标枚举（原为主类私有内部枚举） | 随 TopBar |
+| `core.app.LauncherCommands` | 命令解析（空 / 斜杠转发 / 各命令 / 内存区间）与帮助文案 | 7 个单测 + 命令栏输入 `help` 实测 |
+
+### 主类内部的方法拆分
+
+| 原方法 | 行数 | 拆后 |
+|---|---|---|
+| `createLaunchPanel` | 305 | 187（`createAccountColumn` + `createVersionSelector`） |
+| `importModpack` | 277 | 5（`createImportProgressPage` + `runImportAsync`） |
+| `fetchVersionsAndDownload` | 97 | 1 行委托（`ModpackVersionLoader`） |
+| `showVersionLoadingPage` | 44 | 删除（并入 loader） |
+| `executeCommand` | 135 | 21 + 4 个小方法（解析在 core） |
+| `renderFavoriteResources` | 116 | 6（`FavoritesRenderer`） |
+| `start(Stage)` | 409 | 约 275（`installCrtOverlay` / `startBackgroundServices` / `installDropOverlay`） |
+| `startProcess` | 164 | 约 45（`handleGameExit` + `pumpGameOutput`） |
+| `startGame` | 129 | 约 45（`launchWithEnv`） |
+| `downloadChosenVersion` | 117 | 约 105（`pickPrimaryFile`） |
+
+### 结果
+
+- 主类 **8,970 → 5,993 行**（-33%）。
+- ≥50 行的方法合计 **3,525 → 约 2,400 行**。
+- 单测 **13 → 177**（新增 `LauncherCommandsTest`、`SearchFetcher`/`SearchPages`/`SearchSession`、`LaunchGuards`、`AutoRepair`、`GameExit`、`LaunchHistory`、`IntegrityCachePolicy`、`SessionState` 等）。
+- 每个阶段都保持：0 告警、`clean package` 通过、单测全绿、冒烟 PASS、架构守卫 PASS。
+
+### 只剩「装配」的部分
+
+`start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：
+建顶栏 → 建内容区 → 建页面 → 装拖放层 → 建 Scene → 装快捷键 → 显示窗口 → 起后台任务。
+继续拆它们需要引入「窗口装配器」这层抽象，收益低于风险，暂不处理。
+
+### 本轮没拿到运行时证据的路径
+
+这几处只经过编译与冒烟，**没有真跑游戏 / 真下载整合包**：
+
+- `handleGameExit`（游戏退出后的时长、启动历史、崩溃报告）——需要真实启动一次 Minecraft；
+- `launchWithEnv`（组启动命令并 spawn）——同上；
+- `downloadChosenVersion`（版本下载与安装到实例）——需要一次完整下载；
+- `FavoritesRenderer` 的「有收藏」分支——这台机器上没有收藏项。
+
+已记录的验证方式与证据截图保存在 `C:\Users\Administrator\.dsh\tmp\neko-verify\`（r17–r27）。

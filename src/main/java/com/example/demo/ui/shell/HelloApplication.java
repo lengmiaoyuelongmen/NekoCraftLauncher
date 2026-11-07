@@ -564,6 +564,27 @@ public class HelloApplication extends Application {
             });
   }
 
+  /** 拖入整合包时盖在窗口上的提示层。 */
+  private void installDropOverlay(StackPane rootWrap) {
+      this.dropOverlay = new StackPane();
+      this.dropOverlay.setVisible(false);
+      this.dropOverlay.setManaged(false);
+      this.dropOverlay.setMouseTransparent(true);
+      this.dropOverlay.setStyle("-fx-background-color: rgba(5,20,18,0.72);");
+      this.dropTitle = new Label("松开鼠标导入整合包");
+      this.dropTitle.setStyle("-fx-text-fill: #ccfbf1; -fx-font-size: 24px; -fx-font-weight: bold;");
+      this.dropHint = new Label("支持 .zip / .mrpack，直接拖入窗口即可安装");
+      this.dropHint.setStyle("-fx-text-fill: rgba(204,251,241,0.78); -fx-font-size: 12px;");
+      VBox dropBox =
+          new VBox(10.0, Icons.node("download", 42.0, "#5eead4"), this.dropTitle, this.dropHint);
+      dropBox.setAlignment(Pos.CENTER);
+      dropBox.setStyle(
+          "-fx-background-color: rgba(14,47,38,0.92); -fx-background-radius: 20; -fx-border-color:"
+              + " rgba(94,234,212,0.65); -fx-border-radius: 20; -fx-padding: 34 44;");
+      this.dropOverlay.getChildren().add(dropBox);
+      rootWrap.getChildren().add(this.dropOverlay);
+  }
+
   public void start(Stage stage) {
     List<MinecraftVersion> cachedVersions;
     VBox root;
@@ -641,23 +662,7 @@ public class HelloApplication extends Application {
     StackPane rootWrap = new StackPane(root, resizeGrip);
     rootWrap.setAlignment(Pos.TOP_LEFT);
     this.installResizeHandles(rootWrap, stage);
-    this.dropOverlay = new StackPane();
-    this.dropOverlay.setVisible(false);
-    this.dropOverlay.setManaged(false);
-    this.dropOverlay.setMouseTransparent(true);
-    this.dropOverlay.setStyle("-fx-background-color: rgba(5,20,18,0.72);");
-    this.dropTitle = new Label("松开鼠标导入整合包");
-    this.dropTitle.setStyle("-fx-text-fill: #ccfbf1; -fx-font-size: 24px; -fx-font-weight: bold;");
-    this.dropHint = new Label("支持 .zip / .mrpack，直接拖入窗口即可安装");
-    this.dropHint.setStyle("-fx-text-fill: rgba(204,251,241,0.78); -fx-font-size: 12px;");
-    VBox dropBox =
-        new VBox(10.0, Icons.node("download", 42.0, "#5eead4"), this.dropTitle, this.dropHint);
-    dropBox.setAlignment(Pos.CENTER);
-    dropBox.setStyle(
-        "-fx-background-color: rgba(14,47,38,0.92); -fx-background-radius: 20; -fx-border-color:"
-            + " rgba(94,234,212,0.65); -fx-border-radius: 20; -fx-padding: 34 44;");
-    this.dropOverlay.getChildren().add(dropBox);
-    rootWrap.getChildren().add(this.dropOverlay);
+    this.installDropOverlay(rootWrap);
     StackPane.setAlignment(resizeGrip, Pos.BOTTOM_RIGHT);
     StackPane.setMargin(resizeGrip, new Insets(0.0, 6.0, 6.0, 0.0));
     double[] gripStart = new double[4];
