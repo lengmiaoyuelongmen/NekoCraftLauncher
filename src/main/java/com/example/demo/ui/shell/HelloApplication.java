@@ -5212,6 +5212,121 @@ private static void setFlexible(Node node, boolean on) {
         });
   }
 
+  /** 把游戏标准输出转发到日志区。 */
+  private void pumpGameOutput(Process process) {
+    new Thread(
+            () -> {
+              try (BufferedReader reader =
+                  new BufferedReader(
+                      new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8)); ) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                  String outputLine = line;
+                  Platform.runLater(() -> this.logArea.appendText("[Game] " + outputLine + "\n"));
+                }
+              } catch (Exception exception) {
+                // empty catch block
+              }
+            },
+            "game-output")
+        .start();
+  }
+
+  /** 游戏进程退出后的收尾：重启界面状态、记录时长与启动历史、崩溃诊断。 */
+  private void handleGameExit(Process exited, File gameDir) {
+                  boolean forcedStop = this.launchState.isStopRequested();
+                  this.launchState.clearStop();
+                  this.launchState.finish();
+                  this.setLaunchingUi(false);
+                  this.setGameStatus(false);
+                  if (this.stageRef != null && !this.stageRef.isShowing()) {
+                    GameExit.Kind trayKind = GameExit.kind(forcedStop, exited.exitValue());
+                    this.chrome().notifyTray(GameExit.trayMessage(trayKind),
+                        trayKind == GameExit.Kind.CRASH);
+                  }
+                  if (this.minimizedForGame && this.stageRef != null) {
+                    this.minimizedForGame = false;
+                    this.stageRef.setIconified(false);
+                  }
+                  if (this.config.isPauseVisualsInGame()
+                      && this.ambientBackground != null
+                      && (this.stageRef == null || !this.stageRef.isIconified())) {
+                    this.ambientBackground.start();
+                  }
+                  String recent = "";
+                  try {
+                    recent =
+                        this.logArea.getText(this.lastLaunchLogStart, this.logArea.getLength());
+                  } catch (Exception exception) {
+                    // empty catch block
+                  }
+                  long sessionSeconds = 0L;
+                  if (this.gameStartAt > 0L && this.gameInstanceId != null) {
+                    sessionSeconds =
+                        GameExit.sessionSeconds(this.gameStartAt, System.currentTimeMillis());
+                    File base = new File(this.config.getGameDir());
+                    Playtime.add(base, this.gameInstanceId, sessionSeconds);
+                    this.logArea.appendText(
+                        "⏱ 本次游戏时长 "
+                            + Playtime.format(sessionSeconds)
+                            + "（累计 "
+                            + Playtime.format(Playtime.seconds(base, this.gameInstanceId))
+                            + "）\n");
+                    this.gameStartAt = 0L;
+                  }
+                  boolean crashLike =
+                      GameExit.crashLike(forcedStop, exited.exitValue());
+                  LaunchHistory.record(
+                      new File(this.config.getGameDir()),
+                      new LaunchHistory.Entry(
+                          System.currentTimeMillis(),
+                          this.gameInstanceId,
+                          this.lastLaunchPrepMs,
+                          sessionSeconds,
+                          exited.exitValue(),
+                          crashLike,
+                          forcedStop));
+                  this.lastLaunchPrepMs = 0L;
+                  if (this.launchInsightBar != null) {
+                    this.launchInsightBar.refresh();
+                  }
+                  // 刚写完一条启动记录：概览里的「N 次 · 成功率」要马上跟着变，
+                  // 否则用户看到的还是上一局的数字（曾经就是这样）
+                  if (this.launchOverviewPane != null) {
+                    this.launchOverviewPane.refresh();
+                  }
+                  this.logArea.appendText(
+                      GameExit.logMessage(
+                          GameExit.kind(forcedStop, exited.exitValue()), exited.exitValue()));
+                  this.launchBtn.setDisable(false);
+                  if (crashLike) {
+                    File crashDir = new File(gameDir, "crash-reports");
+                    final long sessionFrom = this.gameStartAt;
+                    File[] reports =
+                        crashDir.listFiles(
+                            (d, n) ->
+                                n.endsWith(".txt")
+                                    && (sessionFrom <= 0
+                                        || new File(d, n).lastModified() >= sessionFrom));
+                    if (reports != null && reports.length > 0) {
+                      Arrays.sort(
+                          reports, Comparator.comparingLong(File::lastModified).reversed());
+                      this.logArea.appendText(
+                          "💥 崩溃报告: " + reports[0].getAbsolutePath() + "\n");
+                    } else {
+                      this.logArea.appendText("💥 非正常退出，可在「工具 → 打开日志目录」里看 latest.log\n");
+                    }
+                    this.logArea.appendText("   如果是缺文件导致，去「工具 → 百宝箱 → 校验库文件」可自动补齐\n");
+                    CrashAnalyzer.Report report = CrashAnalyzer.analyze(gameDir);
+                    this.logArea.appendText(CrashAnalyzer.toText(report));
+                    if (report.hasFindings()) {
+                      CrashReportDialog.show(this.stageRef, report);
+                    } else {
+                      this.showLaunchFailureHint("游戏异常退出（退出码 " + exited.exitValue() + "）");
+                    }
+                  }
+  }
+
   private void startProcess(LaunchPlan plan) throws Exception {
     if (this.isGameProcessAlive()) {
       throw new IllegalStateException("已有游戏进程在运行，已阻止重复启动");
@@ -5263,118 +5378,8 @@ private static void setFlexible(Node node, boolean on) {
     }
     process
         .onExit()
-        .thenAccept(
-            exited ->
-                Platform.runLater(
-                    () -> {
-                      boolean forcedStop = this.launchState.isStopRequested();
-                      this.launchState.clearStop();
-                      this.launchState.finish();
-                      this.setLaunchingUi(false);
-                      this.setGameStatus(false);
-                      if (this.stageRef != null && !this.stageRef.isShowing()) {
-                        GameExit.Kind trayKind = GameExit.kind(forcedStop, exited.exitValue());
-                        this.chrome().notifyTray(GameExit.trayMessage(trayKind),
-                            trayKind == GameExit.Kind.CRASH);
-                      }
-                      if (this.minimizedForGame && this.stageRef != null) {
-                        this.minimizedForGame = false;
-                        this.stageRef.setIconified(false);
-                      }
-                      if (this.config.isPauseVisualsInGame()
-                          && this.ambientBackground != null
-                          && (this.stageRef == null || !this.stageRef.isIconified())) {
-                        this.ambientBackground.start();
-                      }
-                      String recent = "";
-                      try {
-                        recent =
-                            this.logArea.getText(this.lastLaunchLogStart, this.logArea.getLength());
-                      } catch (Exception exception) {
-                        // empty catch block
-                      }
-                      long sessionSeconds = 0L;
-                      if (this.gameStartAt > 0L && this.gameInstanceId != null) {
-                        sessionSeconds =
-                            GameExit.sessionSeconds(this.gameStartAt, System.currentTimeMillis());
-                        File base = new File(this.config.getGameDir());
-                        Playtime.add(base, this.gameInstanceId, sessionSeconds);
-                        this.logArea.appendText(
-                            "⏱ 本次游戏时长 "
-                                + Playtime.format(sessionSeconds)
-                                + "（累计 "
-                                + Playtime.format(Playtime.seconds(base, this.gameInstanceId))
-                                + "）\n");
-                        this.gameStartAt = 0L;
-                      }
-                      boolean crashLike =
-                          GameExit.crashLike(forcedStop, exited.exitValue());
-                      LaunchHistory.record(
-                          new File(this.config.getGameDir()),
-                          new LaunchHistory.Entry(
-                              System.currentTimeMillis(),
-                              this.gameInstanceId,
-                              this.lastLaunchPrepMs,
-                              sessionSeconds,
-                              exited.exitValue(),
-                              crashLike,
-                              forcedStop));
-                      this.lastLaunchPrepMs = 0L;
-                      if (this.launchInsightBar != null) {
-                        this.launchInsightBar.refresh();
-                      }
-                      // 刚写完一条启动记录：概览里的「N 次 · 成功率」要马上跟着变，
-                      // 否则用户看到的还是上一局的数字（曾经就是这样）
-                      if (this.launchOverviewPane != null) {
-                        this.launchOverviewPane.refresh();
-                      }
-                      this.logArea.appendText(
-                          GameExit.logMessage(
-                              GameExit.kind(forcedStop, exited.exitValue()), exited.exitValue()));
-                      this.launchBtn.setDisable(false);
-                      if (crashLike) {
-                        File crashDir = new File(gameDir, "crash-reports");
-                        final long sessionFrom = this.gameStartAt;
-                        File[] reports =
-                            crashDir.listFiles(
-                                (d, n) ->
-                                    n.endsWith(".txt")
-                                        && (sessionFrom <= 0
-                                            || new File(d, n).lastModified() >= sessionFrom));
-                        if (reports != null && reports.length > 0) {
-                          Arrays.sort(
-                              reports, Comparator.comparingLong(File::lastModified).reversed());
-                          this.logArea.appendText(
-                              "💥 崩溃报告: " + reports[0].getAbsolutePath() + "\n");
-                        } else {
-                          this.logArea.appendText("💥 非正常退出，可在「工具 → 打开日志目录」里看 latest.log\n");
-                        }
-                        this.logArea.appendText("   如果是缺文件导致，去「工具 → 百宝箱 → 校验库文件」可自动补齐\n");
-                        CrashAnalyzer.Report report = CrashAnalyzer.analyze(gameDir);
-                        this.logArea.appendText(CrashAnalyzer.toText(report));
-                        if (report.hasFindings()) {
-                          CrashReportDialog.show(this.stageRef, report);
-                        } else {
-                          this.showLaunchFailureHint("游戏异常退出（退出码 " + exited.exitValue() + "）");
-                        }
-                      }
-                    }));
-    new Thread(
-            () -> {
-              try (BufferedReader reader =
-                  new BufferedReader(
-                      new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8)); ) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                  String outputLine = line;
-                  Platform.runLater(() -> this.logArea.appendText("[Game] " + outputLine + "\n"));
-                }
-              } catch (Exception exception) {
-                // empty catch block
-              }
-            },
-            "game-output")
-        .start();
+            .thenAccept(exited -> Platform.runLater(() -> this.handleGameExit(exited, gameDir)));
+    this.pumpGameOutput(process);
   }
 
   private String currentInstanceId() {
