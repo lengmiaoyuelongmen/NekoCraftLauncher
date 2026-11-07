@@ -192,6 +192,7 @@ import com.example.demo.core.runtime.MemoryAdvisor;
 import com.example.demo.core.runtime.NetworkBoost;
 import com.example.demo.core.app.Bootstrap;
 import com.example.demo.core.mod.ModConflictChecker;
+import com.example.demo.core.mod.DependencyInstaller;
 import com.example.demo.core.mod.ModDependencyScanner;
 import com.example.demo.core.mod.ModpackExporter;
 import com.example.demo.core.mod.ModpackImport;
@@ -5181,7 +5182,46 @@ private static void setFlexible(Node node, boolean on) {
       return;
     }
     this.logLine("⚠ 模组依赖缺失：" + ModDependencyScanner.describeMissing(missing));
-    this.logLine("   请在「下载」页装好对应前置再启动");
+    ArrayList<String> pending = new ArrayList<>(missing.keySet());
+    this.logLine("   可自动从 Modrinth 安装这 " + pending.size() + " 个前置");
+    VersionFit.Target target = this.currentVersionTarget();
+    InAppDialog.confirm(
+        this.dialogLayer,
+        "缺少 " + pending.size() + " 个前置模组",
+        ModDependencyScanner.describeMissing(missing) + "\n\n是否自动安装到当前实例？装完重新启动即可。",
+        "自动安装",
+        () -> this.installMissingDependencies(pending, mods, target));
+  }
+
+  /** 后台逐个安装缺失的前置，结果写日志。 */
+  private void installMissingDependencies(
+      List<String> modIds, File modsDir, VersionFit.Target target) {
+    this.logLine("📥 开始自动安装 " + modIds.size() + " 个前置…");
+    CompletableFuture.runAsync(
+        () -> {
+          int ok = 0;
+          for (String modId : modIds) {
+            DependencyInstaller.Result result =
+                DependencyInstaller.installOne(
+                    modId,
+                    modsDir,
+                    target,
+                    httpClient,
+                    msg -> Platform.runLater(() -> this.logLine(msg)));
+            if (result.ok()) {
+              ok++;
+            }
+            String line =
+                (result.ok() ? "✅ " : "❌ ") + result.modId() + "：" + result.message();
+            Platform.runLater(() -> this.logLine(line));
+          }
+          int installed = ok;
+          Platform.runLater(
+              () -> {
+                Toast.ok("前置安装完成 " + installed + "/" + modIds.size() + "，重新启动即可");
+                this.logLine("🧩 前置安装完成：" + installed + "/" + modIds.size());
+              });
+        });
   }
 
   /** classpath 里缺失的库文件数量（启动前判断能不能起来）。 */

@@ -931,6 +931,22 @@ Fabric / Quilt 的 loader 与 MC 解耦。安装流程在真正调用 `LoaderIns
 真机证据：往 `versions/1.12.2/mods` 放一个声明依赖 `cloth-config` 的假模组后启动，
 日志区出现上面两行（`r71-deps.png`）；验证完已删除该假模组。
 
+### 业务判断（续二）：一键补前置
+
+`core.mod.DependencyPick` + `core.mod.DependencyInstaller`：
+
+- `pick(versionsJson, target)` 用 `VersionFit` 的适配排序挑版本，再取 primary 文件
+  （没有 primary 标记就取第一个）；返回 `(versionNumber, url, filename, size)`。
+- `installOne(modId, modsDir, target, http, log)` 先问官方源、失败换镜像，拿不到适配版本
+  就返回「没有适配 X · Y 的版本」，成功则写临时文件再改名，避免半截文件。
+
+界面侧：启动前扫描发现缺前置 → 弹「缺少 N 个前置模组 / id ← 由 谁需要」→
+点「自动安装」在后台逐个装，日志逐条输出结果。
+
+真机证据（`r72-deps-dialog.png`、`r73-deps-install.png`）：放一个声明依赖 `jei` 的假模组后启动，
+弹出对话框；点「自动安装」后下载了 `jei_1.12.2-4.22.0.1034.jar`（715 KB）到实例 mods 目录，
+日志出现「✅ 已安装前置 jei → …」「🧩 前置安装完成：1/1」。验证后假模组与下载的 jar 均已删除。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：
