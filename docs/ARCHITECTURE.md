@@ -825,6 +825,31 @@ clean package     0 告警
 - 单测 **13 → 177**（新增 `LauncherCommandsTest`、`SearchFetcher`/`SearchPages`/`SearchSession`、`LaunchGuards`、`AutoRepair`、`GameExit`、`LaunchHistory`、`IntegrityCachePolicy`、`SessionState` 等）。
 - 每个阶段都保持：0 告警、`clean package` 通过、单测全绿、冒烟 PASS、架构守卫 PASS。
 
+### 装配阶段的第二刀（2026-11-07 20:00）
+
+| 原方法 | 行数 | 拆后 |
+|---|---|---|
+| `createLaunchPanel` | 187 | 约 45（`createAccountColumn` / `createVersionSelector` / `createConsoleSection`） |
+| `start(Stage)` | 296 | 138（`buildLayout` / `installCrtOverlay` / `installDropOverlay` / `installDragAndDrop` / `installStageBounds` / `installKeyBindings` / `startBackgroundServices`） |
+| `runImportAsync` | 266 | 约 70（`runImportAttempt` + `installPackInto`，状态放 `ImportState`） |
+| `startProcess` | 164 | 约 45（`handleGameExit` / `pumpGameOutput`） |
+| `startGame` | 129 | 约 45（`launchWithEnv`） |
+
+主类 **6,050 → 5,999 行**；类里已经没有超过 150 行的方法；≥50 行方法合计 **2,074 行**
+（开工时 3,525）。
+
+搬 `start(Stage)` 的快捷键处理器后，特意用 Ctrl+K 复验了一次命令面板仍能打开——
+这类「搬完看不出问题」的代码，只有真按一次键才知道没断。
+
+### 导入的第二个 bug：复用实例时改掉了名字
+
+导入时会复用「同 MC 版本 + 同加载器」的已有实例（合理，省一次下载），但成功分支仍然
+调用 `InstanceMeta.set(gameDir, instanceId, pack.name(), ...)`，把已有实例的显示名
+覆盖成整合包名（实测 1.12.2「Multi File Pack」被改成「Neko Import Test」）。
+
+修复：只有新建实例才写名字，复用实例只更新描述。配 `InstanceMetaTest` 5 个用例，
+其中一条专门守住「null 名字不覆盖」。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：
