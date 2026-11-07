@@ -185,6 +185,8 @@ public class SmokeWin {
     # 顶部导航可点 ≠ 启动页画完：等一帧稳定再截，否则会拍到只有底色的空页
     Start-Sleep -Seconds 2
     Capture-Window "01-launch"
+    # 首页哈希作为基准：第一次切页如果没有变化也要被检测出来（否则会拿空值直接放行）
+    $prevHash = (Get-FileHash (Join-Path $outDir "01-launch.png") -Algorithm SHA256).Hash
 
     # ---------- 逐页 ----------
     Write-Host "[3/4] 逐页切换..." -ForegroundColor Cyan
