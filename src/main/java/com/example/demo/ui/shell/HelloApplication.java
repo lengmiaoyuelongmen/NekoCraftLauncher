@@ -622,6 +622,152 @@ public class HelloApplication extends Application {
     return root;
   }
 
+  /** 拖入整合包 / 模组文件时的提示与落地。 */
+  private void installDragAndDrop(Scene scene) {
+  scene.addEventFilter(
+      DragEvent.DRAG_OVER,
+      event -> {
+        File archive = this.firstImportArchive(event.getDragboard());
+        File jar = this.firstModJar(event.getDragboard());
+        if (archive == null && jar == null) {
+          return;
+        }
+        event.acceptTransferModes(TransferMode.COPY);
+        if (this.dropOverlay != null) {
+          this.dropTitle.setText(jar != null ? "松开安装模组" : "松开鼠标导入整合包");
+          this.dropHint.setText(
+              jar != null ? "支持 .jar，可一次拖入多个文件" : "支持 .zip / .mrpack，直接拖入窗口即可安装");
+          this.dropOverlay.setVisible(true);
+        }
+        event.consume();
+      });
+  scene.addEventFilter(
+      DragEvent.DRAG_EXITED,
+      event -> {
+        if (this.dropOverlay != null) {
+          this.dropOverlay.setVisible(false);
+        }
+      });
+  scene.addEventFilter(
+      DragEvent.DRAG_DROPPED,
+      event -> {
+        if (this.dropOverlay != null) {
+          this.dropOverlay.setVisible(false);
+        }
+        File archive = this.firstImportArchive(event.getDragboard());
+        List<File> jars = this.modJars(event.getDragboard());
+        if (archive == null && jars.isEmpty()) {
+          return;
+        }
+        event.setDropCompleted(true);
+        event.consume();
+        if (!jars.isEmpty()) {
+          this.installDroppedMods(jars);
+        } else {
+          this.importModpack(archive);
+        }
+      });
+  }
+
+  /** 窗口最小尺寸与超出屏幕时的尺寸钳制。 */
+  private void installStageBounds(Stage stage) {
+  stage.initStyle(StageStyle.TRANSPARENT);
+  stage.setMinWidth(980.0);
+  stage.setMinHeight(680.0);
+  stage
+      .widthProperty()
+      .addListener(
+          (o, old, value) -> {
+            Rectangle2D vb = HelloApplication.screenBounds(stage);
+            if (value.doubleValue() > vb.getWidth()) {
+              stage.setWidth(vb.getWidth());
+            }
+          });
+  stage
+      .heightProperty()
+      .addListener(
+          (o, old, value) -> {
+            Rectangle2D vb = HelloApplication.screenBounds(stage);
+            if (value.doubleValue() > vb.getHeight()) {
+              stage.setHeight(vb.getHeight());
+            }
+          });
+  }
+
+  /** 全局快捷键（Ctrl+K 命令面板、F11 全屏、Ctrl+Shift+0 复位等）。 */
+  private void installKeyBindings(Scene scene, Stage stage) {
+  scene.setOnKeyPressed(
+      e -> {
+        if (e.isControlDown() && e.isShiftDown() && e.getCode() == KeyCode.DIGIT0) {
+          stage.setWidth(1060.0);
+          stage.setHeight(792.0);
+          stage.centerOnScreen();
+          e.consume();
+          return;
+        }
+        if (e.isControlDown() && e.getCode() == KeyCode.K) {
+          this.showCommandPalette();
+          e.consume();
+          return;
+        }
+        if (e.isControlDown() && e.getCode() == KeyCode.Q) {
+          this.requestClose();
+          e.consume();
+          return;
+        }
+        switch (e.getCode()) {
+          case F1:
+            {
+              this.switchPage("launch");
+              break;
+            }
+          case F2:
+            {
+              this.switchPage("instances");
+              break;
+            }
+          case F3:
+            {
+              this.openInstanceSettings("overview");
+              break;
+            }
+          case F4:
+            {
+              this.openInstanceSettings("mods");
+              break;
+            }
+          case F5:
+            {
+              this.switchPage("download");
+              break;
+            }
+          case F6:
+            {
+              this.switchPage("settings");
+              break;
+            }
+          case F7:
+            {
+              this.switchPage("tools");
+              break;
+            }
+          case F8:
+            {
+              this.switchPage("settings");
+              if (this.settingsPanel == null) break;
+              this.settingsPanel.openTab("查看日志");
+              break;
+            }
+          case F9:
+            {
+              this.switchPage("launch");
+              this.applyLogExpanded(!this.logExpanded);
+              break;
+            }
+        }
+      });
+  }
+
   public void start(Stage stage) {
     List<MinecraftVersion> cachedVersions;
     this.stageRef = stage;
@@ -700,140 +846,9 @@ public class HelloApplication extends Application {
     rootWrap.getChildren().add(this.dialogLayer);
     Scene scene = new Scene(rootWrap, 1060.0, 792.0);
     scene.setFill(javafx.scene.paint.Color.TRANSPARENT);
-    scene.addEventFilter(
-        DragEvent.DRAG_OVER,
-        event -> {
-          File archive = this.firstImportArchive(event.getDragboard());
-          File jar = this.firstModJar(event.getDragboard());
-          if (archive == null && jar == null) {
-            return;
-          }
-          event.acceptTransferModes(TransferMode.COPY);
-          if (this.dropOverlay != null) {
-            this.dropTitle.setText(jar != null ? "松开安装模组" : "松开鼠标导入整合包");
-            this.dropHint.setText(
-                jar != null ? "支持 .jar，可一次拖入多个文件" : "支持 .zip / .mrpack，直接拖入窗口即可安装");
-            this.dropOverlay.setVisible(true);
-          }
-          event.consume();
-        });
-    scene.addEventFilter(
-        DragEvent.DRAG_EXITED,
-        event -> {
-          if (this.dropOverlay != null) {
-            this.dropOverlay.setVisible(false);
-          }
-        });
-    scene.addEventFilter(
-        DragEvent.DRAG_DROPPED,
-        event -> {
-          if (this.dropOverlay != null) {
-            this.dropOverlay.setVisible(false);
-          }
-          File archive = this.firstImportArchive(event.getDragboard());
-          List<File> jars = this.modJars(event.getDragboard());
-          if (archive == null && jars.isEmpty()) {
-            return;
-          }
-          event.setDropCompleted(true);
-          event.consume();
-          if (!jars.isEmpty()) {
-            this.installDroppedMods(jars);
-          } else {
-            this.importModpack(archive);
-          }
-        });
-    stage.initStyle(StageStyle.TRANSPARENT);
-    stage.setMinWidth(980.0);
-    stage.setMinHeight(680.0);
-    stage
-        .widthProperty()
-        .addListener(
-            (o, old, value) -> {
-              Rectangle2D vb = HelloApplication.screenBounds(stage);
-              if (value.doubleValue() > vb.getWidth()) {
-                stage.setWidth(vb.getWidth());
-              }
-            });
-    stage
-        .heightProperty()
-        .addListener(
-            (o, old, value) -> {
-              Rectangle2D vb = HelloApplication.screenBounds(stage);
-              if (value.doubleValue() > vb.getHeight()) {
-                stage.setHeight(vb.getHeight());
-              }
-            });
-    scene.setOnKeyPressed(
-        e -> {
-          if (e.isControlDown() && e.isShiftDown() && e.getCode() == KeyCode.DIGIT0) {
-            stage.setWidth(1060.0);
-            stage.setHeight(792.0);
-            stage.centerOnScreen();
-            e.consume();
-            return;
-          }
-          if (e.isControlDown() && e.getCode() == KeyCode.K) {
-            this.showCommandPalette();
-            e.consume();
-            return;
-          }
-          if (e.isControlDown() && e.getCode() == KeyCode.Q) {
-            this.requestClose();
-            e.consume();
-            return;
-          }
-          switch (e.getCode()) {
-            case F1:
-              {
-                this.switchPage("launch");
-                break;
-              }
-            case F2:
-              {
-                this.switchPage("instances");
-                break;
-              }
-            case F3:
-              {
-                this.openInstanceSettings("overview");
-                break;
-              }
-            case F4:
-              {
-                this.openInstanceSettings("mods");
-                break;
-              }
-            case F5:
-              {
-                this.switchPage("download");
-                break;
-              }
-            case F6:
-              {
-                this.switchPage("settings");
-                break;
-              }
-            case F7:
-              {
-                this.switchPage("tools");
-                break;
-              }
-            case F8:
-              {
-                this.switchPage("settings");
-                if (this.settingsPanel == null) break;
-                this.settingsPanel.openTab("查看日志");
-                break;
-              }
-            case F9:
-              {
-                this.switchPage("launch");
-                this.applyLogExpanded(!this.logExpanded);
-                break;
-              }
-          }
-        });
+    this.installDragAndDrop(scene);
+    this.installStageBounds(stage);
+    this.installKeyBindings(scene, stage);
     try {
       URL cssUrl = HelloApplication.class.getResource("/com/example/demo/app.css");
       if (cssUrl != null) {
