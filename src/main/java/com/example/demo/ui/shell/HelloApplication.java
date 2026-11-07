@@ -5179,7 +5179,9 @@ private static void setFlexible(Node node, boolean on) {
                       LaunchCompatibility.firstBlocking(issues);
                   if (blocker != null) {
                     this.logLine("⛔ 启动已取消：" + blocker.message());
-                    this.showLaunchFailureHint("启动已取消：" + blocker.message());
+                    InAppDialog.alert(
+                        "启动失败",
+                        "启动已取消：" + blocker.message() + "\n\n修正后可直接重试启动。");
                     this.launchBtn.setDisable(false);
                     this.finishLaunching();
                     return;
