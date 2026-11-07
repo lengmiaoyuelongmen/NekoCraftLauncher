@@ -1329,7 +1329,8 @@ private static void setFlexible(Node node, boolean on) {
   }
 
   /** 启动页右列：日志区、下载状态条、概览、命令栏与控制台容器。 */
-  private VBox createConsoleSection() {
+  /** 日志区：只读文本框 + 右下角刷新按钮（重新拉版本列表）。 */
+  private void createLogPane() {
     this.logArea = new TextArea();
     // 下载器的源站提示（慢源切换、CDN 源站错误）直接写进日志
     DownloadManager.setMessageSink(this::logLine);
@@ -1390,6 +1391,33 @@ private static void setFlexible(Node node, boolean on) {
     VBox.setVgrow(this.logPane, Priority.ALWAYS);
     this.logPane.setMinHeight(0.0);
     this.logArea.setMinHeight(0.0);
+  }
+
+  /** 启动概览：面板本体 + 透明滚动容器。 */
+  private void createOverviewPane() {
+    this.launchOverviewPane =
+        new LaunchOverviewPane(
+            this.config,
+            this::currentInstanceId,
+            () -> this.switchPage("instances"),
+            () -> this.openInstanceSettings("overview"),
+            () -> this.switchPage("download"),
+            () -> this.switchPage("advisor"));
+    this.launchOverviewScroll = new javafx.scene.control.ScrollPane(this.launchOverviewPane);
+    this.launchOverviewScroll.setFitToWidth(true);
+    this.launchOverviewScroll.setHbarPolicy(
+        javafx.scene.control.ScrollPane.ScrollBarPolicy.NEVER);
+    this.launchOverviewScroll.setVbarPolicy(
+        javafx.scene.control.ScrollPane.ScrollBarPolicy.AS_NEEDED);
+    this.launchOverviewScroll.setMinHeight(0.0);
+    this.launchOverviewScroll.setStyle(
+        "-fx-background: transparent; -fx-background-color: transparent;"
+            + " -fx-border-color: transparent; -fx-padding: 0;");
+    VBox.setVgrow(this.launchOverviewScroll, Priority.ALWAYS);
+  }
+
+  private VBox createConsoleSection() {
+    this.createLogPane();
     this.consoleToolbar =
         new ConsoleToolbar(
             new ConsoleToolbar.Host() {
@@ -1423,25 +1451,7 @@ private static void setFlexible(Node node, boolean on) {
               }
             });
     this.logToggle = this.consoleToolbar.toggleButton();
-    this.launchOverviewPane =
-        new LaunchOverviewPane(
-            this.config,
-            this::currentInstanceId,
-            () -> this.switchPage("instances"),
-            () -> this.openInstanceSettings("overview"),
-            () -> this.switchPage("download"),
-            () -> this.switchPage("advisor"));
-    this.launchOverviewScroll = new javafx.scene.control.ScrollPane(this.launchOverviewPane);
-    this.launchOverviewScroll.setFitToWidth(true);
-    this.launchOverviewScroll.setHbarPolicy(
-        javafx.scene.control.ScrollPane.ScrollBarPolicy.NEVER);
-    this.launchOverviewScroll.setVbarPolicy(
-        javafx.scene.control.ScrollPane.ScrollBarPolicy.AS_NEEDED);
-    this.launchOverviewScroll.setMinHeight(0.0);
-    this.launchOverviewScroll.setStyle(
-        "-fx-background: transparent; -fx-background-color: transparent;"
-            + " -fx-border-color: transparent; -fx-padding: 0;");
-    VBox.setVgrow(this.launchOverviewScroll, Priority.ALWAYS);
+    this.createOverviewPane();
     this.logActionsBar = this.consoleToolbar.node();
     this.commandBar = new CommandBar(this.config, this::handleCommandInput, this::onAiModeToggled);
     HBox commandBar = this.commandBar;
