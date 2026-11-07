@@ -5038,6 +5038,84 @@ private static void setFlexible(Node node, boolean on) {
   /** 启动前的环境准备结果：authlib-injector 文件（离线登录为 null）+ 选好的 java.exe。 */
   private record LaunchEnv(File injector, String javaPath) {}
 
+  /** 环境就绪后组启动命令并 spawn（在 JavaFX 线程上执行）。 */
+  private void launchWithEnv(
+      VersionProfile profile, File gameDir, boolean isolated, File nativesDir, LaunchEnv env) {
+                try {
+                  String javaPath = env.javaPath();
+                  int actual = this.javaMajorVersion(javaPath);
+                  int required = profile.getJavaMajorVersion();
+                  if (actual > 0 && actual < required) {
+                    this.logArea.appendText(
+                        "⚠️ 该版本需要 Java "
+                            + required
+                            + "，当前用的是 Java "
+                            + actual
+                            + "，大概率会崩；可在「设置」里指定 Java 路径\n");
+                  } else if (actual > 0) {
+                    this.logArea.appendText("☕ Java " + actual + "（需要 " + required + "）\n");
+                  }
+                  InstanceSettings.Settings override =
+                      InstanceSettings.get(gameDir, profile.getId());
+                  LauncherConfig launchConfig =
+                      this.config.copyForLaunch(
+                          override.memoryMb(),
+                          override.jvmArgs(),
+                          override.javaPath(),
+                          override.gameArgs());
+                  if (!override.isEmpty()) {
+                    this.logArea.appendText(
+                        "🎛 使用实例级启动设置"
+                            + (override.memoryMb() != null
+                                ? "（内存 " + override.memoryMb() + " MB）"
+                                : "")
+                            + (override.jvmArgs() != null && !override.jvmArgs().isBlank()
+                                ? "（JVM 参数）"
+                                : "")
+                            + (override.javaPath() != null && !override.javaPath().isBlank()
+                                ? "（Java 路径）"
+                                : "")
+                            + "\n");
+                  }
+                  if (this.config.isSmartPerformance()) {
+                    PerformanceTuner.Plan plan =
+                        PerformanceTuner.plan(launchConfig.getMemoryMb());
+                    launchConfig.setJvmArgs(
+                        PerformanceTuner.merge(launchConfig.getJvmArgs(), plan.jvmArgs()));
+                    this.logArea.appendText("⚡ 智能性能：" + plan.summary() + "\n");
+                  }
+                  File instanceDir =
+                      InstanceDirs.root(gameDir, profile.getId(), isolated);
+                  this.ensureChineseLanguage(instanceDir);
+                  LaunchPlan plan =
+                      LaunchPlanner.plan(
+                          profile,
+                          this.currentSession,
+                          launchConfig,
+                          gameDir,
+                          instanceDir,
+                          javaPath,
+                          nativesDir,
+                          env.injector());
+                  if (this.pendingJoinAddress != null && !this.pendingJoinAddress.isBlank()) {
+                    ServerAddress join = ServerAddress.parse(this.pendingJoinAddress);
+                    this.pendingJoinAddress = null;
+                    if (join != null) {
+                      plan = plan.append(join.launchArguments());
+                    }
+                  }
+                  this.gameInstanceId = profile.getId();
+                  this.gameStartAt = System.currentTimeMillis();
+                  this.startProcess(plan);
+                } catch (Exception e) {
+                  this.logArea.appendText("❌ 启动失败: " + e.getMessage() + "\n");
+                  this.showLaunchFailureHint("启动失败: " + e.getMessage());
+                  this.launchBtn.setDisable(false);
+                  // 必须复位，否则「正在运行」会一直挂着、后面再也启动不了
+                  this.finishLaunching();
+                }
+  }
+
   private void startGame(VersionProfile profile) {
     // 准备阶段是异步的，落地前再确认一次，避免并发准备出两个进程
     if (this.isGameProcessAlive()) {
@@ -5082,79 +5160,7 @@ private static void setFlexible(Node node, boolean on) {
             env ->
                 Platform.runLater(
                     () -> {
-                      try {
-                        String javaPath = env.javaPath();
-                        int actual = this.javaMajorVersion(javaPath);
-                        int required = profile.getJavaMajorVersion();
-                        if (actual > 0 && actual < required) {
-                          this.logArea.appendText(
-                              "⚠️ 该版本需要 Java "
-                                  + required
-                                  + "，当前用的是 Java "
-                                  + actual
-                                  + "，大概率会崩；可在「设置」里指定 Java 路径\n");
-                        } else if (actual > 0) {
-                          this.logArea.appendText("☕ Java " + actual + "（需要 " + required + "）\n");
-                        }
-                        InstanceSettings.Settings override =
-                            InstanceSettings.get(gameDir, profile.getId());
-                        LauncherConfig launchConfig =
-                            this.config.copyForLaunch(
-                                override.memoryMb(),
-                                override.jvmArgs(),
-                                override.javaPath(),
-                                override.gameArgs());
-                        if (!override.isEmpty()) {
-                          this.logArea.appendText(
-                              "🎛 使用实例级启动设置"
-                                  + (override.memoryMb() != null
-                                      ? "（内存 " + override.memoryMb() + " MB）"
-                                      : "")
-                                  + (override.jvmArgs() != null && !override.jvmArgs().isBlank()
-                                      ? "（JVM 参数）"
-                                      : "")
-                                  + (override.javaPath() != null && !override.javaPath().isBlank()
-                                      ? "（Java 路径）"
-                                      : "")
-                                  + "\n");
-                        }
-                        if (this.config.isSmartPerformance()) {
-                          PerformanceTuner.Plan plan =
-                              PerformanceTuner.plan(launchConfig.getMemoryMb());
-                          launchConfig.setJvmArgs(
-                              PerformanceTuner.merge(launchConfig.getJvmArgs(), plan.jvmArgs()));
-                          this.logArea.appendText("⚡ 智能性能：" + plan.summary() + "\n");
-                        }
-                        File instanceDir =
-                            InstanceDirs.root(gameDir, profile.getId(), isolated);
-                        this.ensureChineseLanguage(instanceDir);
-                        LaunchPlan plan =
-                            LaunchPlanner.plan(
-                                profile,
-                                this.currentSession,
-                                launchConfig,
-                                gameDir,
-                                instanceDir,
-                                javaPath,
-                                nativesDir,
-                                env.injector());
-                        if (this.pendingJoinAddress != null && !this.pendingJoinAddress.isBlank()) {
-                          ServerAddress join = ServerAddress.parse(this.pendingJoinAddress);
-                          this.pendingJoinAddress = null;
-                          if (join != null) {
-                            plan = plan.append(join.launchArguments());
-                          }
-                        }
-                        this.gameInstanceId = profile.getId();
-                        this.gameStartAt = System.currentTimeMillis();
-                        this.startProcess(plan);
-                      } catch (Exception e) {
-                        this.logArea.appendText("❌ 启动失败: " + e.getMessage() + "\n");
-                        this.showLaunchFailureHint("启动失败: " + e.getMessage());
-                        this.launchBtn.setDisable(false);
-                        // 必须复位，否则「正在运行」会一直挂着、后面再也启动不了
-                        this.finishLaunching();
-                      }
+                        this.launchWithEnv(profile, gameDir, isolated, nativesDir, env);
                     }))
         .exceptionally(
             ex -> {
@@ -5854,6 +5860,21 @@ private static void setFlexible(Node node, boolean on) {
   }
 
   /** 用户选定版本后真正开始下载/安装。 */
+  /** 从版本的文件列表里挑主文件（没有 primary 就取第一个）。 */
+  private static JsonObject pickPrimaryFile(JsonArray files) {
+    JsonObject targetFile = null;
+    for (int i = 0; i < files.size(); ++i) {
+      JsonObject file = files.get(i).getAsJsonObject();
+      if (!file.has("primary") || !file.get("primary").getAsBoolean()) continue;
+      targetFile = file;
+      break;
+    }
+    if (targetFile == null) {
+      targetFile = files.get(0).getAsJsonObject();
+    }
+    return targetFile;
+  }
+
   private void downloadChosenVersion(
       String projectTitle, String projectType, JsonArray arr, int chosen) {
 JsonObject latestVersion = arr.get(chosen).getAsJsonObject();
@@ -5861,16 +5882,7 @@ String versionName = latestVersion.get("version_number").getAsString();
 JsonArray files = latestVersion.getAsJsonArray("files");
 if (files != null && files.size() > 0) {
   File targetDir;
-  JsonObject targetFile = null;
-  for (int i = 0; i < files.size(); ++i) {
-    JsonObject file = files.get(i).getAsJsonObject();
-    if (!file.has("primary") || !file.get("primary").getAsBoolean()) continue;
-    targetFile = file;
-    break;
-  }
-  if (targetFile == null) {
-    targetFile = files.get(0).getAsJsonObject();
-  }
+    JsonObject targetFile = pickPrimaryFile(files);
   String downloadUrl = targetFile.get("url").getAsString();
   String fileName = targetFile.get("filename").getAsString();
   long fileSize = targetFile.get("size").getAsLong() / 1024L;
