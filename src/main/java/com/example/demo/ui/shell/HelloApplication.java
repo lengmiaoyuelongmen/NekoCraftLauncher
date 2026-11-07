@@ -585,11 +585,47 @@ public class HelloApplication extends Application {
       rootWrap.getChildren().add(this.dropOverlay);
   }
 
+  /** 主布局：内容区（启动页 + 下载页 + 环境背景）与外层 VBox。 */
+  private VBox buildLayout(HBox topBar) {
+    this.contentStack = new StackPane();
+    this.contentStack.setAlignment(Pos.TOP_LEFT);
+    this.launchPanel = this.createLaunchPanel();
+    this.downloadPanel = this.createDownloadPanel();
+    this.downloadPanel.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+    this.pages.put("launch", this.launchPanel);
+    this.pages.put("download", this.downloadPanel);
+    this.launchPanel.setId("launch-root");
+    this.applyLaunchBackground();
+    this.launchPanel.setMaxWidth(Double.MAX_VALUE);
+    this.launchPanel.setMaxHeight(Double.MAX_VALUE);
+    this.downloadPanel.setMaxWidth(Double.MAX_VALUE);
+    this.downloadPanel.setMaxHeight(Double.MAX_VALUE);
+    this.downloadPanel.setVisible(false);
+    this.downloadPanel.setOpacity(0.0);
+    AmbientBackground ambient = new AmbientBackground();
+    this.ambientBackground = ambient;
+    ambient.setManaged(false);
+    ambient.widthProperty().bind(this.contentStack.widthProperty());
+    ambient.heightProperty().bind(this.contentStack.heightProperty());
+    this.contentStack.getChildren().add(ambient);
+    this.contentStack.getChildren().addAll(this.launchPanel, this.downloadPanel);
+    this.rootPane = new VBox(topBar, this.contentStack);
+    VBox root = this.rootPane;
+    VBox.setVgrow(this.contentStack, Priority.ALWAYS);
+    this.contentStack.setMinSize(0.0, 0.0);
+    root.setStyle(
+        "-fx-background-color: linear-gradient(to bottom, -app-root-1 0%, -app-root-2 32%,"
+            + " -app-root-3 100%); -fx-background-radius: 16; -fx-border-width: 0;"
+            + " -fx-background-insets: 0;");
+    root.setMinSize(0.0, 0.0);
+    root.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+    return root;
+  }
+
   public void start(Stage stage) {
     List<MinecraftVersion> cachedVersions;
-    VBox root;
-    AmbientBackground ambient;
     this.stageRef = stage;
+    this.primaryStage = stage;
     File bootstrapGameDir = this.resolveGameDir();
     Bootstrap.ensureGameDir(bootstrapGameDir, null);
     if (!SingleInstance.acquire(bootstrapGameDir)) {
@@ -624,37 +660,7 @@ public class HelloApplication extends Application {
     Theme.setLight(this.config.isLightTheme());
     Motion.configure(this.config.isAnimations(), this.config.getAnimationSpeed());
     HBox topBar = this.createTopBar();
-    this.contentStack = new StackPane();
-    this.contentStack.setAlignment(Pos.TOP_LEFT);
-    this.launchPanel = this.createLaunchPanel();
-    this.downloadPanel = this.createDownloadPanel();
-    this.downloadPanel.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-    this.pages.put("launch", this.launchPanel);
-    this.pages.put("download", this.downloadPanel);
-    this.launchPanel.setId("launch-root");
-    this.applyLaunchBackground();
-    this.launchPanel.setMaxWidth(Double.MAX_VALUE);
-    this.launchPanel.setMaxHeight(Double.MAX_VALUE);
-    this.downloadPanel.setMaxWidth(Double.MAX_VALUE);
-    this.downloadPanel.setMaxHeight(Double.MAX_VALUE);
-    this.downloadPanel.setVisible(false);
-    this.downloadPanel.setOpacity(0.0);
-    this.ambientBackground = ambient = new AmbientBackground();
-    ambient.setManaged(false);
-    ambient.widthProperty().bind(this.contentStack.widthProperty());
-    ambient.heightProperty().bind(this.contentStack.heightProperty());
-    this.contentStack.getChildren().add(ambient);
-    this.contentStack.getChildren().addAll(this.launchPanel, this.downloadPanel);
-    this.primaryStage = stage;
-    this.rootPane = root = new VBox(topBar, this.contentStack);
-    VBox.setVgrow(this.contentStack, Priority.ALWAYS);
-    this.contentStack.setMinSize(0.0, 0.0);
-    root.setStyle(
-        "-fx-background-color: linear-gradient(to bottom, -app-root-1 0%, -app-root-2 32%,"
-            + " -app-root-3 100%); -fx-background-radius: 16; -fx-border-width: 0;"
-            + " -fx-background-insets: 0;");
-    root.setMinSize(0.0, 0.0);
-    root.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+    VBox root = this.buildLayout(topBar);
     Rectangle resizeGrip = new Rectangle(18.0, 18.0, javafx.scene.paint.Color.web("#ffffff", 0.1));
     resizeGrip.setArcWidth(6.0);
     resizeGrip.setArcHeight(6.0);
@@ -846,10 +852,14 @@ public class HelloApplication extends Application {
         .iconifiedProperty()
         .addListener(
             (obs, was, iconified) -> {
+              AmbientBackground background = this.ambientBackground;
+              if (background == null) {
+                return;
+              }
               if (iconified.booleanValue()) {
-                ambient.stop();
+                background.stop();
               } else if (!this.launchState.isRunning() || !this.config.isPauseVisualsInGame()) {
-                ambient.start();
+                background.start();
               }
             });
     BootScreen boot =
