@@ -3524,6 +3524,161 @@ private static void setFlexible(Node node, boolean on) {
     return count;
   }
 
+  /** 一次导入尝试里会变动的中间状态（重试时重新创建）。 */
+  private static final class ImportState {
+    File staging;
+    String instanceId;
+    String createdInstance;
+    int fileCount;
+  }
+
+  /** 一次导入尝试：解析整合包、准备版本/加载器、解包并落盘。 */
+  private void runImportAttempt(
+      int attempt,
+      File archive,
+      File gameDir,
+      InstallProgressPage window,
+      Consumer<String> sink,
+      java.util.Set<String> versionsBefore,
+      Runnable stopDlListener,
+      ImportState state)
+      throws Exception {
+    ModpackImport.Pack pack = null;
+    if (attempt > 1) {
+      sink.accept("♻ 上次安装失败，正在重新安装（第 " + attempt + " 次）…");
+      Platform.runLater(
+          () -> {
+            window.setStep(0, "run");
+            window.setStep(1, "idle");
+            window.setStep(2, "idle");
+            window.setStep(3, "idle");
+            window.setStep(4, "idle");
+            window.setProgress(-1);
+          });
+    }
+
+    pack = ModpackImport.inspect(archive);
+    this.checkImportCancelled();
+    sink.accept(
+        "名称: "
+            + pack.name()
+            + "  |  格式: "
+            + pack.format()
+            + "  |  游戏: "
+            + (pack.gameVersion().isBlank() ? "未声明" : pack.gameVersion())
+            + (pack.hasLoader()
+                ? "  |  " + pack.loader() + " " + pack.loaderVersion()
+                : "  |  原版"));
+    Platform.runLater(() -> window.setStep(0, "ok"));
+
+    if (!pack.gameVersion().isBlank()) {
+      Platform.runLater(() -> window.setStep(1, "run"));
+      final String wantedGame = pack.gameVersion();
+      // 已经装过同一个「MC 版本 + 加载器」就直接复用，避免重复导入时重新下载游戏与加载器
+      String preinstalled =
+          this.findInstalledInstance(
+              gameDir, pack.gameVersion(), pack.loader(), pack.loaderVersion());
+      MinecraftVersion mc =
+          this.allMinecraftVersions.stream()
+              .filter(v -> v.getId().equals(wantedGame))
+              .findFirst()
+              .orElse(null);
+      if (preinstalled != null) {
+        state.instanceId = preinstalled;
+        sink.accept("✔ 已存在实例 " + preinstalled + "，跳过游戏/加载器下载");
+        Platform.runLater(() -> window.setStep(1, "ok"));
+      } else if (mc == null) {
+        sink.accept("⚠ 版本清单里没有 " + pack.gameVersion() + "，改为导入到已有实例");
+        Platform.runLater(() -> window.setStep(1, "skip"));
+      } else {
+        this.ensureInstalled(mc.getId(), mc.getUrl(), this::logLine);
+        state.instanceId = mc.getId();
+        Platform.runLater(() -> window.setStep(1, "ok"));
+      }
+    } else {
+      sink.accept("整合包里没有声明游戏版本，需要选择一个已有实例");
+      Platform.runLater(() -> window.setStep(1, "skip"));
+    }
+
+    // 没有可用实例时（无版本清单 / 包没声明版本），让用户从已安装实例里选一个
+    if (state.instanceId == null) {
+      state.instanceId = this.askImportTarget(pack.name());
+      if (state.instanceId == null) {
+        throw new ImportCancelledException();
+      }
+      Platform.runLater(() -> window.setStep(1, "ok"));
+    }
+
+    if (pack.hasLoader() && pack.gameVersion().isBlank()) {
+      Platform.runLater(() -> window.setStep(2, "skip"));
+    } else if (pack.hasLoader() && !this.hasLoaderFor(gameDir, state.instanceId, pack.loader())) {
+      Platform.runLater(() -> window.setStep(2, "run"));
+      String mcTarget = state.instanceId;
+      MinecraftVersion mc =
+          this.allMinecraftVersions.stream()
+              .filter(v -> v.getId().equals(mcTarget))
+              .findFirst()
+              .orElse(null);
+      String mcId = mc == null ? state.instanceId : mc.getId();
+      String javaPath = this.loaderJava(gameDir, pack.loader());
+      state.instanceId =
+          switch (pack.loader()) {
+            case "fabric" ->
+                LoaderInstaller.installFabric(
+                        gameDir, mcId, pack.loaderVersion(), sink)
+                    .get();
+            case "quilt" ->
+                LoaderInstaller.installQuilt(
+                        gameDir, mcId, pack.loaderVersion(), sink)
+                    .get();
+            case "forge" ->
+                LoaderInstaller.installForge(
+                        gameDir, mcId, javaPath, pack.loaderVersion(), sink)
+                    .get();
+            case "neoforge" ->
+                LoaderInstaller.installNeoForge(
+                        gameDir, mcId, javaPath, pack.loaderVersion(), sink)
+                    .get();
+            default -> mcId;
+          };
+      if (!versionsBefore.contains(state.instanceId)) {
+        state.createdInstance = state.instanceId;
+      }
+      Platform.runLater(() -> window.setStep(2, "ok"));
+    } else {
+      Platform.runLater(() -> window.setStep(2, "skip"));
+    }
+
+    File target = InstanceDirs.root(gameDir, state.instanceId, true);
+    File stageRoot = new File(gameDir, "cache");
+    stageRoot.mkdirs();
+    state.staging =
+        java.nio.file.Files.createTempDirectory(stageRoot.toPath(), "modpack-").toFile();
+    state.fileCount =
+        this.installPackInto(
+            archive, gameDir, state.instanceId, pack, window, sink, state.staging, state.createdInstance != null);
+
+    String importedId = state.instanceId;
+    String packName = pack.name();
+    int installedFiles = state.fileCount;
+    Platform.runLater(
+        () -> {
+          stopDlListener.run();
+          window.clearDownload();
+          window.setStep(4, "ok");
+          window.finish(
+              true, "安装完成，共 " + installedFiles + " 个文件，点左上角「返回」去实例列表");
+          this.refreshInstalledVersions();
+          Toast.ok("已导入整合包: " + packName);
+          this.config.setLastInstance(importedId);
+          this.config.save();
+          if (this.instancesPanel != null) {
+            this.instancesPanel.setSelectedId(importedId);
+          }
+        });
+    return;
+  }
+
   private void runImportAsync(File archive, InstallProgressPage window) {
     // 把下载器的实时状态接到页面的「下载进度」条上（文件数 / 字节 / 速度 / 当前文件）
     final java.util.function.Consumer<DownloadManager.Status> dlListener =
@@ -3565,149 +3720,13 @@ private static void setFlexible(Node node, boolean on) {
               new java.util.HashSet<>(VersionProfile.installedIds(gameDir));
 
           for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-            File staging = null;
-            String instanceId = null;
-            String createdInstance = null;
-            ModpackImport.Pack pack = null;
-            int fileCount = 0;
+            ImportState state = new ImportState();
             try {
-              if (attempt > 1) {
-                sink.accept("♻ 上次安装失败，正在重新安装（第 " + attempt + " 次）…");
-                Platform.runLater(
-                    () -> {
-                      window.setStep(0, "run");
-                      window.setStep(1, "idle");
-                      window.setStep(2, "idle");
-                      window.setStep(3, "idle");
-                      window.setStep(4, "idle");
-                      window.setProgress(-1);
-                    });
-              }
-
-              pack = ModpackImport.inspect(archive);
-              this.checkImportCancelled();
-              sink.accept(
-                  "名称: "
-                      + pack.name()
-                      + "  |  格式: "
-                      + pack.format()
-                      + "  |  游戏: "
-                      + (pack.gameVersion().isBlank() ? "未声明" : pack.gameVersion())
-                      + (pack.hasLoader()
-                          ? "  |  " + pack.loader() + " " + pack.loaderVersion()
-                          : "  |  原版"));
-              Platform.runLater(() -> window.setStep(0, "ok"));
-
-              if (!pack.gameVersion().isBlank()) {
-                Platform.runLater(() -> window.setStep(1, "run"));
-                final String wantedGame = pack.gameVersion();
-                // 已经装过同一个「MC 版本 + 加载器」就直接复用，避免重复导入时重新下载游戏与加载器
-                String preinstalled =
-                    this.findInstalledInstance(
-                        gameDir, pack.gameVersion(), pack.loader(), pack.loaderVersion());
-                MinecraftVersion mc =
-                    this.allMinecraftVersions.stream()
-                        .filter(v -> v.getId().equals(wantedGame))
-                        .findFirst()
-                        .orElse(null);
-                if (preinstalled != null) {
-                  instanceId = preinstalled;
-                  sink.accept("✔ 已存在实例 " + preinstalled + "，跳过游戏/加载器下载");
-                  Platform.runLater(() -> window.setStep(1, "ok"));
-                } else if (mc == null) {
-                  sink.accept("⚠ 版本清单里没有 " + pack.gameVersion() + "，改为导入到已有实例");
-                  Platform.runLater(() -> window.setStep(1, "skip"));
-                } else {
-                  this.ensureInstalled(mc.getId(), mc.getUrl(), this::logLine);
-                  instanceId = mc.getId();
-                  Platform.runLater(() -> window.setStep(1, "ok"));
-                }
-              } else {
-                sink.accept("整合包里没有声明游戏版本，需要选择一个已有实例");
-                Platform.runLater(() -> window.setStep(1, "skip"));
-              }
-
-              // 没有可用实例时（无版本清单 / 包没声明版本），让用户从已安装实例里选一个
-              if (instanceId == null) {
-                instanceId = this.askImportTarget(pack.name());
-                if (instanceId == null) {
-                  throw new ImportCancelledException();
-                }
-                Platform.runLater(() -> window.setStep(1, "ok"));
-              }
-
-              if (pack.hasLoader() && pack.gameVersion().isBlank()) {
-                Platform.runLater(() -> window.setStep(2, "skip"));
-              } else if (pack.hasLoader() && !this.hasLoaderFor(gameDir, instanceId, pack.loader())) {
-                Platform.runLater(() -> window.setStep(2, "run"));
-                String mcTarget = instanceId;
-                MinecraftVersion mc =
-                    this.allMinecraftVersions.stream()
-                        .filter(v -> v.getId().equals(mcTarget))
-                        .findFirst()
-                        .orElse(null);
-                String mcId = mc == null ? instanceId : mc.getId();
-                String javaPath = this.loaderJava(gameDir, pack.loader());
-                instanceId =
-                    switch (pack.loader()) {
-                      case "fabric" ->
-                          LoaderInstaller.installFabric(
-                                  gameDir, mcId, pack.loaderVersion(), sink)
-                              .get();
-                      case "quilt" ->
-                          LoaderInstaller.installQuilt(
-                                  gameDir, mcId, pack.loaderVersion(), sink)
-                              .get();
-                      case "forge" ->
-                          LoaderInstaller.installForge(
-                                  gameDir, mcId, javaPath, pack.loaderVersion(), sink)
-                              .get();
-                      case "neoforge" ->
-                          LoaderInstaller.installNeoForge(
-                                  gameDir, mcId, javaPath, pack.loaderVersion(), sink)
-                              .get();
-                      default -> mcId;
-                    };
-                if (!versionsBefore.contains(instanceId)) {
-                  createdInstance = instanceId;
-                }
-                Platform.runLater(() -> window.setStep(2, "ok"));
-              } else {
-                Platform.runLater(() -> window.setStep(2, "skip"));
-              }
-
-              File target = InstanceDirs.root(gameDir, instanceId, true);
-              File stageRoot = new File(gameDir, "cache");
-              stageRoot.mkdirs();
-              staging =
-                  java.nio.file.Files.createTempDirectory(stageRoot.toPath(), "modpack-").toFile();
-              fileCount =
-                  this.installPackInto(
-                      archive, gameDir, instanceId, pack, window, sink, staging, createdInstance != null);
-
-              String importedId = instanceId;
-              String packName = pack.name();
-              int installedFiles = fileCount;
-              Platform.runLater(
-                  () -> {
-                    stopDlListener.run();
-                    window.clearDownload();
-                    window.setStep(4, "ok");
-                    window.finish(
-                        true, "安装完成，共 " + installedFiles + " 个文件，点左上角「返回」去实例列表");
-                    this.refreshInstalledVersions();
-                    Toast.ok("已导入整合包: " + packName);
-                    this.config.setLastInstance(importedId);
-                    this.config.save();
-                    if (this.instancesPanel != null) {
-                      this.instancesPanel.setSelectedId(importedId);
-                    }
-                  });
-              return;
+              this.runImportAttempt(attempt, archive, gameDir, window, sink, versionsBefore, stopDlListener, state);
             } catch (ImportCancelledException cancelled) {
               this.importCancelled = false;
-              deleteTree(staging);
-              rollbackCreatedInstance(gameDir, instanceId, createdInstance);
+              deleteTree(state.staging);
+              rollbackCreatedInstance(gameDir, state.instanceId, state.createdInstance);
               Platform.runLater(
                   () -> {
                     stopDlListener.run();
@@ -3716,7 +3735,7 @@ private static void setFlexible(Node node, boolean on) {
                   });
               return;
             } catch (Exception e) {
-              deleteTree(staging);
+              deleteTree(state.staging);
               String message = rootMessage(e);
               this.logLine("❌ 第 " + attempt + " 次安装失败: " + message);
               for (Throwable cause = e.getCause(); cause != null; cause = cause.getCause()) {
@@ -3724,7 +3743,7 @@ private static void setFlexible(Node node, boolean on) {
                   this.logLine("   ↳ " + cause.getMessage());
                 }
               }
-              rollbackCreatedInstance(gameDir, instanceId, createdInstance);
+              rollbackCreatedInstance(gameDir, state.instanceId, state.createdInstance);
               if (attempt >= maxAttempts) {
                 String hint = importFailureHint(message);
                 this.logLine("❌ 导入失败: " + message + (hint.isEmpty() ? "" : "（" + hint + "）"));
