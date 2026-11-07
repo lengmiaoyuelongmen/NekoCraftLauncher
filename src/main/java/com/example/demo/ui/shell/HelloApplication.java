@@ -3196,13 +3196,7 @@ private static void setFlexible(Node node, boolean on) {
   }
 
   private String installDirFor(String projectType) {
-    return switch (projectType) {
-      case "模组" -> "mods";
-      case "资源包" -> "resourcepacks";
-      case "光影包" -> "shaderpacks";
-      case "数据包" -> "datapacks";
-      default -> "downloads/modpack";
-    };
+    return ProjectFormat.installDir(projectType);
   }
 
   private final StringBuilder logBuffer = new StringBuilder();
@@ -5917,7 +5911,7 @@ if (files != null && files.size() > 0) {
   }
   File saveFile = new File(targetDir, fileName);
   boolean isModpack =
-      fileName.toLowerCase(Locale.ROOT).endsWith(".mrpack") || "整合包".equals(projectType);
+      fileName.toLowerCase(Locale.ROOT).endsWith(".mrpack") || ProjectFormat.isModpack(projectType);
   InstallProgressPage downloadPage = null;
   java.util.function.Consumer<DownloadManager.Status> dlListener = null;
   if (isModpack) {

@@ -831,13 +831,27 @@ clean package     0 告警
 建顶栏 → 建内容区 → 建页面 → 装拖放层 → 建 Scene → 装快捷键 → 显示窗口 → 起后台任务。
 继续拆它们需要引入「窗口装配器」这层抽象，收益低于风险，暂不处理。
 
-### 本轮没拿到运行时证据的路径
+### 运行时验证（2026-11-07 18:00 补齐）
 
-这几处只经过编译与冒烟，**没有真跑游戏 / 真下载整合包**：
+先前没有运行时证据的几条路径，已经用真机跑过：
 
-- `handleGameExit`（游戏退出后的时长、启动历史、崩溃报告）——需要真实启动一次 Minecraft；
-- `launchWithEnv`（组启动命令并 spawn）——同上；
-- `downloadChosenVersion`（版本下载与安装到实例）——需要一次完整下载；
-- `FavoritesRenderer` 的「有收藏」分支——这台机器上没有收藏项。
+- **启动 → 停止**：命令栏 `launch` 起 1.12.2（Java 8、authlib-injector），日志出现
+  `✅ 游戏进程已启动 (pid 3432)`、`⏱ 启动准备耗时 1.0 秒` 与 `[Game]` 转发；点顶栏
+  「结束游戏」后 `launch-history.json` 新增 `{instanceId:1.12.2, prepMs:1013,
+  sessionSeconds:91, stopped:true}`，`playtime.json` 的 1.12.2 从 102 → 193 秒，
+  概览从「22 次 · 55%」变成「23 次 · 57%」、最近一次显示「主动结束 · 准备 1.0s · 游戏 1 分」。
+- **FavoritesRenderer 有数据分支**：写入两条收藏后，收藏夹页显示「整合包（1）」
+  「模组（1）」两组与各自的下载量、星标、下载按钮。
+- **downloadChosenVersion**：从「数据包」分类下载 VeinMiner，日志打印下载地址与
+  `✅ 下载完成: ...\versions\1.12.2\datapacks\veinminer-neoforge-2.13.0.jar`。
+
+### 由此发现并修掉的真实 bug
+
+`installDirFor` 只判断中文类型（「模组」「数据包」…），而社区页传进来的是 Modrinth 的
+英文类型（`mod` / `datapack` …），于是**除整合包外的所有资源都被丢进
+`downloads/modpack`**，下载完成后的「已放入 xxx/」提示也永远不显示。
+
+修复：新增 `core.mod.ProjectFormat.installDir` / `isModpack`（中英文都认）并配 4 个单测，
+主类改用它们。复测：同一个数据包现在落在 `versions/1.12.2/datapacks/`。
 
 已记录的验证方式与证据截图保存在 `C:\Users\Administrator\.dsh\tmp\neko-verify\`（r17–r27）。
