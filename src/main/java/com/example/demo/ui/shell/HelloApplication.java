@@ -5147,6 +5147,22 @@ private static void setFlexible(Node node, boolean on) {
   private record LaunchEnv(File injector, String javaPath) {}
 
   /** 环境就绪后组启动命令并 spawn（在 JavaFX 线程上执行）。 */
+  /** classpath 里缺失的库文件数量（启动前判断能不能起来）。 */
+  private int missingLibraryCount(File gameDir, VersionProfile profile) {
+    File libraries = new File(gameDir, "libraries");
+    int missing = 0;
+    for (com.google.gson.JsonObject library : profile.classpathLibraries()) {
+      String path = VersionProfile.libraryPath(library);
+      if (path == null || path.isBlank()) {
+        continue;
+      }
+      if (!new File(libraries, path).isFile()) {
+        missing++;
+      }
+    }
+    return missing;
+  }
+
   /** 客户端 jar 是否就位（继承版本里 jar 在 rootId 目录下）。 */
   private boolean hasClientJar(File gameDir, VersionProfile profile) {
     String rootId = profile.getRootId();
@@ -5171,7 +5187,8 @@ private static void setFlexible(Node node, boolean on) {
                           actual,
                           javaPath,
                           this.hasClientJar(gameDir, profile),
-                          VersionProfile.isInstalled(gameDir, profile.getId()));
+                          VersionProfile.isInstalled(gameDir, profile.getId()),
+                          this.missingLibraryCount(gameDir, profile));
                   for (LaunchCompatibility.Issue issue : issues) {
                     this.logLine("⚠ " + issue.message());
                   }

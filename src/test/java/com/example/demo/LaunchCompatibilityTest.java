@@ -85,4 +85,27 @@ class LaunchCompatibilityTest {
         assertNull(LaunchCompatibility.firstBlocking(List.of()));
         assertEquals("", LaunchCompatibility.describe(null));
     }
+    @Test
+    void missingLibrariesBlockWithRepairHint() {
+        List<Issue> issues = LaunchCompatibility.check(8, 8, "java", true, true, 7);
+        Issue first = LaunchCompatibility.firstBlocking(issues);
+        assertEquals(Kind.MISSING_LIBRARIES, first.kind());
+        assertTrue(first.message().contains("7"));
+        assertTrue(first.message().contains("校验库文件"));
+    }
+
+    @Test
+    void noMissingLibrariesIsClean() {
+        assertTrue(LaunchCompatibility.check(8, 8, "java", true, true, 0).isEmpty());
+        assertTrue(LaunchCompatibility.check(8, 8, "java", true, true).isEmpty());
+    }
+
+    @Test
+    void libraryProblemIsListedTogetherWithOthers() {
+        List<Issue> issues = LaunchCompatibility.check(17, 8, "java", true, true, 2);
+        assertEquals(2, issues.size());
+        String text = LaunchCompatibility.describe(issues);
+        assertTrue(text.contains("Java 17"));
+        assertTrue(text.contains("2 个库文件"));
+    }
 }

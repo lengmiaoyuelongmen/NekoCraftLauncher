@@ -24,7 +24,8 @@ public final class LaunchCompatibility {
         JAVA_TOO_OLD,
         JAVA_UNKNOWN,
         CLIENT_JAR_MISSING,
-        VERSION_JSON_MISSING
+        VERSION_JSON_MISSING,
+        MISSING_LIBRARIES
     }
 
     /** 一条检查结果。 */
@@ -49,6 +50,21 @@ public final class LaunchCompatibility {
             String javaPath,
             boolean clientJarExists,
             boolean versionJsonExists) {
+        return check(requiredJava, actualJava, javaPath, clientJarExists, versionJsonExists, 0);
+    }
+
+    /**
+     * 带库文件缺失数量的完整检查。
+     *
+     * @param missingLibraries classpath 里不存在的库文件数量（&gt;0 时游戏起不来）
+     */
+    public static List<Issue> check(
+            int requiredJava,
+            int actualJava,
+            String javaPath,
+            boolean clientJarExists,
+            boolean versionJsonExists,
+            int missingLibraries) {
         List<Issue> issues = new ArrayList<>();
         if (!versionJsonExists) {
             issues.add(new Issue(Kind.VERSION_JSON_MISSING, Severity.BLOCK,
@@ -71,6 +87,10 @@ public final class LaunchCompatibility {
         if (!clientJarExists) {
             issues.add(new Issue(Kind.CLIENT_JAR_MISSING, Severity.BLOCK,
                     "缺少客户端 jar，可在「工具 → 百宝箱 → 校验库文件」里补齐"));
+        }
+        if (missingLibraries > 0) {
+            issues.add(new Issue(Kind.MISSING_LIBRARIES, Severity.BLOCK,
+                    "缺少 " + missingLibraries + " 个库文件，游戏无法启动；去「工具 → 百宝箱 → 校验库文件」自动补齐"));
         }
         return issues;
     }
