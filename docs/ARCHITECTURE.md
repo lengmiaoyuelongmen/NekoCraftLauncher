@@ -850,6 +850,26 @@ clean package     0 告警
 修复：只有新建实例才写名字，复用实例只更新描述。配 `InstanceMetaTest` 5 个用例，
 其中一条专门守住「null 名字不覆盖」。
 
+### 快捷键实测（2026-11-07 21:00）
+
+搬运 `installKeyBindings` 后按了一遍能按的快捷键：
+
+| 快捷键 | 结果 |
+|---|---|
+| Ctrl+K | ✅ 命令面板打开（11 条命令），Esc 关闭 |
+| Ctrl+Shift+0 | ✅ 窗口从 1060×830 变为 1060×792 并居中 |
+| F11 | ❌ **代码里没有 F11 处理**——`installKeyBindings` 只有 F1–F9 分支，之前汇报里写的「F11 全屏」是我记错了 |
+| F5 / F1–F9 | ⚠️ 合成按键（keybd_event）送不到 JavaFX 场景，实测按 F5 页面没切换；这些分支与 Ctrl+K 在同一个 `switch` 里，但没拿到运行时证据 |
+| 拖放安装模组 | ⚠️ 无法用脚本模拟 OLE 拖放，未验证 |
+
+结论：`installKeyBindings` 的搬运至少 Ctrl+K、Ctrl+Shift+0 两条路径确认可用；F 键分支需要真实键盘验证。
+
+### 收尾：控制台列再拆一层
+
+`createConsoleSection` 143 → 约 60 行：`createLogPane()`（只读日志框 + 刷新按钮）和
+`createOverviewPane()`（概览面板 + 透明滚动容器）。类里最长的方法现在是
+`start(Stage)` 138 行。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：
