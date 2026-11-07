@@ -38,6 +38,15 @@ public final class SearchSession {
         }
     }
 
+    /** 官方源与镜像的请求顺序：按页码奇偶交替。 */
+    public record Pair(String primary, String backup) {
+    }
+
+    public static Pair primaryBackup(String officialUrl, String mirrorUrl, int offset) {
+        boolean evenPage = Math.max(0, offset) / PAGE_SIZE % 2 == 0;
+        return evenPage ? new Pair(officialUrl, mirrorUrl) : new Pair(mirrorUrl, officialUrl);
+    }
+
     /** 还有没有下一页：总数未知（-1）时按“可能有”处理。 */
     public static boolean hasMore(int offset, int total) {
         return total < 0 || offset < total;

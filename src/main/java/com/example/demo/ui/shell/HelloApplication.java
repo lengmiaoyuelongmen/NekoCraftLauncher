@@ -242,6 +242,7 @@ import com.example.demo.core.launch.GameExit;
 import com.example.demo.core.launch.LaunchGuards;
 import com.example.demo.core.launch.LaunchState;
 import com.example.demo.core.download.ModrinthSearch;
+import com.example.demo.core.download.SearchFetcher;
 import com.example.demo.core.download.SearchSession;
 import com.example.demo.core.mod.ProjectFormat;
 import com.example.demo.core.model.InstanceId;
@@ -433,6 +434,7 @@ public class HelloApplication extends Application {
   private static final HttpClient httpClient =
       HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(15L)).build();
   private boolean isSearching = false;
+  private SearchFetcher searchFetcher;
   private static final Duration FAST_ANIM = Duration.millis(150.0);
   private static final Interpolator SMOOTH_INTERPOLATOR = Interpolator.SPLINE(0.25, 0.1, 0.25, 1.0);
   private final LauncherConfig config = LauncherConfig.load();
@@ -1871,7 +1873,7 @@ private static void setFlexible(Node node, boolean on) {
     String mirror =
         base.replace("https://api.modrinth.com/v2", "https://mod.mcimirror.top/modrinth/v2");
     this.logLine("🧩 正在搜索模组：" + query + "（当前实例 " + (mc == null ? "未知版本" : mc) + "）");
-    this.alternateSearchBodies(base, mirror, 0)
+    this.searchFetcher().alternate(base, mirror, 0)
         .orTimeout(10L, TimeUnit.SECONDS)
         .thenAccept(body -> Platform.runLater(() -> this.aiShowInstallChoice(query, body)))
         .exceptionally(
@@ -3190,7 +3192,7 @@ private static void setFlexible(Node node, boolean on) {
       boolean prepareIcons = true;
       String sourceUrl = prepareIcons ? mirrorUrl : url;
 
-      this.alternateSearchBodies(url, sourceUrl, type.equals("modpack") ? 40 : 0)
+      this.searchFetcher().alternate(url, sourceUrl, type.equals("modpack") ? 40 : 0)
           .thenAccept(
               body -> {
                 ArrayList<ModpackProject> projects = new ArrayList<ModpackProject>();
@@ -3296,6 +3298,14 @@ private static void setFlexible(Node node, boolean on) {
     return image;
   }
 
+  /** 搜索网络层（官方源与镜像交替）；第一次用到时创建。 */
+  private SearchFetcher searchFetcher() {
+    if (this.searchFetcher == null) {
+      this.searchFetcher = new SearchFetcher(httpClient, java.time.Duration.ofSeconds(8L));
+    }
+    return this.searchFetcher;
+  }
+
   private void performSearch() {
     List<ModpackProject> ready;
     String warmedType = this.apiProjectType();
@@ -3330,39 +3340,6 @@ private static void setFlexible(Node node, boolean on) {
     }
     this.resultView.status().showLoading("正在从 Modrinth 获取数据…（失败自动切 MCIM 镜像）");
     this.loadSearchPage(true);
-  }
-
-  private CompletableFuture<String> fetchSearchBody(String url) {
-    return CompletableFuture.supplyAsync(
-        () -> {
-          try {
-            HttpRequest req =
-                HttpRequest.newBuilder(URI.create(url))
-                    .header("User-Agent", "PCL-CE-Launcher/1.0")
-                    .GET()
-                    .timeout(java.time.Duration.ofSeconds(8L))
-                    .build();
-            HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
-            return resp.statusCode() == 200 ? resp.body() : null;
-          } catch (Exception e) {
-            return null;
-          }
-        });
-  }
-
-  private CompletableFuture<String> alternateSearchBodies(
-      String officialUrl, String mirrorUrl, int offset) {
-    boolean evenPage = Math.max(0, offset) / 40 % 2 == 0;
-    String primary = evenPage ? officialUrl : mirrorUrl;
-    String backup = evenPage ? mirrorUrl : officialUrl;
-    return this.fetchSearchBody(primary)
-        .thenCompose(
-            body -> {
-              if (body != null && body.startsWith("{")) {
-                return CompletableFuture.completedFuture(body);
-              }
-              return this.fetchSearchBody(backup);
-            });
   }
 
   private void prepareIconsAndRun(List<ModpackProject> projects, Runnable onReady) {
@@ -3454,7 +3431,7 @@ private static void setFlexible(Node node, boolean on) {
       String urlStr = ModrinthSearch.buildUrl(query, pType, gameVer, loader, sort, offset);
       String effectiveMirror = ModrinthSearch.mirrorUrl(urlStr, pType);
 
-      this.alternateSearchBodies(urlStr, effectiveMirror, offset)
+      this.searchFetcher().alternate(urlStr, effectiveMirror, offset)
           .orTimeout(10L, TimeUnit.SECONDS)
           .thenAccept(
               body ->

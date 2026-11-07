@@ -35,6 +35,25 @@ class SearchSessionTest {
     }
 
     @Test
+    void officialAndMirrorAlternateByPage() {
+        SearchSession.Pair first = SearchSession.primaryBackup("official", "mirror", 0);
+        assertEquals("official", first.primary());
+        assertEquals("mirror", first.backup());
+
+        // 第二页（offset = PAGE_SIZE）先问镜像
+        SearchSession.Pair second = SearchSession.primaryBackup("official", "mirror", SearchSession.PAGE_SIZE);
+        assertEquals("mirror", second.primary());
+        assertEquals("official", second.backup());
+
+        SearchSession.Pair third =
+                SearchSession.primaryBackup("official", "mirror", SearchSession.PAGE_SIZE * 2);
+        assertEquals("official", third.primary());
+
+        // 负偏移按第一页处理
+        assertEquals("official", SearchSession.primaryBackup("official", "mirror", -5).primary());
+    }
+
+    @Test
     void hasMoreHandlesUnknownTotal() {
         assertTrue(SearchSession.hasMore(0, -1), "总数未知时按可能有下一页处理");
         assertTrue(SearchSession.hasMore(40, 100));
