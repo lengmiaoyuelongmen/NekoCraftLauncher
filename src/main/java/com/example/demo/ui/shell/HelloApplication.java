@@ -213,6 +213,7 @@ import com.example.demo.ui.component.CrashReportDialog;
 import com.example.demo.ui.component.DownloadFilterBar;
 import com.example.demo.ui.component.DownloadNavItem;
 import com.example.demo.ui.component.DownloadStatusBar;
+import com.example.demo.ui.component.StyleRepair;
 import com.example.demo.ui.component.TopBar;
 import com.example.demo.ui.component.DownloadResultView;
 import com.example.demo.ui.component.LaunchAccountColumn;
@@ -1092,6 +1093,15 @@ public class HelloApplication extends Application {
       target.setOpacity(0.0);
       this.contentStack.getChildren().add(target);
     }
+    // 切页后补一次圆角描边：新页面的按钮/卡片是刚创建的，来不及手工逐个修
+    Platform.runLater(
+        () -> {
+          try {
+            StyleRepair.fixRoundedBorders(this.rootPane);
+          } catch (Exception ignored) {
+            // 样式修复失败不影响功能
+          }
+        });
     String highlight = this.navHighlight != null ? this.navHighlight : pageName;
     this.navHighlight = null;
     this.topBar.highlight(highlight);
@@ -4519,7 +4529,10 @@ private static void setFlexible(Node node, boolean on) {
                 .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
             + "  实例 "
             + this.currentInstanceId();
-    String text = HealthAdvice.render(header, lines) + this.logTailForReport(50);
+    int logLines = this.config.getHealthReportLogLines();
+    String text =
+        HealthAdvice.render(header, lines)
+            + this.logTailForReport(logLines <= 0 ? Integer.MAX_VALUE : logLines);
     File dir = new File(game, "logs");
     File out =
         new File(
@@ -5045,7 +5058,7 @@ private static void setFlexible(Node node, boolean on) {
     String jsonUrl = selectedVersion.getUrl();
     File gameDir = new File(this.config.getGameDir());
     // 首次点启动时把体检里的硬问题集中说一次，别让玩家进游戏才发现
-    if (!this.launchAdviceShown) {
+    if (!this.launchAdviceShown && !this.config.isSkipLaunchAdvice()) {
       List<String> bad = this.preLaunchAdvice(id);
       if (!bad.isEmpty()) {
         this.launchAdviceShown = true;
@@ -5054,7 +5067,28 @@ private static void setFlexible(Node node, boolean on) {
           text.append("• ").append(line).append("\n");
         }
         text.append("\n仍然启动吗？也可以先去「设置」调整。");
-        InAppDialog.confirm(null, "启动前检查", text.toString(), "仍然启动", this::handleLaunch);
+        Label body = new Label(text.toString());
+        body.setWrapText(true);
+        body.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 12.5px;");
+        CheckBox dontAsk = new CheckBox("以后不再提示");
+        dontAsk.setStyle("-fx-text-fill: -app-text-dim; -fx-font-size: 12px;");
+        VBox content = new VBox(10.0, body, dontAsk);
+        InAppDialog.custom(
+            null,
+            "启动前检查",
+            content,
+            List.of(
+                InAppDialog.Action.secondary("取消", null),
+                InAppDialog.Action.primary(
+                    "仍然启动",
+                    () -> {
+                      if (dontAsk.isSelected()) {
+                        this.config.setSkipLaunchAdvice(true);
+                        this.config.save();
+                      }
+                      this.handleLaunch();
+                    })),
+            null);
         return;
       }
     }

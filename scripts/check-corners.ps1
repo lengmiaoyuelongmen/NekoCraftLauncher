@@ -21,6 +21,8 @@ public class CornerWin {
   [DllImport("user32.dll")] public static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
   [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
+  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int c);
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
   [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
   public static IntPtr Find(string title) {
     IntPtr found = IntPtr.Zero;
@@ -41,6 +43,11 @@ if ($hwnd -eq [IntPtr]::Zero) {
     Write-Host "FAIL: 找不到窗口 '$Title'（先启动启动器）" -ForegroundColor Red
     exit 1
 }
+# 截图前把窗口提到前台，否则 CopyFromScreen 拍到的是压在上面的别的窗口
+[CornerWin]::ShowWindow($hwnd, 9) | Out-Null
+[CornerWin]::SetForegroundWindow($hwnd) | Out-Null
+Start-Sleep -Milliseconds 500
+
 $rect = New-Object CornerWin+RECT
 [CornerWin]::GetWindowRect($hwnd, [ref]$rect) | Out-Null
 $w = $rect.Right - $rect.Left
@@ -64,17 +71,21 @@ function Dist($a, $b) {
 }
 
 # 桌面参考色：截图左上角（窗口外）
-$desk = $bmp.GetPixel(2, 2)
+$deskTopLeft = $bmp.GetPixel(2, 2)
 
 $corners = @(
-    @{ name = "左上"; x0 = $margin; y0 = $margin; dx = 1; dy = 1 },
-    @{ name = "右上"; x0 = $margin + $w - 1; y0 = $margin; dx = -1; dy = 1 },
-    @{ name = "左下"; x0 = $margin; y0 = $margin + $h - 1; dx = 1; dy = -1 },
-    @{ name = "右下"; x0 = $margin + $w - 1; y0 = $margin + $h - 1; dx = -1; dy = -1 }
+    @{ name = "左上"; x0 = $margin; y0 = $margin; dx = 1; dy = 1; ox = -8; oy = -8 },
+    @{ name = "右上"; x0 = $margin + $w - 1; y0 = $margin; dx = -1; dy = 1; ox = 8; oy = -8 },
+    @{ name = "左下"; x0 = $margin; y0 = $margin + $h - 1; dx = 1; dy = -1; ox = -8; oy = 8 },
+    @{ name = "右下"; x0 = $margin + $w - 1; y0 = $margin + $h - 1; dx = -1; dy = -1; ox = 8; oy = 8 }
 )
 
 $fail = 0
 foreach ($c in $corners) {
+    # 每个角用"紧贴窗口外侧"的像素当桌面参考色：壁纸在窗口上下颜色可能不同
+    $deskX = [Math]::Max(0, [Math]::Min($capW - 1, $c.x0 + $c.ox))
+    $deskY = [Math]::Max(0, [Math]::Min($capH - 1, $c.y0 + $c.oy))
+    $desk = $bmp.GetPixel($deskX, $deskY)
     # 沿对角线往里走，找到第一个"明显不是桌面"的像素
     $run = 0
     for ($i = 0; $i -lt 40; $i++) {

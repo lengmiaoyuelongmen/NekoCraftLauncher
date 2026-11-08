@@ -158,6 +158,10 @@ public class LauncherConfig {
     private boolean smartPerformance = false;
     /** 启动页日志是否展开（记住用户上次的选择）。 */
     private boolean logExpanded = false;
+    /** 启动前检查不再提示（用户明确关掉后不再弹）。 */
+    private boolean skipLaunchAdvice = false;
+    /** 体检报告附带的日志行数：50 / 200 / 0（0 = 全部）。 */
+    private int healthReportLogLines = 50;
 
     /** 游戏进程优先级：normal / above / high */
     private String gamePriority = "normal";
@@ -626,6 +630,22 @@ public class LauncherConfig {
 
     public void setUiFontScale(double uiFontScale) {
         this.uiFontScale = uiFontScale;
+    }
+
+    public boolean isSkipLaunchAdvice() {
+        return skipLaunchAdvice;
+    }
+
+    public void setSkipLaunchAdvice(boolean skipLaunchAdvice) {
+        this.skipLaunchAdvice = skipLaunchAdvice;
+    }
+
+    public int getHealthReportLogLines() {
+        return healthReportLogLines;
+    }
+
+    public void setHealthReportLogLines(int healthReportLogLines) {
+        this.healthReportLogLines = Math.max(0, Math.min(1000, healthReportLogLines));
     }
 
     public boolean isLogExpanded() {

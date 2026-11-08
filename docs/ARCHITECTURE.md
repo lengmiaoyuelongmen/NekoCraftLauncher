@@ -1116,6 +1116,21 @@ Neko Craft Launcher 体检报告  2026-11-08 20:50:01  实例 1.12.2
    列出每条原因并提供「仍然启动 / 取消」，会话内只弹一次。真机把 1.12.2 的 `javaVersion`
    临时改成 99 复现：弹窗显示「• 只找到 Java 25，该版本需要 Java 99 或更高」，取消后正常停留。
 
+### 圆角续：按键方角描边 + 自检进冒烟（2026-11-08 22:50）
+
+**按键圆角缺陷**：JavaFX 的 `-fx-border-color` 默认画直角，一批内联样式写了
+`-fx-background-radius` 却没写 `-fx-border-radius`（全仓 22 处），于是"圆角底 + 方角边框"。
+新增 `ui.component.StyleRepair`：遍历场景树，对**有 border-color、没有 border-radius** 的 Region，
+按它自己的背景半径补齐 `-fx-border-radius`；每次切页后跑一遍，新创建的按钮也能覆盖。
+
+**圆角自检进冒烟**：`smoke-test.ps1` 现在会调用 `check-corners.ps1`，四角不是圆角就 FAIL。
+输出：`PASS: 5 个页面切换完成，stderr 无异常，四角为圆角`。
+
+**启动前检查可关掉**：弹窗加了「以后不再提示」复选框，勾选并点「仍然启动」会写
+`config.skipLaunchAdvice`，之后不再弹。
+
+**体检报告日志行数可配置**：`config.healthReportLogLines`（默认 50，0 = 全部），导出时按它截取。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：

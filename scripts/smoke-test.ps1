@@ -288,6 +288,16 @@ public class SmokeWin {
         Write-Host ("FAIL: 页面没有真正切换（前四张里只有 {0} 张不同，且窗口标题未变）" -f $pageUnique) -ForegroundColor Red
         exit 1
     }
+    # ---------- 圆角自检 ----------
+    $cornerScript = Join-Path $PSScriptRoot "check-corners.ps1"
+    $cornerOk = $false
+    if (Test-Path $cornerScript) {
+        $cornerOut = & powershell -ExecutionPolicy Bypass -File $cornerScript 2>&1
+        $cornerOk = ($LASTEXITCODE -eq 0)
+        Write-Host (($cornerOut | Select-Object -Last 1) -join " ") -ForegroundColor $(if ($cornerOk) { "Green" } else { "Red" })
+    } else {
+        Write-Host "FAIL: 缺少 scripts/check-corners.ps1" -ForegroundColor Red
+    }
     Write-Host ""
     Write-Host "截图: $($shots -join ', ')" -ForegroundColor DarkGray
     if ($exceptions.Count -gt 0) {
@@ -296,7 +306,11 @@ public class SmokeWin {
         Write-Host "完整日志: $stderr" -ForegroundColor Red
         exit 1
     }
-    Write-Host "PASS: 5 个页面切换完成，stderr 无异常" -ForegroundColor Green
+    if (-not $cornerOk) {
+        Write-Host "FAIL: 窗口圆角自检未通过" -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "PASS: 5 个页面切换完成，stderr 无异常，四角为圆角" -ForegroundColor Green
     exit 0
 }
 finally {
