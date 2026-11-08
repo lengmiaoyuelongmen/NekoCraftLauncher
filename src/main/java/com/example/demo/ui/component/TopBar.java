@@ -96,8 +96,10 @@ public final class TopBar {
         badge.setTextFill(Color.web("#5eead4"));
 
         Label liveClock = new Label();
+        // 等宽字体优先 Consolas：Cascadia Mono 在部分机器上缺字时会退回到奇怪的字形
         liveClock.setStyle("-fx-text-fill: #7b818b; -fx-font-size: 10.5px;"
-                + " -fx-font-family: 'Cascadia Mono', 'Consolas', monospace;");
+                + " -fx-font-family: 'Consolas', 'Cascadia Mono', monospace;"
+                + " -fx-font-smoothing-type: gray;");
         DateTimeFormatter clockFormat = DateTimeFormatter.ofPattern("HH:mm:ss");
         liveClock.setText(LocalTime.now().format(clockFormat));
         Timeline clockTimer = new Timeline(new KeyFrame(Duration.seconds(1.0), e -> {

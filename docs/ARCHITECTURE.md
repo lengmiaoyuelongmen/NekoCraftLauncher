@@ -1193,6 +1193,19 @@ PASS: 5 个页面切换完成，stderr 无异常，UI 自检通过
   宽度不足自动换行。
 - 保留"图标 + 文字"而非纯符号：UIA/无障碍仍按名字可找，类目一眼可读。
 
+### 设置分栏符号化 + 时钟字形修复（2026-11-09 07:20）
+
+- **时钟字形**：顶栏时钟原来优先 `Cascadia Mono`，缺字时回退成奇怪字形（截图里显示成
+  `dgy;'u|`）；改为 `Consolas` 优先并加 `-fx-font-smoothing-type: gray`，真机显示正常
+  `07:14:57`。
+- **设置分栏符号化**：启动=play、Java=package、管理=tools、联机=server、AI=sparkles、
+  个性化=image、语言=globe、杂项=layers、软件信息=folder、软件更新=refresh、反馈=edit、
+  查看日志=terminal；悬停图标放大 1.18，选中时图标提亮 + 文案加粗。
+  （注意：`selectTab` 里原来按 `getChildren().get(1)` 取文字，加了图标后索引要改成 2。）
+- **卡片悬停**：设置页每张卡片挂上 `Motion.hoverCard`（轻微抬升），与下载列表卡片一致。
+
+真机：设置页 12 个分栏全部带图标；冒烟 5 页 + 弹窗自检全绿。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：

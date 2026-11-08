@@ -391,8 +391,27 @@ public final class SettingsPanel extends VBox {
         return label;
     }
 
+    /** 每个分栏的符号，和下载页侧栏保持同一套图标语言。 */
+    private static String tabIcon(String name) {
+        return switch (name) {
+            case "启动" -> "play";
+            case "Java" -> "package";
+            case "管理" -> "tools";
+            case "联机" -> "server";
+            case "AI" -> "sparkles";
+            case "个性化" -> "image";
+            case "语言" -> "globe";
+            case "杂项" -> "layers";
+            case "软件信息" -> "folder";
+            case "软件更新" -> "refresh";
+            case "反馈" -> "edit";
+            case "查看日志" -> "terminal";
+            default -> "dot";
+        };
+    }
+
     private HBox tabItem(String name) {
-        HBox item = new HBox(9);
+        HBox item = new HBox(8);
         item.setAlignment(Pos.CENTER_LEFT);
         item.setPadding(new Insets(8, 10, 8, 10));
         item.setCursor(Cursor.HAND);
@@ -405,15 +424,36 @@ public final class SettingsPanel extends VBox {
         bar.setArcHeight(2);
         bar.setStyle("-fx-fill: transparent;");
 
+        javafx.scene.Node icon = com.example.demo.ui.shell.Icons.node(tabIcon(name), 13.0, "#9aa3ad");
+        icon.setOpacity(0.72);
+        icon.setMouseTransparent(true);
+
         Label text = new Label(name);
         text.setStyle("-fx-text-fill: -app-text-dim; -fx-font-size: 13px;");
         // 点击必须落在整行上：文字与色条不吞事件，否则只点中文字时选不中分栏
         text.setMouseTransparent(true);
         bar.setMouseTransparent(true);
-        item.getChildren().addAll(bar, text);
+        item.getChildren().addAll(bar, icon, text);
         item.setOnMouseClicked(e -> selectTab(name));
+        item.setOnMouseEntered(e -> scaleIcon(icon, 1.18));
+        item.setOnMouseExited(e -> scaleIcon(icon, 1.0));
+        // 记下图标，切换分栏时由 selectTab 提亮
         tabItems.put(name, item);
         return item;
+    }
+
+    private static void scaleIcon(javafx.scene.Node icon, double scale) {
+        if (!com.example.demo.ui.shell.Motion.isEnabled()) {
+            icon.setScaleX(scale);
+            icon.setScaleY(scale);
+            return;
+        }
+        javafx.animation.ScaleTransition transition =
+                new javafx.animation.ScaleTransition(com.example.demo.ui.shell.Motion.FAST, icon);
+        transition.setToX(scale);
+        transition.setToY(scale);
+        transition.setInterpolator(com.example.demo.ui.shell.Motion.OUT);
+        transition.play();
     }
 
     private void filterSettings(String query) {
@@ -450,9 +490,11 @@ public final class SettingsPanel extends VBox {
             HBox box = entry.getValue();
             box.getStyleClass().remove("app-tab-active");
             if (active) box.getStyleClass().add("app-tab-active");
-            if (box.getChildren().size() >= 2) {
+            if (box.getChildren().size() >= 3) {
                 box.getChildren().get(0).setStyle("-fx-fill: " + (active ? "#cbd5e1" : "transparent") + ";");
-                box.getChildren().get(1).setStyle("-fx-text-fill: " + (active ? "-app-text-strong" : "-app-text-dim")
+                javafx.scene.Node tabIcon = box.getChildren().get(1);
+                tabIcon.setOpacity(active ? 1.0 : 0.72);
+                box.getChildren().get(2).setStyle("-fx-text-fill: " + (active ? "-app-text-strong" : "-app-text-dim")
                         + "; -fx-font-size: 13px;" + (active ? " -fx-font-weight: bold;" : ""));
             }
         }
@@ -1525,7 +1567,8 @@ public final class SettingsPanel extends VBox {
                 + " -fx-background-radius: 16; -fx-border-color: -app-border-soft; -fx-border-radius: 16;"
                 + " -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.16), 18, 0.10, 0, 6);");
         box.getChildren().addAll(children);
-        box.setMaxWidth(780);
+        // 设置卡片轻轻抬起一点，鼠标掠过时能感觉到"这张卡是活的"
+        com.example.demo.ui.shell.Motion.hoverCard(box);
         return box;
     }
 
