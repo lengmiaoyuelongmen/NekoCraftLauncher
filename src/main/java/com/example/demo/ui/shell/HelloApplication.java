@@ -1098,6 +1098,9 @@ public class HelloApplication extends Application {
         () -> {
           try {
             StyleRepair.fixRoundedBorders(this.rootPane);
+            // 自检：修完还有缺失，说明某个节点的背景半径读不出来；冒烟会检查这一行
+            int missing = StyleRepair.countMissing(this.rootPane);
+            System.out.println("圆角描边检查: " + missing + " 个节点缺失");
           } catch (Exception ignored) {
             // 样式修复失败不影响功能
           }

@@ -35,26 +35,46 @@ public final class StyleRepair {
         }
     }
 
-    private static void fixOne(Node node) {
+    /** 只判断、不修改：用于自检。只有"圆角底 + 方角边"才算缺陷，直线分隔线不算。 */
+    public static boolean needsFix(Node node) {
         if (!(node instanceof Region region)) {
-            return;
+            return false;
+        }
+        String style = region.getStyle();
+        if (style == null
+                || style.isEmpty()
+                || !style.contains("-fx-border-color")
+                || style.contains("-fx-border-radius")) {
+            return false;
+        }
+        String radii = radiiFromStyle(style);
+        if (radii == null) {
+            radii = radiiFromBackground(region);
+        }
+        return radii != null;
+    }
+
+    private static boolean fixOne(Node node) {
+        if (!(node instanceof Region region)) {
+            return false;
         }
         String style = region.getStyle();
         if (style == null || style.isEmpty()) {
-            return;
+            return false;
         }
         if (!style.contains("-fx-border-color") || style.contains("-fx-border-radius")) {
-            return;
+            return false;
         }
         String radii = radiiFromStyle(style);
         if (radii == null) {
             radii = radiiFromBackground(region);
         }
         if (radii == null) {
-            return;
+            return false;
         }
         String suffix = style.endsWith(";") ? " " : "; ";
         region.setStyle(style + suffix + "-fx-border-radius: " + radii + ";");
+        return true;
     }
 
     /** 从内联样式的 {@code -fx-background-radius} 里取半径。 */
@@ -96,4 +116,18 @@ public final class StyleRepair {
     private static String format(double value) {
         return String.format(java.util.Locale.ROOT, "%.1f", value);
     }
-}
+    /** 统计还有多少节点写了 border-color 却没有 border-radius（0 才算干净）。 */
+    public static int countMissing(Parent root) {
+        if (root == null) {
+            return 0;
+        }
+        int missing = needsFix(root) ? 1 : 0;
+        for (Node child : root.getChildrenUnmodifiable()) {
+            if (child instanceof Parent parent) {
+                missing += countMissing(parent);
+            } else {
+                missing += needsFix(child) ? 1 : 0;
+            }
+        }
+        return missing;
+    }}

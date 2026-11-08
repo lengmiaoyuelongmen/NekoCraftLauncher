@@ -111,6 +111,7 @@ public final class Toast {
         pill.setOpacity(0);
         pill.setTranslateY(-8);
         stack.getChildren().add(pill);
+        com.example.demo.ui.component.StyleRepair.fixRoundedBorders(stack);
 
         FadeTransition in = new FadeTransition(Duration.millis(160), pill);
         in.setToValue(1);

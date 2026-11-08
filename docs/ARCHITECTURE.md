@@ -1131,6 +1131,17 @@ Neko Craft Launcher 体检报告  2026-11-08 20:50:01  实例 1.12.2
 
 **体检报告日志行数可配置**：`config.healthReportLogLines`（默认 50，0 = 全部），导出时按它截取。
 
+### 圆角收尾：弹窗/Toast 也修、冒烟断言 0 缺失（2026-11-08 23:20）
+
+- `StyleRepair` 现在挂到三处：切页之后、`InAppDialog.show()` 建完弹窗之后、Toast 的 pill 创建之后，
+  弹窗和提示条里的按钮也享受同样的描边修复。
+- 自检口径收紧：只有「背景是圆角（内联 `-fx-background-radius` 或实际背景半径 > 0）+ 有 border-color
+  + 没有 border-radius」才算缺陷；纯直线分隔线不算，避免误报。
+- 每次切页后 `System.out.println("圆角描边检查: N 个节点缺失")`，冒烟读 stdout 断言 N 恒为 0：
+  `PASS: 5 个页面切换完成，stderr 无异常，四角为圆角，描边自检 0 缺失`。
+- 视觉证据：用 UIA 找到「保存」按钮的真实矩形（1385,860 82x35），裁 30×30 放大 8 倍——
+  左上是平滑的抗锯齿圆弧，没有方角描边。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：

@@ -310,7 +310,21 @@ public class SmokeWin {
         Write-Host "FAIL: 窗口圆角自检未通过" -ForegroundColor Red
         exit 1
     }
-    Write-Host "PASS: 5 个页面切换完成，stderr 无异常，四角为圆角" -ForegroundColor Green
+    # ---------- 描边自检 ----------
+    $outText = ""
+    if (Test-Path $stdout) { $outText = Get-Content $stdout -Raw -ErrorAction SilentlyContinue }
+    $roundLines = @($outText -split "`r?`n" | Where-Object { $_ -match "圆角描边检查: (\d+) 个节点缺失" })
+    if ($roundLines.Count -eq 0) {
+        Write-Host "FAIL: 没有拿到圆角描边自检结果（页面可能没切换）" -ForegroundColor Red
+        exit 1
+    }
+    $bad = @($roundLines | Where-Object { $_ -notmatch "圆角描边检查: 0 个节点缺失" })
+    if ($bad.Count -gt 0) {
+        Write-Host ("FAIL: 仍有 {0} 次自检发现缺 border-radius 的节点" -f $bad.Count) -ForegroundColor Red
+        $bad | Select-Object -First 3 | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
+        exit 1
+    }
+    Write-Host "PASS: 5 个页面切换完成，stderr 无异常，四角为圆角，描边自检 0 缺失" -ForegroundColor Green
     exit 0
 }
 finally {
