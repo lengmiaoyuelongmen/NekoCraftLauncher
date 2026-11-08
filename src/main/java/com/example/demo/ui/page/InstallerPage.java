@@ -235,12 +235,60 @@ public final class InstallerPage {
         title.setText(game == null ? "安装新实例" : "安装 Minecraft " + game.getId());
     }
 
-    /** 切换游戏版本：之前选的加载器版本作废。 */
+    /** 切换游戏版本：之前选的加载器版本作废，并重新预检各加载器是否适配。 */
     public void onGameVersionChanged() {
         selectedVersions.clear();
         updateTitle();
+        checkLoaderSupport();
         if (expandedLoader != null) {
             loadVersions(expandedLoader);
+        }
+    }
+
+    /**
+     * 预检：哪些加载器根本没有这个 MC 版本的构建。
+     *
+     * <p>不点开也能看出来——没构建的加载器置灰并在副标题写明，省得用户点进去等一次
+     * 注定失败的请求。
+     */
+    private void checkLoaderSupport() {
+        MinecraftVersion game = versionCombo.getValue();
+        if (game == null) {
+            return;
+        }
+        String mc = game.getId();
+        for (String loader : new String[]{"Fabric", "Forge", "NeoForge", "Quilt"}) {
+            LoaderRow row = rows.get(loader);
+            if (row == null) {
+                continue;
+            }
+            row.subtitle.setText("正在检查 " + loader + " 是否支持 " + mc + "…");
+            LoaderInstaller.listLoaderVersions(loader, mc)
+                    .thenAccept(versions -> Platform.runLater(() -> {
+                        MinecraftVersion current = versionCombo.getValue();
+                        if (current == null || !mc.equals(current.getId())) {
+                            return;
+                        }
+                        boolean supported = versions != null && !versions.isEmpty();
+                        applySupport(loader, supported, mc);
+                    }));
+        }
+    }
+
+    /** 把预检结果画到加载器行上。 */
+    private void applySupport(String loader, boolean supported, String mc) {
+        LoaderRow row = rows.get(loader);
+        if (row == null) {
+            return;
+        }
+        if (supported) {
+            row.subtitle.setText("");
+            row.header.setOpacity(1.0);
+            row.header.setDisable(false);
+        } else {
+            row.subtitle.setText("没有支持 " + mc + " 的 " + loader + " 构建");
+            row.header.setOpacity(0.55);
+            row.header.setDisable(false);
         }
     }
 

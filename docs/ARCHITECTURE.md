@@ -1018,6 +1018,17 @@ InstanceCloner 回滚、DependencyInstaller 复用判断等）。
 
 两次都验证了同一件事：`versions/1.12.2` 保留 56 个文件、版本目录 14 个不变。
 
+### 安装页的加载器可用性预检（2026-11-08 18:45）
+
+切换「游戏版本」时，安装页会对 Fabric / Forge / NeoForge / Quilt 各查一次元数据：
+
+- 有构建：副标题清空，正常显示；
+- 没有构建：副标题直接写「没有支持 26.3 的 NeoForge 构建」并把整行降到 55% 不透明度，
+  用户不用点进去等一次注定失败的请求。
+
+真机（Minecraft 26.3）：NeoForge 行显示「没有支持 26.3 的 NeoForge 构建」且置灰，Fabric 行
+照常列出 0.20.1 / 0.20.0 / 0.19.5…，Forge 行无异常。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：
