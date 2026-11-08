@@ -1204,8 +1204,14 @@ public class HelloApplication extends Application {
   }
 
   private void applyLogExpanded(boolean expanded) {
+    boolean changed = this.logExpanded != expanded;
     this.logExpanded = expanded;
     this.refreshLaunchBody();
+    if (changed && this.config != null) {
+      // 记住用户的选择，下次启动沿用（启动时按配置恢复，值相同不会重复写盘）
+      this.config.setLogExpanded(expanded);
+      this.config.save();
+    }
   }
 
   private void refreshLaunchBody() {
@@ -1522,8 +1528,8 @@ private static void setFlexible(Node node, boolean on) {
     this.createVersionSelector();
     VBox userArea = this.accountColumn;
     VBox logContainer = this.createConsoleSection();
-    // 默认收起日志，先把「启动概览」露出来；想看实时输出点一下「展开日志」
-    this.applyLogExpanded(false);
+    // 记住上次的展开状态；第一次启动默认收起，先把「启动概览」露出来
+    this.applyLogExpanded(this.config.isLogExpanded());
     // 黄金比例分栏与模块标题在 ui.page.LaunchPage：这里只准备两列内容
     logContainer.setMinWidth(0.0);
     VBox launchPanel = LaunchPage.build(userArea, logContainer);
@@ -5207,7 +5213,7 @@ private static void setFlexible(Node node, boolean on) {
     this.logLine("⚠ 模组依赖缺失：" + ModDependencyScanner.describeMissing(missing));
     ArrayList<String> pending = new ArrayList<>(missing.keySet());
     if (!this.config.isAutoInstallDeps()) {
-      this.logLine("   可在「设置 → 启动器」打开自动补装，或去「下载」页手动安装");
+      this.logLine("   可在「设置 → 管理」打开自动补装，或去「下载」页手动安装");
       return;
     }
     this.logLine("   可自动从 Modrinth 安装这 " + pending.size() + " 个前置");

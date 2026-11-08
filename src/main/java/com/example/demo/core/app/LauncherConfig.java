@@ -156,6 +156,8 @@ public class LauncherConfig {
 
     /** 智能性能：启动时自动合并 G1GC 参数并调整游戏进程优先级 */
     private boolean smartPerformance = false;
+    /** 启动页日志是否展开（记住用户上次的选择）。 */
+    private boolean logExpanded = false;
 
     /** 游戏进程优先级：normal / above / high */
     private String gamePriority = "normal";
@@ -624,6 +626,14 @@ public class LauncherConfig {
 
     public void setUiFontScale(double uiFontScale) {
         this.uiFontScale = uiFontScale;
+    }
+
+    public boolean isLogExpanded() {
+        return logExpanded;
+    }
+
+    public void setLogExpanded(boolean logExpanded) {
+        this.logExpanded = logExpanded;
     }
 
     public boolean isSmartPerformance() {
