@@ -2736,6 +2736,28 @@ private static void setFlexible(Node node, boolean on) {
                 return;
               }
               log.accept("🔧 正在安装 " + loader + "（版本 " + id + "）...");
+              // 先问一句元数据：这个加载器到底有没有适配这个 MC 版本，避免白跑一次安装再回滚
+              List<String> supportedVersions =
+                  LoaderInstaller.listLoaderVersions(loader, id).get(30L, TimeUnit.SECONDS);
+              if (supportedVersions.isEmpty()) {
+                String message =
+                    loader
+                        + " 没有可用于 Minecraft "
+                        + id
+                        + " 的版本（加载器尚未适配该游戏版本，或元数据服务不可达）；"
+                        + "可换一个加载器，或在「设置 → 下载源」里选镜像后重试";
+                log.accept("⛔ " + message);
+                Platform.runLater(
+                    () -> {
+                      InAppDialog.alert("加载器不可用", message);
+                      this.logArea.appendText("❌ " + message + "\n");
+                      btn.setDisable(false);
+                      btn.setText("开始下载");
+                      this.setInstallerProgress(false);
+                      this.setInstallerStatus("未安装：" + message);
+                    });
+                return;
+              }
               String javaPath =
                   this.resolveJavaPath(gameDir, baseProfile.getJavaMajorVersion(), log);
               resultId =
@@ -3625,6 +3647,13 @@ private static void setFlexible(Node node, boolean on) {
     int fileCount;
   }
 
+  /** 重试也不会变好的失败（例如加载器根本不支持这个 MC 版本）：不再重试。 */
+  private static final class ImportAbortException extends RuntimeException {
+    ImportAbortException(String message) {
+      super(message);
+    }
+  }
+
   /** 一次导入尝试：解析整合包、准备版本/加载器、解包并落盘。 */
   private void runImportAttempt(
       int attempt,
@@ -3714,6 +3743,19 @@ private static void setFlexible(Node node, boolean on) {
               .orElse(null);
       String mcId = mc == null ? state.instanceId : mc.getId();
       String javaPath = this.loaderJava(gameDir, pack.loader());
+      // 先确认加载器支持这个 MC 版本，别等到下载器报 HTTP 400 再回滚
+      LoaderCompatibility.Loader loaderKind = LoaderCompatibility.fromLabel(pack.loader());
+      String loaderLabel = loaderKind == null ? pack.loader() : loaderKind.label();
+      if (!pack.gameVersion().isBlank()
+          && LoaderInstaller.listLoaderVersions(loaderLabel, pack.gameVersion())
+              .get(30L, TimeUnit.SECONDS)
+              .isEmpty()) {
+        throw new ImportAbortException(
+            loaderLabel
+                + " 没有可用于 Minecraft "
+                + pack.gameVersion()
+                + " 的版本（该加载器尚未适配这个游戏版本，或元数据服务不可达）");
+      }
       state.instanceId =
           switch (pack.loader()) {
             case "fabric" ->
@@ -3837,7 +3879,9 @@ private static void setFlexible(Node node, boolean on) {
                 }
               }
               rollbackCreatedInstance(gameDir, state.instanceId, state.createdInstance);
-              if (attempt >= maxAttempts) {
+              // 重试也不会变好的失败（加载器不支持该 MC 版本）直接判定失败
+              boolean fatal = e instanceof ImportAbortException;
+              if (fatal || attempt >= maxAttempts) {
                 String hint = importFailureHint(message);
                 this.logLine("❌ 导入失败: " + message + (hint.isEmpty() ? "" : "（" + hint + "）"));
                 String finalMessage = message;
@@ -3847,7 +3891,10 @@ private static void setFlexible(Node node, boolean on) {
                       window.clearDownload();
                       window.finish(
                           false,
-                          "导入失败（已重试 " + maxAttempts + " 次）：" + finalMessage
+                          (fatal
+                                  ? "导入失败："
+                                  : "导入失败（已重试 " + maxAttempts + " 次）：")
+                              + finalMessage
                               + (hint.isEmpty() ? "" : " · " + hint));
                       Toast.error("导入失败：" + finalMessage);
                     });
