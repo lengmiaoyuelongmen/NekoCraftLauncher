@@ -55,6 +55,7 @@ import com.example.demo.core.download.CurseForgeClient;
 import com.example.demo.core.download.DownloadManager;
 import com.example.demo.core.download.IconProxy;
 import com.example.demo.core.model.Favorites;
+import com.example.demo.core.mod.BulkDelete;
 import com.example.demo.core.mod.ModDependencyScanner;
 import com.example.demo.core.mod.ModpackImport;
 import com.example.demo.ui.shell.Icons;
@@ -1571,14 +1572,20 @@ public final class ModsPanel extends VBox {
 
     private void deleteDisabledMods() {
         File[] files = modsDir.listFiles((dir, name) -> name.toLowerCase(Locale.ROOT).endsWith(".jar.disabled"));
+        int total = files == null ? 0 : files.length;
         int removed = 0;
         if (files != null) {
             for (File file : files) {
                 if (file.delete()) removed++;
             }
         }
-        log("🗑️ 已删除 " + removed + " 个禁用模组");
-        Toast.ok("已删除 " + removed + " 个禁用模组");
+        BulkDelete result = new BulkDelete(total, removed);
+        log(result.logMessage("禁用模组"));
+        if (result.shouldWarn()) {
+            Toast.error(result.toastMessage("禁用模组"));
+        } else {
+            Toast.ok(result.toastMessage("禁用模组"));
+        }
         lastSignature = "";
         metaSignature = "";
         refreshLocal(true);
@@ -1617,12 +1624,18 @@ public final class ModsPanel extends VBox {
                 "删除选中模组", "确定删除选中的 " + selectedMods.size() + " 个模组吗？文件会直接从 mods 目录删除，无法恢复。",
                 "删除",
                 () -> {
+            int total = selectedMods.size();
             int removed = 0;
             for (String name : new ArrayList<>(selectedMods)) {
                 if (new File(modsDir, name).delete()) removed++;
             }
-            log("🗑️ 已删除 " + removed + " 个选中模组");
-            Toast.ok("已删除 " + removed + " 个模组");
+            BulkDelete result = new BulkDelete(total, removed);
+            log(result.logMessage("选中模组"));
+            if (result.shouldWarn()) {
+                Toast.error(result.toastMessage("模组"));
+            } else {
+                Toast.ok(result.toastMessage("模组"));
+            }
             selectedMods.clear();
             lastSignature = "";
             metaSignature = "";
