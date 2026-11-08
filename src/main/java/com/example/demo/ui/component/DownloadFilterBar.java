@@ -87,14 +87,13 @@ public final class DownloadFilterBar extends VBox {
 
     FlowPane row1 = new FlowPane(10.0, 8.0);
     row1.setPrefWrapLength(860.0);
+    row1.setHgap(10.0);
     sourceCombo = filterCombo("全部", "Modrinth", "CurseForge");
     tagCombo = filterCombo("全部", "轻量", "冒险", "硬核");
     gameVersionCombo = filterCombo("任意", "1.21", "1.20.1", "1.19.2", "1.16.5", "1.12.2", "1.7.10");
     loaderCombo = filterCombo("任意", "Fabric", "Forge", "Quilt", "NeoForge", "DataPack");
     sortCombo = filterCombo("默认", "下载量", "更新时间");
 
-    Region spacer = new Region();
-    HBox.setHgrow(spacer, Priority.ALWAYS);
     Button refreshBtn = iconButton("refresh", "刷新列表");
     refreshBtn.setOnAction(e -> fireSearch());
     Button speedBtn = new Button("测速");
@@ -108,19 +107,18 @@ public final class DownloadFilterBar extends VBox {
       taskBtn.setOnAction(e -> onShowTasks.run());
     }
 
-    FlowPane row2 = new FlowPane(12.0, 8.0);
-    row2.setPrefWrapLength(860.0);
-    row2.getChildren()
-        .addAll(labeled("来源", sourceCombo), labeled("标签", tagCombo), labeled("排序", sortCombo));
+    // 集成成一条筛选带：五个下拉 + 三个动作按钮同一个 FlowPane，宽度不够自动换行
     row1.getChildren()
         .addAll(
-            labeled("游戏版本", gameVersionCombo),
-            labeled("加载器", loaderCombo),
-            spacer,
+            labeled("游戏版本", "dot", gameVersionCombo),
+            labeled("加载器", "tools", loaderCombo),
+            labeled("来源", "globe", sourceCombo),
+            labeled("标签", "sparkles", tagCombo),
+            labeled("排序", "chevron-down", sortCombo),
             speedBtn,
             refreshBtn,
             taskBtn);
-    filterBox.getChildren().addAll(row1, row2);
+    filterBox.getChildren().add(row1);
 
     sourceCombo.setPrefWidth(125.0);
     sourceCombo.setMinWidth(110.0);
@@ -170,7 +168,16 @@ public final class DownloadFilterBar extends VBox {
   }
 
   private HBox labeled(String text, ComboBox<String> combo) {
+    return labeled(text, null, combo);
+  }
+
+  /** 带符号的筛选标签：图标 + 文字，视觉上更像一条工具带。 */
+  private HBox labeled(String text, String iconKey, ComboBox<String> combo) {
     Label label = new Label(text);
+    if (iconKey != null) {
+      label.setGraphic(com.example.demo.ui.shell.Icons.node(iconKey, 12.0, "#9aa3ad"));
+      label.setGraphicTextGap(5.0);
+    }
     HBox box = new HBox(6.0, label, combo);
     box.setAlignment(Pos.CENTER_LEFT);
     label.setStyle("-fx-text-fill: -app-text-muted-3; -fx-font-size: 12px;");

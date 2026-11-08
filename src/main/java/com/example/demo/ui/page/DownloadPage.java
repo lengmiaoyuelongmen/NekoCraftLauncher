@@ -87,10 +87,20 @@ public final class DownloadPage {
         navScroll.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
 
         navBox.getChildren().add(group("游戏", false));
-        navBox.getChildren().add(navItem("Minecraft"));
+        navBox.getChildren().add(navItem("Minecraft", "play"));
         navBox.getChildren().add(group("社区资源", true));
-        for (String item : new String[]{"模组", "整合包", "数据包", "资源包", "光影包", "世界", "收藏夹"}) {
-            DownloadNavItem node = navItem(item);
+        String[][] communityItems = {
+                {"模组", "layers"},
+                {"整合包", "package"},
+                {"数据包", "folder"},
+                {"资源包", "image"},
+                {"光影包", "sparkles"},
+                {"世界", "globe"},
+                {"收藏夹", "star"}
+        };
+        for (String[] entry : communityItems) {
+            String item = entry[0];
+            DownloadNavItem node = navItem(item, entry[1]);
             if ("整合包".equals(item)) {
                 node.setActive(true);
             }
@@ -98,7 +108,7 @@ public final class DownloadPage {
         }
         navBox.getChildren().add(group("安装包", true));
         for (String loader : new String[]{"OptiFine", "Fabric", "Quilt", "Forge", "NeoForge"}) {
-            DownloadNavItem node = navItem(loader);
+            DownloadNavItem node = navItem(loader, "tools");
             installerItems.add(node);
             navBox.getChildren().add(node);
         }
@@ -171,9 +181,14 @@ public final class DownloadPage {
     }
 
     private DownloadNavItem navItem(String text) {
-        DownloadNavItem node = new DownloadNavItem(text);
+        return navItem(text, "dot");
+    }
+
+    private DownloadNavItem navItem(String text, String iconKey) {
+        DownloadNavItem node = new DownloadNavItem(text, iconKey);
         navItems.add(node);
         node.setOnMouseClicked(e -> select(text, node));
+        Motion.reveal(node, navItems.size() * 18L);
         return node;
     }
 
