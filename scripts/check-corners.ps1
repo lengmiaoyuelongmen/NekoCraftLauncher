@@ -2,8 +2,7 @@
 # 方角窗口的角点几乎立刻是窗口色（对角线 1~2px）；16px 圆角的窗口大约 4~5px 才出现内容，
 # 因为弧线到外框角的距离约为 0.29 × 半径。
 param(
-    [string]$Title = "Neko Craft Launcher",
-    [int]$MinInset = 3
+    [string]$Title = "Neko Craft Launcher"
 )
 
 $ErrorActionPreference = "Stop"
@@ -23,6 +22,9 @@ public class CornerWin {
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int c);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, IntPtr extra);
   [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
   public static IntPtr Find(string title) {
     IntPtr found = IntPtr.Zero;
@@ -43,10 +45,22 @@ if ($hwnd -eq [IntPtr]::Zero) {
     Write-Host "FAIL: 找不到窗口 '$Title'（先启动启动器）" -ForegroundColor Red
     exit 1
 }
-# 截图前把窗口提到前台，否则 CopyFromScreen 拍到的是压在上面的别的窗口
-[CornerWin]::ShowWindow($hwnd, 9) | Out-Null
-[CornerWin]::SetForegroundWindow($hwnd) | Out-Null
-Start-Sleep -Milliseconds 500
+# 截图前把窗口提到前台，否则 CopyFromScreen 拍到的是压在上面的别的窗口。
+# Windows 会拦住后台进程抢前台，所以先用 ALT 解锁再 SetForegroundWindow（和 smoke 一致）
+$focused = $false
+for ($try = 0; $try -lt 5; $try++) {
+    [CornerWin]::ShowWindow($hwnd, 9) | Out-Null
+    [CornerWin]::keybd_event(0x12, 0, 0, [IntPtr]::Zero)
+    Start-Sleep -Milliseconds 40
+    [CornerWin]::SetForegroundWindow($hwnd) | Out-Null
+    [CornerWin]::keybd_event(0x12, 0, 2, [IntPtr]::Zero)
+    Start-Sleep -Milliseconds 350
+    if ([CornerWin]::GetForegroundWindow() -eq $hwnd) { $focused = $true; break }
+}
+if (-not $focused) {
+    Write-Host "SKIP: 窗口无法切到前台（被别的窗口盖住），本次不判圆角" -ForegroundColor DarkYellow
+    exit 2
+}
 
 $rect = New-Object CornerWin+RECT
 [CornerWin]::GetWindowRect($hwnd, [ref]$rect) | Out-Null
@@ -55,6 +69,14 @@ $h = $rect.Bottom - $rect.Top
 Write-Host ("窗口: {0},{1} {2}x{3}" -f $rect.Left, $rect.Top, $w, $h)
 
 # 多截 24px 边距，用来取"桌面参考色"（窗口内部取样会把阴影当成桌面）
+# 按窗口 DPI 缩放：125% 下同一个圆角的像素跨度会变大
+$dpi = 96
+try { $dpi = [int][CornerWin]::GetDpiForWindow($hwnd) } catch { }
+if ($dpi -le 0) { $dpi = 96 }
+$scale = $dpi / 96.0
+$minRun = [Math]::Max(3, [int][Math]::Round(2.2 * $scale))
+Write-Host ("DPI: {0}（缩放 {1:P0}），阈值 {2}px" -f $dpi, $scale, $minRun)
+
 $margin = 24
 $capW = $w + $margin * 2
 $capH = $h + $margin * 2
@@ -96,11 +118,11 @@ foreach ($c in $corners) {
         if ((Dist $px $desk) -gt 26) { break }
         $run = $i
     }
-    $ok = $run -ge $MinInset
+    $ok = $run -ge $MinRun
     if (-not $ok) { $fail++ }
     $tag = if ($ok) { "OK  " } else { "FAIL" }
     $color = if ($ok) { "Green" } else { "Red" }
-    Write-Host ("{0} {1}: 对角线 {2}px 后才出现内容（阈值 {3}px）" -f $tag, $c.name, ($run + 1), $MinInset) -ForegroundColor $color
+    Write-Host ("{0} {1}: 对角线 {2}px 后才出现内容（阈值 {3}px）" -f $tag, $c.name, ($run + 1), $MinRun) -ForegroundColor $color
 }
 
 $bmp.Dispose()

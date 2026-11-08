@@ -288,15 +288,33 @@ public class SmokeWin {
         Write-Host ("FAIL: 页面没有真正切换（前四张里只有 {0} 张不同，且窗口标题未变）" -f $pageUnique) -ForegroundColor Red
         exit 1
     }
-    # ---------- 圆角自检 ----------
-    $cornerScript = Join-Path $PSScriptRoot "check-corners.ps1"
-    $cornerOk = $false
-    if (Test-Path $cornerScript) {
-        $cornerOut = & powershell -ExecutionPolicy Bypass -File $cornerScript 2>&1
-        $cornerOk = ($LASTEXITCODE -eq 0)
-        Write-Host (($cornerOut | Select-Object -Last 1) -join " ") -ForegroundColor $(if ($cornerOk) { "Green" } else { "Red" })
+    # 打开一次体检弹窗：让"弹窗描边检查"也有数据，然后关掉
+    try {
+        $h2 = [SmokeWin]::Find($Title)
+        if ($h2 -ne [IntPtr]::Zero) {
+            $root2 = [System.Windows.Automation.AutomationElement]::FromHandle($h2)
+            $btnCond = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty, "一键体检")
+            $health = $root2.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $btnCond)
+            if ($health) {
+                $health.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+                Start-Sleep -Milliseconds 1500
+                $closeCond = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty, "关闭")
+                $close = $root2.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $closeCond)
+                if ($close) { $close.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke() }
+                Start-Sleep -Milliseconds 800
+                Write-Host "  · 体检弹窗已开关一次" -ForegroundColor DarkGray
+            }
+        }
+    } catch { Write-Host ("  ! 体检弹窗没打开: {0}" -f $_) -ForegroundColor DarkYellow }
+
+    # ---------- UI 自检（四角 + 描边） ----------
+    $uiScript = Join-Path $PSScriptRoot "check-ui.ps1"
+    $uiOk = $false
+    if (Test-Path $uiScript) {
+        & powershell -ExecutionPolicy Bypass -File $uiScript -LogPath $stdout 2>&1 | ForEach-Object { Write-Host $_ }
+        $uiOk = ($LASTEXITCODE -eq 0)
     } else {
-        Write-Host "FAIL: 缺少 scripts/check-corners.ps1" -ForegroundColor Red
+        Write-Host "FAIL: 缺少 scripts/check-ui.ps1" -ForegroundColor Red
     }
     Write-Host ""
     Write-Host "截图: $($shots -join ', ')" -ForegroundColor DarkGray
@@ -306,25 +324,11 @@ public class SmokeWin {
         Write-Host "完整日志: $stderr" -ForegroundColor Red
         exit 1
     }
-    if (-not $cornerOk) {
-        Write-Host "FAIL: 窗口圆角自检未通过" -ForegroundColor Red
+    if (-not $uiOk) {
+        Write-Host "FAIL: UI 自检未通过（圆角或描边）" -ForegroundColor Red
         exit 1
     }
-    # ---------- 描边自检 ----------
-    $outText = ""
-    if (Test-Path $stdout) { $outText = Get-Content $stdout -Raw -ErrorAction SilentlyContinue }
-    $roundLines = @($outText -split "`r?`n" | Where-Object { $_ -match "圆角描边检查: (\d+) 个节点缺失" })
-    if ($roundLines.Count -eq 0) {
-        Write-Host "FAIL: 没有拿到圆角描边自检结果（页面可能没切换）" -ForegroundColor Red
-        exit 1
-    }
-    $bad = @($roundLines | Where-Object { $_ -notmatch "圆角描边检查: 0 个节点缺失" })
-    if ($bad.Count -gt 0) {
-        Write-Host ("FAIL: 仍有 {0} 次自检发现缺 border-radius 的节点" -f $bad.Count) -ForegroundColor Red
-        $bad | Select-Object -First 3 | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
-        exit 1
-    }
-    Write-Host "PASS: 5 个页面切换完成，stderr 无异常，四角为圆角，描边自检 0 缺失" -ForegroundColor Green
+    Write-Host "PASS: 5 个页面切换完成，stderr 无异常，UI 自检通过" -ForegroundColor Green
     exit 0
 }
 finally {

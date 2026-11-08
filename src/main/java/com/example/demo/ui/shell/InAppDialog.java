@@ -272,8 +272,10 @@ public final class InAppDialog {
         backdrop.setFocusTraversable(true);
 
         layer.getChildren().add(backdrop);
-        // 弹窗里的按钮也是"圆角底 + 方角描边"的高发区，创建后补一次
+        // 弹窗里的按钮也是"圆角底 + 方角描边"的高发区，创建后补一次并自检
         com.example.demo.ui.component.StyleRepair.fixRoundedBorders(backdrop);
+        int missing = com.example.demo.ui.component.StyleRepair.countMissing(backdrop);
+        System.out.println("弹窗描边检查: " + missing + " 个节点缺失");
         // 入场动画：淡入 + 卡片轻微放大，和应用的 Motion 风格一致
         backdrop.setOpacity(0);
         card.setScaleX(0.97);
