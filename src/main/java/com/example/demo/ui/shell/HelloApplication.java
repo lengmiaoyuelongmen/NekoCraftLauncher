@@ -580,7 +580,8 @@ public class HelloApplication extends Application {
       this.dropOverlay.setVisible(false);
       this.dropOverlay.setManaged(false);
       this.dropOverlay.setMouseTransparent(true);
-      this.dropOverlay.setStyle("-fx-background-color: rgba(5,20,18,0.72);");
+      this.dropOverlay.setStyle(
+          "-fx-background-color: rgba(5,20,18,0.72); -fx-background-radius: 16;");
       this.dropTitle = new Label("松开鼠标导入整合包");
       this.dropTitle.setStyle("-fx-text-fill: #ccfbf1; -fx-font-size: 24px; -fx-font-weight: bold;");
       this.dropHint = new Label("支持 .zip / .mrpack，直接拖入窗口即可安装");
@@ -629,6 +630,14 @@ public class HelloApplication extends Application {
             + " -fx-background-insets: 0;");
     root.setMinSize(0.0, 0.0);
     root.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+    // 圆角窗口的经典缺陷：子节点（页面背景图、列表底色）会画到圆角外面，
+    // 让四个角出现方角毛刺。给外壳加一个跟随尺寸的圆角裁剪。
+    javafx.scene.shape.Rectangle shellClip = new javafx.scene.shape.Rectangle();
+    shellClip.setArcWidth(32.0);
+    shellClip.setArcHeight(32.0);
+    shellClip.widthProperty().bind(root.widthProperty());
+    shellClip.heightProperty().bind(root.heightProperty());
+    root.setClip(shellClip);
     return root;
   }
 
@@ -4418,6 +4427,16 @@ private static void setFlexible(Node node, boolean on) {
     lines.add(javaAdvice);
     lines.add(memoryAdvice);
     lines.add(HealthAdvice.heapLine(configuredMemory, HardwareInfo.totalMemoryMb()));
+    long diskFree = 0L;
+    long diskTotal = 0L;
+    try {
+      java.nio.file.FileStore store = java.nio.file.Files.getFileStore(game.toPath());
+      diskFree = store.getUsableSpace();
+      diskTotal = store.getTotalSpace();
+    } catch (Exception ignored) {
+      // 读不到就跳过磁盘检查
+    }
+    lines.add(HealthAdvice.diskLine(diskFree, diskTotal));
     lines.add(new HealthAdvice.Line(
         versionOk, modCount > 0 || versionOk ? "正常" : "提示", modCount + " 个模组文件"));
     lines.add(new HealthAdvice.Line(
@@ -4460,6 +4479,27 @@ private static void setFlexible(Node node, boolean on) {
     dialog.showAndWait();
   }
 
+  /** 报告末尾附最近 N 行启动日志，方便求助时一次贴全。 */
+  private String logTailForReport(int lines) {
+    if (this.logArea == null) {
+      return "";
+    }
+    String[] all = this.logArea.getText().split("\\R");
+    int from = Math.max(0, all.length - lines);
+    StringBuilder tail = new StringBuilder();
+    tail.append(System.lineSeparator())
+        .append("最近 ")
+        .append(Math.min(lines, all.length))
+        .append(" 行启动日志")
+        .append(System.lineSeparator())
+        .append("────────────────────")
+        .append(System.lineSeparator());
+    for (int i = from; i < all.length; i++) {
+      tail.append(all[i]).append(System.lineSeparator());
+    }
+    return tail.toString();
+  }
+
   /** 导出体检报告：写进 game/logs 并复制到剪贴板。 */
   private void exportHealthReport(File game, List<HealthAdvice.Line> lines) {
     String header =
@@ -4468,7 +4508,7 @@ private static void setFlexible(Node node, boolean on) {
                 .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
             + "  实例 "
             + this.currentInstanceId();
-    String text = HealthAdvice.render(header, lines);
+    String text = HealthAdvice.render(header, lines) + this.logTailForReport(50);
     File dir = new File(game, "logs");
     File out =
         new File(
@@ -5156,6 +5196,15 @@ private static void setFlexible(Node node, boolean on) {
     File gameDir = new File(this.config.getGameDir());
     LaunchPreflight.Report report =
         LaunchPreflight.check(gameDir, profile.getJavaMajorVersion());
+    // 内存上限也要在下游戏前说清楚：配置超过物理内存时游戏根本起不来
+    int heapMb =
+        this.config.isAutoMemory()
+            ? MemoryAdvisor.suggest(null).memoryMb()
+            : this.config.getMemoryMb();
+    HealthAdvice.Line heap = HealthAdvice.heapLine(heapMb, HardwareInfo.totalMemoryMb());
+    if (!heap.ok()) {
+      log.accept("⚠ " + heap.message());
+    }
     log.accept(
         "🧪 自检通过：目录可写，磁盘剩余 "
             + report.usableBytes() / 1024L / 1024L / 1024L

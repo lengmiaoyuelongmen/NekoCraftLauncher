@@ -75,4 +75,15 @@ class HealthAdviceTest {
         assertTrue(text.contains("[注意]"), text);
         assertTrue(text.contains("Java 8"), text);
         assertFalse(text.contains("[正常] 正常"), "级别不要和前缀重复：" + text);
+    }    @Test
+    void diskSpaceThresholds() {
+        long gb = 1024L * 1024L * 1024L;
+        assertTrue(HealthAdvice.diskLine(200L * gb, 500L * gb).ok());
+        HealthAdvice.Line low = HealthAdvice.diskLine(1 * gb, 500L * gb);
+        assertFalse(low.ok());
+        assertTrue(low.level().contains("偏低"), low.level());
+        HealthAdvice.Line empty = HealthAdvice.diskLine(300L * 1024 * 1024, 500L * gb);
+        assertFalse(empty.ok());
+        assertTrue(empty.level().contains("不足"), empty.level());
+        assertTrue(HealthAdvice.diskLine(0, 0).ok(), "读不到不误报");
     }}

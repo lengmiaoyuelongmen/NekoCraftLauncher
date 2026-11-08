@@ -115,4 +115,24 @@ public final class HealthAdvice {
             out.append(line.message()).append(System.lineSeparator());
         }
         return out.toString();
+    }
+    /** 游戏目录所在磁盘空间：低于 2 GB 提示，低于 512 MB 直接算问题。 */
+    public static Line diskLine(long freeBytes, long totalBytes) {
+        long freeMb = freeBytes / (1024L * 1024L);
+        long totalMb = totalBytes / (1024L * 1024L);
+        if (freeBytes <= 0) {
+            return new Line(true, "未知", "读不到磁盘剩余空间");
+        }
+        String base = "可用 " + gb(freeMb) + " / 共 " + gb(totalMb);
+        if (freeMb < 512) {
+            return new Line(false, "空间不足", base + "，装不下新版本或资源包，建议先清理");
+        }
+        if (freeMb < 2048) {
+            return new Line(false, "偏低", base + "，更新大版本时可能中途失败");
+        }
+        return new Line(true, "正常", base);
+    }
+
+    private static String gb(long mb) {
+        return String.format(java.util.Locale.ROOT, "%.1f GB", mb / 1024.0);
     }}
