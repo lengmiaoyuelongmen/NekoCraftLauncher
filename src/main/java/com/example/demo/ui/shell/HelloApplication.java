@@ -382,6 +382,8 @@ public class HelloApplication extends Application {
   private javafx.scene.control.ScrollPane launchOverviewScroll;
   private VBox consoleBox;
   private boolean logExpanded;
+  /** 启动前检查只在本次会话里提示一次，避免每次点启动都弹窗。 */
+  private boolean launchAdviceShown;
   private Node currentPageNode;
   private String pendingJoinAddress;
   private Process gameProcess;
@@ -4469,11 +4471,20 @@ private static void setFlexible(Node node, boolean on) {
         });
     Button export = new Button("导出体检报告");
     export.setOnAction(e -> this.exportHealthReport(game, lines));
+    int logLineCount =
+        this.logArea == null ? 0 : this.logArea.getText().split("\\R").length;
+    Label exportHint =
+        new Label(
+            logLineCount <= 0
+                ? "导出时附带最近启动日志"
+                : "导出时附带最近 " + Math.min(50, logLineCount) + " 行启动日志");
+    exportHint.setStyle("-fx-text-fill: -app-text-dim-3; -fx-font-size: 11px;");
 
     Button openCrash = new Button("打开崩溃目录");
     openCrash.setDisable(!hasCrash);
     openCrash.setOnAction(e -> this.openDir(new File(game, "crash-reports")));
-    HBox actions = new HBox(8.0, fullCheck, export, openCrash);
+    HBox actions = new HBox(8.0, fullCheck, export, openCrash, exportHint);
+    actions.setAlignment(Pos.CENTER_LEFT);
     dialog.getDialogPane().setContent(new VBox(12.0, rows, actions));
     dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
     dialog.showAndWait();
@@ -4984,6 +4995,42 @@ private static void setFlexible(Node node, boolean on) {
     return true;
   }
 
+  /** 启动前的硬问题（Java 版本、内存上限、磁盘空间），返回非空就该先提醒。 */
+  private List<String> preLaunchAdvice(String id) {
+    List<String> out = new ArrayList<>();
+    try {
+      VersionProfile profile = VersionProfile.load(new File(this.config.getGameDir()), id);
+      int required = profile.getJavaMajorVersion();
+      JavaScanner.JavaInfo info = JavaScanner.bestMatch(new File(this.config.getGameDir()), required);
+      int available = info == null ? 0 : info.major();
+      HealthAdvice.Line java = HealthAdvice.javaLine(required, available);
+      if (!java.ok()) {
+        out.add(java.message());
+      }
+    } catch (Exception ignored) {
+      // 版本读不出来时交给启动流程报错
+    }
+    int heapMb =
+        this.config.isAutoMemory()
+            ? MemoryAdvisor.suggest(null).memoryMb()
+            : this.config.getMemoryMb();
+    HealthAdvice.Line heap = HealthAdvice.heapLine(heapMb, HardwareInfo.totalMemoryMb());
+    if (!heap.ok()) {
+      out.add(heap.message());
+    }
+    try {
+      java.nio.file.FileStore store =
+          java.nio.file.Files.getFileStore(new File(this.config.getGameDir()).toPath());
+      HealthAdvice.Line disk = HealthAdvice.diskLine(store.getUsableSpace(), store.getTotalSpace());
+      if (!disk.ok()) {
+        out.add(disk.message());
+      }
+    } catch (Exception ignored) {
+      // 读不到磁盘就跳过
+    }
+    return out;
+  }
+
   private void handleLaunch() {
     // 每次只能启动一个：已经在启动流程里，或者已经有游戏进程在跑，都直接拦下
     if (this.blockIfAlreadyRunning()) {
@@ -4997,6 +5044,20 @@ private static void setFlexible(Node node, boolean on) {
     String id = selectedVersion.getId();
     String jsonUrl = selectedVersion.getUrl();
     File gameDir = new File(this.config.getGameDir());
+    // 首次点启动时把体检里的硬问题集中说一次，别让玩家进游戏才发现
+    if (!this.launchAdviceShown) {
+      List<String> bad = this.preLaunchAdvice(id);
+      if (!bad.isEmpty()) {
+        this.launchAdviceShown = true;
+        StringBuilder text = new StringBuilder();
+        for (String line : bad) {
+          text.append("• ").append(line).append("\n");
+        }
+        text.append("\n仍然启动吗？也可以先去「设置」调整。");
+        InAppDialog.confirm(null, "启动前检查", text.toString(), "仍然启动", this::handleLaunch);
+        return;
+      }
+    }
     this.launchState.beginPrepare();
     // 记录本次会话开始时间：崩溃诊断只认这之后生成的 crash-report
     CrashAnalyzer.markSessionStart(System.currentTimeMillis());
