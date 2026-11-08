@@ -981,7 +981,7 @@ Summary resolve(initialIds, fetcher, scanner, maxInstalls, log)
 | 删除实例 | 目录删了，`instances.json` 条目还在 | 成功后 `InstanceMeta.remove()` 一并清掉 |
 | 实例重命名/描述保存 | 写盘失败仍显示「已保存 ✓」 | `InstanceMeta.set` 返回布尔，界面显示「保存失败：磁盘只读或被占用」 |
 | 收藏实例 | 写盘失败无提示 | 失败弹错误提示，不重绘成"已收藏" |
-| 导入取消/失败 | 会删掉**复用**的实例目录（mods/saves 全丢） | `core.instance.ImportRollback` 只删本次新建的东西 |
+| 导入取消/失败 | 会删掉**复用**的实例目录（mods/saves 全丢） | `core.instance.ImportRollback` 只删本次新建的东西（真机复现见下） |
 | 导入成功 | 清单文件没下全也说「安装完成」 | 追加「⚠ 整合包声明 N 个文件，实际下载成功 M 个」 |
 | 克隆实例 | 中途失败留下半成品目录 | `finally` 里清理，源实例不动 |
 | 加载器安装 | 版本与 MC 不匹配也照装 | `core.meta.LoaderCompatibility` 先校验，不匹配直接拦住 |
@@ -991,6 +991,17 @@ Summary resolve(initialIds, fetcher, scanner, maxInstalls, log)
 对应单测从 227 增至 **241**（BulkDelete、ImportRollback、InstanceMeta 写入失败、
 InstanceCloner 回滚、DependencyInstaller 复用判断等）。
 
+**真机复现（2026-11-08 17:30）**：造了一个声明 `minecraft 1.12.2 + fabric-loader 0.15.11`
+的整合包，Fabric 元数据接口对 1.12.2 返回 HTTP 400，两次重试都失败：
+
+```
+❌ 第 1 次安装失败: HTTP 400 -> https://meta.fabricmc.net/v2/versions/loader/1.12.2
+↩ 复用的实例，保留原目录：1.12.2
+❌ 导入失败（已重试 2 次）…
+```
+
+修复后 `versions/1.12.2` 仍是 56 个文件、版本目录仍是 14 个；修复前这条路径会把整个
+实例目录删掉。这也顺带验证了「导入失败 → 回滚」的日志文案。
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：
