@@ -173,6 +173,7 @@ import com.example.demo.core.download.IconProxy;
 import com.example.demo.core.download.Integrity;
 import com.example.demo.core.game.CrashAnalyzer;
 import com.example.demo.core.game.JavaManager;
+import com.example.demo.core.game.JavaScanner;
 import com.example.demo.core.game.LoaderInstaller;
 import com.example.demo.core.runtime.PerformanceOptimizer;
 import com.example.demo.core.runtime.PerformanceTuner;
@@ -248,6 +249,7 @@ import com.example.demo.core.model.LanguageConfig;
 import com.example.demo.core.launch.AutoRepair;
 import com.example.demo.core.launch.IntegrityCachePolicy;
 import com.example.demo.core.launch.GameExit;
+import com.example.demo.core.launch.HealthAdvice;
 import com.example.demo.core.launch.LaunchCompatibility;
 import com.example.demo.core.launch.LaunchGuards;
 import com.example.demo.core.launch.LaunchState;
@@ -3024,7 +3026,11 @@ private static void setFlexible(Node node, boolean on) {
 
   /** 当前实例的适配目标：MC 版本 + 加载器（给社区资源的版本筛选与推荐用）。 */
   private VersionFit.Target currentVersionTarget() {
-    String instanceId = this.currentInstanceId();
+    return this.versionTargetOf(this.currentInstanceId());
+  }
+
+  /** 指定实例的 MC 版本 + 加载器；读不出来时按原版处理。 */
+  private VersionFit.Target versionTargetOf(String instanceId) {
     if (instanceId == null || instanceId.isBlank()) {
       return VersionFit.Target.of("", VersionFit.Loader.VANILLA);
     }
@@ -3627,11 +3633,26 @@ private static void setFlexible(Node node, boolean on) {
               + "\n",
           StandardCharsets.UTF_8);
       // 复用已存在实例时不要改它的显示名，只更新描述
-      InstanceMeta.set(
+      if (!InstanceMeta.set(
           gameDir,
           instanceId,
           createdInstance ? pack.name() : null,
-          pack.format() + " 导入");
+          pack.format() + " 导入")) {
+        sink.accept("⚠ 实例名称/描述没能写入 instances.json（不影响文件安装）");
+      }
+      // 跨加载器导入是常见坑：Forge 实例里塞了 Fabric 模组，进游戏才发现起不来
+      VersionFit.Target importedTarget = this.versionTargetOf(instanceId);
+      List<ModLoaderCheck.Finding> mismatched =
+          ModLoaderCheck.scan(new File(target, "mods"), importedTarget.loader());
+      if (!mismatched.isEmpty()) {
+        String warning =
+            "⚠ 整合包里有模组与当前加载器不匹配："
+                + ModLoaderCheck.describe(mismatched, importedTarget.loader());
+        sink.accept(warning);
+        sink.accept("   可在「一键体检」里复查，或换一个对应加载器的整合包");
+        // 安装进度页看完就关了，主日志里也留一份
+        this.logLine(warning);
+      }
       sink.accept(
           "导入完成: " + pack.name() + " → " + target.getAbsolutePath() + "（" + count + " 个文件）");
 
@@ -4359,6 +4380,30 @@ private static void setFlexible(Node node, boolean on) {
     VersionFit.Target target = this.currentVersionTarget();
     List<ModLoaderCheck.Finding> loaderMismatch =
         ModLoaderCheck.scan(mods, target == null ? null : target.loader());
+    // Java：该版本要求的主版本 vs 扫描到的最合适 Java
+    int requiredJava = HealthAdvice.NO_REQUIREMENT;
+    int availableJava = 0;
+    try {
+      VersionProfile profile = id == null ? null : VersionProfile.load(game, id);
+      if (profile != null) {
+        requiredJava = profile.getJavaMajorVersion();
+        JavaScanner.JavaInfo info = JavaScanner.bestMatch(game, requiredJava);
+        if (info != null) {
+          availableJava = info.major();
+        }
+      }
+    } catch (Exception ignored) {
+      // 版本读不出来时，上面「版本文件」那行会报出来
+    }
+    HealthAdvice.Line javaAdvice = HealthAdvice.javaLine(requiredJava, availableJava);
+    // 内存：自动分配时用建议值，手动设置时用配置值
+    MemoryAdvisor.Suggestion memorySuggestion = MemoryAdvisor.suggest(mods);
+    boolean autoMemory = this.config.isAutoMemory();
+    int configuredMemory =
+        autoMemory ? memorySuggestion.memoryMb() : this.config.getMemoryMb();
+    HealthAdvice.Line memoryAdvice =
+        HealthAdvice.memoryLine(
+            configuredMemory, memorySuggestion.memoryMb(), autoMemory, memorySuggestion.reason());
     Dialog<ButtonType> dialog = new Dialog<>();
     dialog.initOwner(this.stageRef);
     dialog.setTitle("一键体检");
@@ -4368,7 +4413,8 @@ private static void setFlexible(Node node, boolean on) {
             8.0,
             this.healthRow(
                 versionOk ? "正常" : "缺失", versionOk ? "版本文件存在" : "版本 JSON / 客户端文件不完整", versionOk),
-            this.healthRow("正常", "Java 由启动器自动选择", true),
+            this.healthRow(javaAdvice.level(), javaAdvice.message(), javaAdvice.ok()),
+            this.healthRow(memoryAdvice.level(), memoryAdvice.message(), memoryAdvice.ok()),
             this.healthRow(modCount > 0 || versionOk ? "正常" : "提示", modCount + " 个模组文件", versionOk),
             this.healthRow(
                 hasCrash ? "有记录" : "正常",

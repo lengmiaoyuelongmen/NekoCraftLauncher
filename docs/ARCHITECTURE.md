@@ -1048,6 +1048,24 @@ InstanceCloner 回滚、DependencyInstaller 复用判断等）。
 真机：往原版 1.12.2 的 mods 里丢一个 `nekofake-1.0.0.jar`（带 `fabric.mod.json`），体检面板多出一行
 「不匹配 · 实例是原版，却装了 1 个模组（原版加载不了模组）：nekofake-1.0.0.jar」。
 
+### 体检三连（2026-11-08 20:25）
+
+1. **Java 行不再是死文案**：读版本 JSON 的 `javaMajorVersion`，再用 `JavaScanner.bestMatch` 找本机最合适的
+   Java，结论交给 `core.launch.HealthAdvice.javaLine(要求, 实际)`——没要求 / 缺 Java / 版本过低 / 正常，四种说法。
+2. **内存行按建议值判断**：`MemoryAdvisor.suggest(mods)` 给建议，自动分配时直接用建议值，手动设置时用配置值；
+   低于建议 75% 才提示「偏低」，差一点不制造焦虑。
+3. **导入后跨加载器提示**：整合包落盘后用 `ModLoaderCheck.scan(target/mods, 实例加载器)` 检查，
+   不匹配就写日志（同时进安装进度与主日志）：
+
+```
+⚠ 整合包里有模组与当前加载器不匹配：实例是原版，却装了 1 个模组（原版加载不了模组）：nekocross-1.0.0.jar
+   可在「一键体检」里复查，或换一个对应加载器的整合包
+```
+
+真机：体检面板显示「正常 · Java 8（该版本要求 8）」与「正常 · 自动分配 8704 MB（建议 8704 MB，本机 23 GB × 35% = 8522 MB…）」；
+把一个带 `fabric.mod.json` 的 jar 打进整合包导入原版 1.12.2，日志出现上面那条警告（重试时会重复，
+因为每次尝试都会重新扫描，属于预期）。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：
