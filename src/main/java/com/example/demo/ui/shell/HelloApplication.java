@@ -196,6 +196,7 @@ import com.example.demo.core.mod.ModConflictChecker;
 import com.example.demo.core.mod.DependencyInstaller;
 import com.example.demo.core.mod.DependencyResolver;
 import com.example.demo.core.mod.ModDependencyScanner;
+import com.example.demo.core.mod.ModLoaderCheck;
 import com.example.demo.core.mod.ModpackExporter;
 import com.example.demo.core.mod.ModpackImport;
 import com.example.demo.core.mod.ServerPackExporter;
@@ -4355,6 +4356,9 @@ private static void setFlexible(Node node, boolean on) {
         (reports = new File(game, "crash-reports").listFiles((d, n) -> n.endsWith(".txt"))) != null
             && reports.length > 0;
     List<String> conflicts = ModConflictChecker.check(mods);
+    VersionFit.Target target = this.currentVersionTarget();
+    List<ModLoaderCheck.Finding> loaderMismatch =
+        ModLoaderCheck.scan(mods, target == null ? null : target.loader());
     Dialog<ButtonType> dialog = new Dialog<>();
     dialog.initOwner(this.stageRef);
     dialog.setTitle("一键体检");
@@ -4375,7 +4379,13 @@ private static void setFlexible(Node node, boolean on) {
                 (conflicts.isEmpty()
                     ? "未发现重复 modId"
                     : "发现 " + conflicts.size() + " 个模组冲突：" + conflicts.get(0)),
-                conflicts.isEmpty()));
+                conflicts.isEmpty()),
+            this.healthRow(
+                loaderMismatch.isEmpty() ? "正常" : "不匹配",
+                (loaderMismatch.isEmpty()
+                    ? "模组与实例加载器一致"
+                    : ModLoaderCheck.describe(loaderMismatch, target.loader())),
+                loaderMismatch.isEmpty()));
     Button fullCheck = new Button("运行完整性检查");
     fullCheck.setDisable(id == null);
     fullCheck.setOnAction(

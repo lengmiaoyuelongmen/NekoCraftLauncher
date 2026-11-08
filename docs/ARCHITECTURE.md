@@ -1029,6 +1029,25 @@ InstanceCloner 回滚、DependencyInstaller 复用判断等）。
 真机（Minecraft 26.3）：NeoForge 行显示「没有支持 26.3 的 NeoForge 构建」且置灰，Fabric 行
 照常列出 0.20.1 / 0.20.0 / 0.19.5…，Forge 行无异常。
 
+### 一键体检：模组与加载器是否匹配（2026-11-08 19:30）
+
+新增 `core.mod.ModLoaderCheck`：按 jar 里的元数据判断模组家族（`fabric.mod.json` → Fabric、
+`quilt.mod.json` → Quilt、`META-INF/neoforge.mods.toml` → NeoForge、`META-INF/mods.toml` /
+`mcmod.info` → Forge），再和实例实际加载器比对：
+
+| 实例加载器 | 允许的模组 |
+|---|---|
+| Fabric | Fabric |
+| Quilt | Fabric / Quilt |
+| Forge | Forge |
+| NeoForge | NeoForge |
+| 原版 | 无（装了就是错） |
+
+`.jar.disabled` 不参与判断（用户已经关掉了）。认不出家族的 jar 一律不报，交给完整性检查。
+
+真机：往原版 1.12.2 的 mods 里丢一个 `nekofake-1.0.0.jar`（带 `fabric.mod.json`），体检面板多出一行
+「不匹配 · 实例是原版，却装了 1 个模组（原版加载不了模组）：nekofake-1.0.0.jar」。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：
