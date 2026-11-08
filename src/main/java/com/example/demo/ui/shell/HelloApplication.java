@@ -3898,8 +3898,8 @@ private static void setFlexible(Node node, boolean on) {
   }
 
   /** 静默删除临时目录。 */
-  private static void deleteTree(File dir) {
-    InstanceFiles.deleteTree(dir);
+  private static boolean deleteTree(File dir) {
+    return InstanceFiles.deleteTree(dir);
   }
 
   /** 失败时把这次安装新建的实例和版本目录清掉，避免留下半成品实例。 */
