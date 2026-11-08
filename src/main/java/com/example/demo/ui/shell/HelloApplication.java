@@ -154,6 +154,7 @@ import com.example.demo.core.meta.LoaderCompatibility;
 import com.example.demo.core.meta.VersionManager;
 import com.example.demo.core.meta.VersionProfile;
 import com.example.demo.core.model.AssetIndex;
+import com.example.demo.core.instance.ImportRollback;
 import com.example.demo.core.model.Instance;
 import com.example.demo.core.model.InstanceDirs;
 import com.example.demo.core.model.InstanceSettings;
@@ -3575,7 +3576,13 @@ private static void setFlexible(Node node, boolean on) {
           });
       int count = ModpackImport.extract(archive, staging, sink);
       this.checkImportCancelled();
-      count += ModpackImport.installIndexedFiles(archive, staging, sink);
+      int indexed = ModpackImport.installIndexedFiles(archive, staging, sink);
+      count += indexed;
+      if (pack.declaredFiles() > 0 && indexed < pack.declaredFiles()) {
+        // 清单里的文件没全下来：不拦安装（有些包会把可选文件写进清单），但必须说清楚
+        sink.accept(
+            "⚠ 整合包声明 " + pack.declaredFiles() + " 个文件，实际下载成功 " + indexed + " 个");
+      }
       ModpackImport.flattenMods(staging, sink);
       this.checkImportCancelled();
 
@@ -3897,19 +3904,20 @@ private static void setFlexible(Node node, boolean on) {
 
   /** 失败时把这次安装新建的实例和版本目录清掉，避免留下半成品实例。 */
   private void rollbackCreatedInstance(File gameDir, String instanceId, String createdVersion) {
-    if (instanceId == null) {
-      return;
+    ImportRollback.Plan plan = ImportRollback.planFor(instanceId, createdVersion);
+    if (!plan.note().isEmpty()) {
+      this.logLine("↩ " + plan.note());
     }
-    try {
-      File instanceDir = InstanceDirs.root(gameDir, instanceId, true);
-      deleteTree(instanceDir);
-      this.logLine("↩ 已清理本次创建的实例目录: " + instanceId);
-    } catch (Exception ignored) {
-      // 忽略
+    if (plan.deleteInstanceDir()) {
+      try {
+        deleteTree(InstanceDirs.root(gameDir, instanceId, true));
+      } catch (Exception ignored) {
+        // 忽略
+      }
     }
-    if (createdVersion != null) {
+    if (plan.deleteVersionDir()) {
+      // 复用实例时 createdVersion 为 null：只删本次新建的版本，绝不碰用户已有实例
       deleteTree(new File(new File(gameDir, "versions"), createdVersion));
-      this.logLine("↩ 已清理本次安装的加载器版本: " + createdVersion);
     }
   }
 
