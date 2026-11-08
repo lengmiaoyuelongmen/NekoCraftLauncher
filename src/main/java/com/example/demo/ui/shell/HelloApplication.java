@@ -3909,15 +3909,17 @@ private static void setFlexible(Node node, boolean on) {
       this.logLine("↩ " + plan.note());
     }
     if (plan.deleteInstanceDir()) {
-      try {
-        deleteTree(InstanceDirs.root(gameDir, instanceId, true));
-      } catch (Exception ignored) {
-        // 忽略
+      File instanceDir = InstanceDirs.root(gameDir, instanceId, true);
+      if (!deleteTree(instanceDir)) {
+        this.logLine("⚠ 实例目录没能清理干净（可能被游戏或资源管理器占用）: " + instanceDir);
       }
     }
     if (plan.deleteVersionDir()) {
       // 复用实例时 createdVersion 为 null：只删本次新建的版本，绝不碰用户已有实例
-      deleteTree(new File(new File(gameDir, "versions"), createdVersion));
+      File versionDir = new File(new File(gameDir, "versions"), createdVersion);
+      if (!deleteTree(versionDir)) {
+        this.logLine("⚠ 版本目录没能清理干净（可能被游戏或资源管理器占用）: " + versionDir);
+      }
     }
   }
 
