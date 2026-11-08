@@ -273,9 +273,10 @@ public final class InAppDialog {
 
         layer.getChildren().add(backdrop);
         // 弹窗里的按钮也是"圆角底 + 方角描边"的高发区，创建后补一次并自检
-        com.example.demo.ui.component.StyleRepair.fixRoundedBorders(backdrop);
+        int fixedCount = com.example.demo.ui.component.StyleRepair.fixRoundedBorders(backdrop);
         int missing = com.example.demo.ui.component.StyleRepair.countMissing(backdrop);
-        System.out.println("弹窗描边检查: " + missing + " 个节点缺失");
+        System.out.println(
+                "弹窗描边修复: " + fixedCount + " 个，剩余缺失: " + missing + " 个");
         // 入场动画：淡入 + 卡片轻微放大，和应用的 Motion 风格一致
         backdrop.setOpacity(0);
         card.setScaleX(0.97);
@@ -299,6 +300,15 @@ public final class InAppDialog {
         out.setToValue(0);
         out.setOnFinished(e -> host.getChildren().remove(backdrop));
         out.play();
+    }
+
+    /** 关掉宿主层里所有弹窗（自检/自动化用）。 */
+    public static void closeAll() {
+        StackPane layer = globalHost;
+        if (layer == null) {
+            return;
+        }
+        layer.getChildren().clear();
     }
 
     /** 宿主层里当前是否有弹窗。 */

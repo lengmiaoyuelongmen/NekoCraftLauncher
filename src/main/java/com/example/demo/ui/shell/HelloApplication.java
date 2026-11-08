@@ -888,6 +888,21 @@ public class HelloApplication extends Application {
     // 弹窗层直接叠在原根节点上：外面再包一层 StackPane 会破坏窗口圆角与描边
     rootWrap.getChildren().add(this.dialogLayer);
     Scene scene = this.createScene(rootWrap, stage);
+    // 自动化自检：启动后自动开一个弹窗再关掉，让「弹窗描边」也进日志
+    if (System.getProperty("mc.uiSelfCheck") != null) {
+      Platform.runLater(
+          () -> {
+            PauseTransition delay = new PauseTransition(Duration.millis(2500));
+            delay.setOnFinished(
+                ev -> {
+                  InAppDialog.alert("UI 自检", "圆角描边自检：这个弹窗会自动关闭");
+                  PauseTransition close = new PauseTransition(Duration.millis(700));
+                  close.setOnFinished(e2 -> InAppDialog.closeAll());
+                  close.play();
+                });
+            delay.play();
+          });
+    }
     Platform.setImplicitExit(false);
     stage.setOpacity(Math.max(0.7, Math.min(1.0, this.config.getUiOpacity())));
     stage.setTitle("Neko Craft Launcher");
@@ -1097,10 +1112,11 @@ public class HelloApplication extends Application {
     Platform.runLater(
         () -> {
           try {
-            StyleRepair.fixRoundedBorders(this.rootPane);
+            int fixedCount = StyleRepair.fixRoundedBorders(this.rootPane);
             // 自检：修完还有缺失，说明某个节点的背景半径读不出来；冒烟会检查这一行
             int missing = StyleRepair.countMissing(this.rootPane);
-            System.out.println("圆角描边检查: " + missing + " 个节点缺失");
+            System.out.println(
+                "圆角描边修复: " + fixedCount + " 个，剩余缺失: " + missing + " 个");
           } catch (Exception ignored) {
             // 样式修复失败不影响功能
           }

@@ -151,7 +151,7 @@ public class SmokeWin {
     $javaExe = Join-Path $JavaHome "bin\javaw.exe"
     if (-not (Test-Path $javaExe)) { $javaExe = Join-Path $JavaHome "bin\java.exe" }
     $launcher = Start-Process -FilePath $javaExe `
-        -ArgumentList '-jar', $Jar -WorkingDirectory $root `
+        -ArgumentList '-Dmc.uiSelfCheck=1', '-jar', $Jar -WorkingDirectory $root `
         -RedirectStandardOutput $stdout -RedirectStandardError $stderr -WindowStyle Hidden -PassThru
     # 轮询等窗口出现，不要用固定 sleep（冷启动/杀毒扫描会拖慢）
     if (-not (Wait-Launcher ([Math]::Max(90, $StartupWaitSec + 20)))) {
@@ -311,7 +311,7 @@ public class SmokeWin {
     $uiScript = Join-Path $PSScriptRoot "check-ui.ps1"
     $uiOk = $false
     if (Test-Path $uiScript) {
-        & powershell -ExecutionPolicy Bypass -File $uiScript -LogPath $stdout 2>&1 | ForEach-Object { Write-Host $_ }
+        & powershell -ExecutionPolicy Bypass -File $uiScript -LogPath $stdout -RequireDialog 2>&1 | ForEach-Object { Write-Host $_ }
         $uiOk = ($LASTEXITCODE -eq 0)
     } else {
         Write-Host "FAIL: 缺少 scripts/check-ui.ps1" -ForegroundColor Red

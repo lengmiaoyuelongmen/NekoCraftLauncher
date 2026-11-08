@@ -3,7 +3,8 @@
 param(
     [string]$Title = "Neko Craft Launcher",
     [string]$LogPath = "",
-    [switch]$SkipCorners
+    [switch]$SkipCorners,
+    [switch]$RequireDialog
 )
 
 $ErrorActionPreference = "Continue"
@@ -31,25 +32,34 @@ if ($LogPath) {
         $fail++
     } else {
         $text = Get-Content $LogPath -Raw -ErrorAction SilentlyContinue
-        $pageLines = @($text -split "`r?`n" | Where-Object { $_ -match "圆角描边检查: (\d+) 个节点缺失" })
-        $dialogLines = @($text -split "`r?`n" | Where-Object { $_ -match "弹窗描边检查: (\d+) 个节点缺失" })
+        # 形如：圆角描边修复: 3 个，剩余缺失: 0 个
+        $pageLines = @($text -split "`r?`n" | Where-Object { $_ -match "圆角描边修复: \d+ 个，剩余缺失: \d+ 个" })
+        $dialogLines = @($text -split "`r?`n" | Where-Object { $_ -match "弹窗描边修复: \d+ 个，剩余缺失: \d+ 个" })
         if ($pageLines.Count -eq 0) {
-            Write-Host "FAIL: 日志里没有『圆角描边检查』（页面可能没切换过）" -ForegroundColor Red
+            Write-Host "FAIL: 日志里没有『圆角描边修复』（页面可能没切换过）" -ForegroundColor Red
             $fail++
         }
-        $badPage = @($pageLines | Where-Object { $_ -notmatch "圆角描边检查: 0 个节点缺失" })
+        $badPage = @($pageLines | Where-Object { $_ -notmatch "剩余缺失: 0 个" })
         if ($badPage.Count -gt 0) {
             Write-Host ("FAIL: {0} 次页面自检发现缺 border-radius 的节点" -f $badPage.Count) -ForegroundColor Red
             $badPage | Select-Object -First 3 | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
             $fail++
         }
-        $badDialog = @($dialogLines | Where-Object { $_ -notmatch "弹窗描边检查: 0 个节点缺失" })
+        $badDialog = @($dialogLines | Where-Object { $_ -notmatch "剩余缺失: 0 个" })
         if ($badDialog.Count -gt 0) {
             Write-Host ("FAIL: {0} 次弹窗自检发现缺 border-radius 的节点" -f $badDialog.Count) -ForegroundColor Red
             $badDialog | Select-Object -First 3 | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
             $fail++
         }
-        Write-Host ("页面自检 {0} 次、弹窗自检 {1} 次，全部为 0 缺失" -f $pageLines.Count, $dialogLines.Count) -ForegroundColor DarkGray
+        if ($RequireDialog -and $dialogLines.Count -eq 0) {
+            Write-Host "FAIL: 要求至少打开过一次弹窗（弹窗自检 0 次）" -ForegroundColor Red
+            $fail++
+        }
+        $pageFixed = 0
+        foreach ($line in $pageLines) {
+            if ($line -match "圆角描边修复: (\d+) 个") { $pageFixed += [int]$Matches[1] }
+        }
+        Write-Host ("页面自检 {0} 次（累计修复 {1} 个）、弹窗自检 {2} 次" -f $pageLines.Count, $pageFixed, $dialogLines.Count) -ForegroundColor DarkGray
     }
 }
 

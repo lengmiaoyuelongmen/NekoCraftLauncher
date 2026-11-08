@@ -20,19 +20,24 @@ public final class StyleRepair {
     private StyleRepair() {
     }
 
-    /** 修复 root 及其所有子节点。 */
-    public static void fixRoundedBorders(Parent root) {
+    /**
+     * 修复 root 及其所有子节点。
+     *
+     * @return 本次修好的节点数量
+     */
+    public static int fixRoundedBorders(Parent root) {
         if (root == null) {
-            return;
+            return 0;
         }
-        fixOne(root);
+        int fixed = fixOne(root) ? 1 : 0;
         for (Node child : root.getChildrenUnmodifiable()) {
             if (child instanceof Parent parent) {
-                fixRoundedBorders(parent);
+                fixed += fixRoundedBorders(parent);
             } else {
-                fixOne(child);
+                fixed += fixOne(child) ? 1 : 0;
             }
         }
+        return fixed;
     }
 
     /** 只判断、不修改：用于自检。只有"圆角底 + 方角边"才算缺陷，直线分隔线不算。 */
