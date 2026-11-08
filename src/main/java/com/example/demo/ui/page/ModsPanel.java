@@ -1596,19 +1596,27 @@ public final class ModsPanel extends VBox {
             Toast.info("先勾选要操作的模组");
             return;
         }
+        int attempted = 0;
         int changed = 0;
         for (String name : new ArrayList<>(selectedMods)) {
             File file = new File(modsDir, name);
             if (!file.isFile()) continue;
             boolean disabled = name.toLowerCase(Locale.ROOT).endsWith(".disabled");
             if (disabled == enabled) continue;
+            attempted++;
             File target = enabled
                     ? new File(modsDir, name.substring(0, name.length() - ".disabled".length()))
                     : new File(modsDir, name + ".disabled");
             if (file.renameTo(target)) changed++;
         }
-        log("🧩 已" + (enabled ? "启用" : "禁用") + "选中 " + changed + " 个模组");
-        Toast.ok("已" + (enabled ? "启用" : "禁用") + " " + changed + " 个模组");
+        String verb = enabled ? "启用" : "禁用";
+        BulkDelete result = new BulkDelete(attempted, changed);
+        log("🧩 " + result.logMessage("已" + verb, "选中模组").replace("🗑️ ", ""));
+        if (result.shouldWarn()) {
+            Toast.error(result.toastMessage(verb, "模组"));
+        } else {
+            Toast.ok(result.toastMessage(verb, "模组"));
+        }
         selectedMods.clear();
         lastSignature = "";
         metaSignature = "";

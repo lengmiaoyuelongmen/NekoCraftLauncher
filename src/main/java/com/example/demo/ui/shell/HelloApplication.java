@@ -5778,6 +5778,8 @@ private static void setFlexible(Node node, boolean on) {
           Platform.runLater(
               () -> {
                 if (ok) {
+                  // 元数据跟着实例一起清掉，否则以后新建同 id 实例会继承旧名字
+                  InstanceMeta.remove(new File(this.config.getGameDir()), id);
                   this.logMessage("🗑️ 已删除实例 " + id);
                   this.refreshInstalledVersions();
                   if (this.instanceSettingsPanel != null) {

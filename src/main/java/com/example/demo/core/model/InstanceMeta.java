@@ -76,6 +76,18 @@ public final class InstanceMeta {
         saveAll(gameDir, all);
     }
 
+    /** 删除实例时清掉它的显示名/描述，避免以后新建同 id 实例继承旧信息。 */
+    public static void remove(File gameDir, String id) {
+        if (id == null) {
+            return;
+        }
+        JsonObject all = loadAll(gameDir);
+        if (all.has(id)) {
+            all.remove(id);
+            saveAll(gameDir, all);
+        }
+    }
+
     public static void set(File gameDir, String id, String name, String description) {
         JsonObject all = loadAll(gameDir);
         JsonObject meta = all.has(id) && all.get(id).isJsonObject()

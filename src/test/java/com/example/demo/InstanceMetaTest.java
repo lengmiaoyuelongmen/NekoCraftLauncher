@@ -57,4 +57,16 @@ class InstanceMetaTest {
         assertTrue(raw.contains("测试整合包 TestPack"), "中文必须按 UTF-8 落盘");
         assertTrue(raw.contains("Modrinth 导入"));
     }
+    @Test
+    void removeDropsOnlyThatInstance(@TempDir File gameDir) {
+        InstanceMeta.set(gameDir, "1.12.2", "Multi File Pack", "Modrinth 导入");
+        InstanceMeta.set(gameDir, "1.20.1", "Forge Loader Test", "Modrinth 导入");
+        InstanceMeta.remove(gameDir, "1.12.2");
+        assertEquals("1.12.2", InstanceMeta.name(gameDir, "1.12.2"), "删掉的实例回退成 id");
+        assertEquals("Forge Loader Test", InstanceMeta.name(gameDir, "1.20.1"), "别的实例不受影响");
+        InstanceMeta.remove(gameDir, null);
+        InstanceMeta.remove(gameDir, "missing");
+        assertEquals("Forge Loader Test", InstanceMeta.name(gameDir, "1.20.1"));
+    }
+
 }
