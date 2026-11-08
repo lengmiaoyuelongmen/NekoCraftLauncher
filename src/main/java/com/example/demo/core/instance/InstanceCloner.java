@@ -39,9 +39,19 @@ public final class InstanceCloner {
         String newId = freeId(versions, sourceId + "-copy");
         File target = new File(versions, newId);
 
-        InstanceFiles.copyTree(source, target, copyData ? Set.of() : DATA_DIRS);
-        renameVersionJson(target, sourceId, newId);
-        return target;
+        // 中途失败（磁盘满、文件被占用、json 损坏）必须把半成品删掉，
+        // 否则 versions 下会留下一个名字对不上、又删不掉的残壳实例
+        boolean done = false;
+        try {
+            InstanceFiles.copyTree(source, target, copyData ? Set.of() : DATA_DIRS);
+            renameVersionJson(target, sourceId, newId);
+            done = true;
+            return target;
+        } finally {
+            if (!done) {
+                InstanceFiles.deleteTree(target);
+            }
+        }
     }
 
     /** 找一个还没被占用的 id：{@code foo-copy}、{@code foo-copy2}… */

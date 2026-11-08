@@ -66,4 +66,24 @@ class InstanceClonerTest {
         assertEquals("1.20.1-copy", first.getName());
         assertEquals("1.20.1-copy2", second.getName(), "重名时自动加序号");
     }
+    @Test
+    void failedCloneLeavesNothingBehind(@TempDir Path temp) throws Exception {
+        Path version = Files.createDirectories(temp.resolve("versions/1.12.2"));
+        // 故意写坏版本 JSON：复制能过，改写 id 时会抛异常
+        Files.writeString(version.resolve("1.12.2.json"), "{ not json", StandardCharsets.UTF_8);
+        Files.writeString(version.resolve("1.12.2.jar"), "jar", StandardCharsets.UTF_8);
+
+        File game = temp.toFile();
+        boolean threw = false;
+        try {
+            InstanceCloner.duplicate(game, "1.12.2", false);
+        } catch (Exception expected) {
+            threw = true;
+        }
+        assertTrue(threw, "坏 JSON 应该让克隆失败");
+        assertFalse(new File(game, "versions/1.12.2-copy").exists(),
+                "失败后不能留下半成品实例目录");
+        assertTrue(new File(game, "versions/1.12.2").isDirectory(), "源实例必须原样保留");
+    }
+
 }
