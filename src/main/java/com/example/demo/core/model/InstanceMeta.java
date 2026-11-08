@@ -31,10 +31,13 @@ public final class InstanceMeta {
         }
     }
 
-    private static void saveAll(File gameDir, JsonObject root) {
+    /** @return 是否写盘成功（磁盘满 / 只读 / 被占用时为 false） */
+    private static boolean saveAll(File gameDir, JsonObject root) {
         try (Writer writer = new FileWriter(file(gameDir))) {
             GSON.toJson(root, writer);
-        } catch (Exception ignored) {
+            return true;
+        } catch (Exception e) {
+            return false;
         }
     }
 
@@ -67,13 +70,14 @@ public final class InstanceMeta {
         return false;
     }
 
-    public static void setFavorite(File gameDir, String id, boolean favorite) {
+    /** @return 是否写盘成功 */
+    public static boolean setFavorite(File gameDir, String id, boolean favorite) {
         JsonObject all = loadAll(gameDir);
         JsonObject meta = all.has(id) && all.get(id).isJsonObject()
                 ? all.getAsJsonObject(id) : new JsonObject();
         meta.addProperty("fav", favorite);
         all.add(id, meta);
-        saveAll(gameDir, all);
+        return saveAll(gameDir, all);
     }
 
     /** 删除实例时清掉它的显示名/描述，避免以后新建同 id 实例继承旧信息。 */
@@ -88,13 +92,14 @@ public final class InstanceMeta {
         }
     }
 
-    public static void set(File gameDir, String id, String name, String description) {
+    /** @return 是否写盘成功 */
+    public static boolean set(File gameDir, String id, String name, String description) {
         JsonObject all = loadAll(gameDir);
         JsonObject meta = all.has(id) && all.get(id).isJsonObject()
                 ? all.getAsJsonObject(id) : new JsonObject();
         if (name != null) meta.addProperty("name", name);
         if (description != null) meta.addProperty("desc", description);
         all.add(id, meta);
-        saveAll(gameDir, all);
+        return saveAll(gameDir, all);
     }
 }

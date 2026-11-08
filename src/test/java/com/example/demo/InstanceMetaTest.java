@@ -69,4 +69,15 @@ class InstanceMetaTest {
         assertEquals("Forge Loader Test", InstanceMeta.name(gameDir, "1.20.1"));
     }
 
+    @Test
+    void writeFailureIsReported(@TempDir File gameDir) throws Exception {
+        // 用一个同名目录占住 instances.json 的位置，让写入必然失败
+        java.io.File blocker = new java.io.File(gameDir, "instances.json");
+        java.nio.file.Files.createDirectories(blocker.toPath());
+
+        assertFalse(InstanceMeta.set(gameDir, "1.12.2", "名字", "描述"), "写盘失败必须返回 false");
+        assertFalse(InstanceMeta.setFavorite(gameDir, "1.12.2", true));
+        assertEquals("1.12.2", InstanceMeta.name(gameDir, "1.12.2"), "失败时不能假装写进去了");
+    }
+
 }

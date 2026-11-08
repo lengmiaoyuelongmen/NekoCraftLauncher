@@ -1675,7 +1675,8 @@ public final class ModsPanel extends VBox {
         }
     }
 
-    private void saveIndex() {
+    /** 把模组版本记录写盘；写失败返回 false（调用方要提示，否则下次更新会重复装）。 */
+    private boolean saveIndex() {
         JsonObject root = new JsonObject();
         for (Map.Entry<String, String[]> entry : modIndex.entrySet()) {
             JsonObject meta = new JsonObject();
@@ -1686,7 +1687,10 @@ public final class ModsPanel extends VBox {
         }
         try (java.io.Writer writer = new java.io.FileWriter(indexFile())) {
             new com.google.gson.GsonBuilder().setPrettyPrinting().create().toJson(root, writer);
-        } catch (Exception ignored) {
+            return true;
+        } catch (Exception e) {
+            log("⚠ 模组版本记录没能保存（下次更新可能重复）: " + e.getMessage());
+            return false;
         }
     }
 
