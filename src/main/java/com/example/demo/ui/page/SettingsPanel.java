@@ -407,6 +407,9 @@ public final class SettingsPanel extends VBox {
 
         Label text = new Label(name);
         text.setStyle("-fx-text-fill: -app-text-dim; -fx-font-size: 13px;");
+        // 点击必须落在整行上：文字与色条不吞事件，否则只点中文字时选不中分栏
+        text.setMouseTransparent(true);
+        bar.setMouseTransparent(true);
         item.getChildren().addAll(bar, text);
         item.setOnMouseClicked(e -> selectTab(name));
         tabItems.put(name, item);
@@ -587,7 +590,7 @@ public final class SettingsPanel extends VBox {
                 autoDepsBox,
                 autoRepairBox,
                 labeled("完整性抽样", new HBox(10, assetSampleSpinner, hint("每个实例抽样校验的 assets 对象数，0 = 不抽样"))),
-                hint("模组依赖只做提示，不再自动补装"));
+                hint("自动补装会从 Modrinth 按当前实例的版本与加载器挑选，缺前置时先弹窗确认"));
         return scroll(card);
     }
 
