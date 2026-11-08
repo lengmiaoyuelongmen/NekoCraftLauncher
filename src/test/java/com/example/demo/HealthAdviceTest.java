@@ -50,4 +50,29 @@ class HealthAdviceTest {
         assertTrue(HealthAdvice.memoryLine(8704, 8704, true, "本机 23 GB").ok());
         assertTrue(HealthAdvice.memoryLine(2048, 2048, true, "").ok(), "建议值本身永远算合格");
     }
-}
+    @Test
+    void heapAbovePhysicalMemoryIsFlagged() {
+        HealthAdvice.Line tooBig = HealthAdvice.heapLine(16384, 8192);
+        assertFalse(tooBig.ok());
+        assertTrue(tooBig.level().contains("超出"), tooBig.level());
+        assertTrue(tooBig.message().contains("建议降到"), tooBig.message());
+
+        HealthAdvice.Line tight = HealthAdvice.heapLine(7000, 8192);
+        assertFalse(tight.ok(), "超过物理内存 80% 要提示");
+        assertTrue(tight.level().contains("偏高"), tight.level());
+
+        assertTrue(HealthAdvice.heapLine(4096, 8192).ok());
+        assertTrue(HealthAdvice.heapLine(2048, 0).ok(), "读不到物理内存时不误报");
+    }
+
+    @Test
+    void reportListsEveryLine() {
+        String text = HealthAdvice.render("实例 1.12.2", java.util.List.of(
+                HealthAdvice.javaLine(8, 8),
+                HealthAdvice.memoryLine(1024, 8704, false, "")));
+        assertTrue(text.contains("实例 1.12.2"), text);
+        assertTrue(text.contains("[正常]"), text);
+        assertTrue(text.contains("[注意]"), text);
+        assertTrue(text.contains("Java 8"), text);
+        assertFalse(text.contains("[正常] 正常"), "级别不要和前缀重复：" + text);
+    }}

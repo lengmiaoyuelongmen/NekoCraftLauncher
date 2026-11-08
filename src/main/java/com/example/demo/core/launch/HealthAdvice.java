@@ -68,4 +68,51 @@ public final class HealthAdvice {
         }
         return new Line(false, "偏低", base + "，大型整合包可能卡顿或 OOM");
     }
-}
+
+    /**
+     * Java 最大内存和物理内存是否匹配。
+     *
+     * @param maxHeapMb 配置（或自动分配）的最大堆内存
+     * @param physicalMb 本机物理内存（0 = 读不到，跳过判断）
+     */
+    public static Line heapLine(int maxHeapMb, long physicalMb) {
+        if (physicalMb <= 0 || maxHeapMb <= 0) {
+            return new Line(true, "未知", "读不到物理内存，跳过内存上限检查");
+        }
+        // 给系统和显存留出余量：超过物理内存的 80% 就容易触发整机交换
+        long safeLimit = Math.round(physicalMb * 0.8);
+        String base = "-Xmx " + maxHeapMb + " MB（本机 " + physicalMb + " MB）";
+        if (maxHeapMb > physicalMb) {
+            return new Line(
+                    false,
+                    "超出物理内存",
+                    base + "，超过本机内存，启动会失败或疯狂交换，建议降到 " + safeLimit + " MB 以内");
+        }
+        if (maxHeapMb > safeLimit) {
+            return new Line(
+                    false,
+                    "偏高",
+                    base + "，已占物理内存 80% 以上，系统和其他程序可能被挤爆，建议 " + safeLimit + " MB 以内");
+        }
+        return new Line(true, "正常", base);
+    }
+
+    /** 把体检结果渲染成可导出的文本。 */
+    public static String render(String header, java.util.List<Line> lines) {
+        StringBuilder out = new StringBuilder();
+        if (header != null && !header.isBlank()) {
+            out.append(header).append(System.lineSeparator());
+            out.append("────────────────────").append(System.lineSeparator());
+        }
+        for (Line line : lines) {
+            boolean plain = line.level() == null
+                    || line.level().isBlank()
+                    || "正常".equals(line.level());
+            out.append(line.ok() ? "[正常] " : "[注意] ");
+            if (!plain) {
+                out.append(line.level()).append("  ");
+            }
+            out.append(line.message()).append(System.lineSeparator());
+        }
+        return out.toString();
+    }}

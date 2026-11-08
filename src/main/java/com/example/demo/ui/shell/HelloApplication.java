@@ -3614,6 +3614,19 @@ private static void setFlexible(Node node, boolean on) {
       }
       ModpackImport.flattenMods(staging, sink);
       this.checkImportCancelled();
+      // 跨加载器检查放在合并之前：玩家还没被写入文件就先看到提示
+      VersionFit.Target importedTarget = this.versionTargetOf(instanceId);
+      List<ModLoaderCheck.Finding> mismatched =
+          ModLoaderCheck.scan(new File(staging, "mods"), importedTarget.loader());
+      if (!mismatched.isEmpty()) {
+        String warning =
+            "⚠ 整合包里有模组与当前加载器不匹配："
+                + ModLoaderCheck.describe(mismatched, importedTarget.loader());
+        sink.accept(warning);
+        sink.accept("   仍然可以继续安装；装完可在「一键体检」复查，或换一个对应加载器的整合包");
+        // 安装进度页看完就关了，主日志里也留一份
+        this.logLine(warning);
+      }
 
       // 合并到实例目录
       if (!target.isDirectory() && !target.mkdirs()) {
@@ -3640,19 +3653,7 @@ private static void setFlexible(Node node, boolean on) {
           pack.format() + " 导入")) {
         sink.accept("⚠ 实例名称/描述没能写入 instances.json（不影响文件安装）");
       }
-      // 跨加载器导入是常见坑：Forge 实例里塞了 Fabric 模组，进游戏才发现起不来
-      VersionFit.Target importedTarget = this.versionTargetOf(instanceId);
-      List<ModLoaderCheck.Finding> mismatched =
-          ModLoaderCheck.scan(new File(target, "mods"), importedTarget.loader());
-      if (!mismatched.isEmpty()) {
-        String warning =
-            "⚠ 整合包里有模组与当前加载器不匹配："
-                + ModLoaderCheck.describe(mismatched, importedTarget.loader());
-        sink.accept(warning);
-        sink.accept("   可在「一键体检」里复查，或换一个对应加载器的整合包");
-        // 安装进度页看完就关了，主日志里也留一份
-        this.logLine(warning);
-      }
+      // 跨加载器检查已经提前到合并之前（staging 阶段），这里不再重复扫描
       sink.accept(
           "导入完成: " + pack.name() + " → " + target.getAbsolutePath() + "（" + count + " 个文件）");
 
@@ -4408,30 +4409,37 @@ private static void setFlexible(Node node, boolean on) {
     dialog.initOwner(this.stageRef);
     dialog.setTitle("一键体检");
     dialog.setHeaderText(id == null ? "还没有选择实例" : "实例 " + id);
-    VBox rows =
-        new VBox(
-            8.0,
-            this.healthRow(
-                versionOk ? "正常" : "缺失", versionOk ? "版本文件存在" : "版本 JSON / 客户端文件不完整", versionOk),
-            this.healthRow(javaAdvice.level(), javaAdvice.message(), javaAdvice.ok()),
-            this.healthRow(memoryAdvice.level(), memoryAdvice.message(), memoryAdvice.ok()),
-            this.healthRow(modCount > 0 || versionOk ? "正常" : "提示", modCount + " 个模组文件", versionOk),
-            this.healthRow(
-                hasCrash ? "有记录" : "正常",
-                (hasCrash ? "发现 " + reports.length + " 条崩溃记录" : "未发现崩溃记录"),
-                !hasCrash),
-            this.healthRow(
-                conflicts.isEmpty() ? "正常" : "冲突",
-                (conflicts.isEmpty()
-                    ? "未发现重复 modId"
-                    : "发现 " + conflicts.size() + " 个模组冲突：" + conflicts.get(0)),
-                conflicts.isEmpty()),
-            this.healthRow(
-                loaderMismatch.isEmpty() ? "正常" : "不匹配",
-                (loaderMismatch.isEmpty()
-                    ? "模组与实例加载器一致"
-                    : ModLoaderCheck.describe(loaderMismatch, target.loader())),
-                loaderMismatch.isEmpty()));
+    // 先收集成数据，再渲染：导出的文本和界面上的行是同一份内容
+    List<HealthAdvice.Line> lines = new ArrayList<>();
+    lines.add(new HealthAdvice.Line(
+        versionOk,
+        versionOk ? "正常" : "缺失",
+        versionOk ? "版本文件存在" : "版本 JSON / 客户端文件不完整"));
+    lines.add(javaAdvice);
+    lines.add(memoryAdvice);
+    lines.add(HealthAdvice.heapLine(configuredMemory, HardwareInfo.totalMemoryMb()));
+    lines.add(new HealthAdvice.Line(
+        versionOk, modCount > 0 || versionOk ? "正常" : "提示", modCount + " 个模组文件"));
+    lines.add(new HealthAdvice.Line(
+        !hasCrash,
+        hasCrash ? "有记录" : "正常",
+        hasCrash ? "发现 " + reports.length + " 条崩溃记录" : "未发现崩溃记录"));
+    lines.add(new HealthAdvice.Line(
+        conflicts.isEmpty(),
+        conflicts.isEmpty() ? "正常" : "冲突",
+        conflicts.isEmpty()
+            ? "未发现重复 modId"
+            : "发现 " + conflicts.size() + " 个模组冲突：" + conflicts.get(0)));
+    lines.add(new HealthAdvice.Line(
+        loaderMismatch.isEmpty(),
+        loaderMismatch.isEmpty() ? "正常" : "不匹配",
+        loaderMismatch.isEmpty()
+            ? "模组与实例加载器一致"
+            : ModLoaderCheck.describe(loaderMismatch, target.loader())));
+    VBox rows = new VBox(8.0);
+    for (HealthAdvice.Line line : lines) {
+      rows.getChildren().add(this.healthRow(line.level(), line.message(), line.ok()));
+    }
     Button fullCheck = new Button("运行完整性检查");
     fullCheck.setDisable(id == null);
     fullCheck.setOnAction(
@@ -4440,13 +4448,46 @@ private static void setFlexible(Node node, boolean on) {
             this.checkInstance(Instance.of(game, id));
           }
         });
+    Button export = new Button("导出体检报告");
+    export.setOnAction(e -> this.exportHealthReport(game, lines));
+
     Button openCrash = new Button("打开崩溃目录");
     openCrash.setDisable(!hasCrash);
     openCrash.setOnAction(e -> this.openDir(new File(game, "crash-reports")));
-    HBox actions = new HBox(8.0, fullCheck, openCrash);
+    HBox actions = new HBox(8.0, fullCheck, export, openCrash);
     dialog.getDialogPane().setContent(new VBox(12.0, rows, actions));
     dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
     dialog.showAndWait();
+  }
+
+  /** 导出体检报告：写进 game/logs 并复制到剪贴板。 */
+  private void exportHealthReport(File game, List<HealthAdvice.Line> lines) {
+    String header =
+        "Neko Craft Launcher 体检报告  "
+            + java.time.LocalDateTime.now()
+                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+            + "  实例 "
+            + this.currentInstanceId();
+    String text = HealthAdvice.render(header, lines);
+    File dir = new File(game, "logs");
+    File out =
+        new File(
+            dir,
+            "health-check-"
+                + java.time.LocalDateTime.now()
+                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
+                + ".txt");
+    try {
+      Files.createDirectories(dir.toPath());
+      Files.writeString(out.toPath(), text, StandardCharsets.UTF_8);
+      javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
+      content.putString(text);
+      javafx.scene.input.Clipboard.getSystemClipboard().setContent(content);
+      Toast.ok("体检报告已保存并复制：" + out.getName());
+      this.logLine("🩺 体检报告已导出: " + out.getAbsolutePath());
+    } catch (Exception e) {
+      Toast.error("导出体检报告失败: " + e.getMessage());
+    }
   }
 
   private HBox healthRow(String level, String message, boolean ok) {
