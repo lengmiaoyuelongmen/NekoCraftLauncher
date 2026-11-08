@@ -310,9 +310,7 @@ public final class SettingsPanel extends VBox {
 
         autoJava = check("自动检测并选择最合适的 Java（推荐）", config.isAutoSelectJava());
         isolationBox = check("开启版本隔离（每个实例独立 mods / config / saves）", config.isIsolation());
-        autoDepsBox = check("安装模组时自动补装缺失的前置依赖", false);
-        autoDepsBox.setVisible(false);
-        autoDepsBox.setManaged(false);
+        autoDepsBox = check("启动时自动补装缺失的前置依赖（从 Modrinth 下载）", config.isAutoInstallDeps());
         autoRepairBox = check("启动前自动补全缺失的库文件", config.isAutoRepairLibraries());
         hardwareAccelBox = check("启用硬件加速（显卡渲染；关闭后需重启启动器）", config.isHardwareAcceleration());
         animationsBox = check("界面动画效果（关闭 = 性能模式）", config.isAnimations());

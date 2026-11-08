@@ -1054,6 +1054,23 @@ public class HelloApplication extends Application {
   }
 
   private void switchPage(String pageName) {
+    this.primaryStage
+        .getProperties()
+        .put("page", pageName);
+    if (this.stageRef != null) {
+      this.stageRef.setTitle(
+          "Neko Craft Launcher · "
+              + switch (pageName) {
+                case "launch" -> "启动";
+                case "download" -> "下载";
+                case "settings" -> "设置";
+                case "tools" -> "工具";
+                case "instances" -> "实例";
+                case "advisor" -> "顾问";
+                case "worlds" -> "世界";
+                default -> pageName;
+              });
+    }
     Node target = this.pages.computeIfAbsent(pageName, this::createPage);
     if (!this.contentStack.getChildren().contains(target)) {
       target.setVisible(false);
@@ -1076,6 +1093,11 @@ public class HelloApplication extends Application {
     }
     if (current != null) {
       Motion.pageOut(current, null);
+    }
+    if (!"download".equals(pageName)
+        && this.resultView != null
+        && this.resultView.prewarm().isVisible()) {
+      this.resultView.prewarm().hide();
     }
     if ("download".equals(pageName) && !this.downloadInitialized) {
       this.downloadInitialized = true;
@@ -5184,6 +5206,10 @@ private static void setFlexible(Node node, boolean on) {
     }
     this.logLine("⚠ 模组依赖缺失：" + ModDependencyScanner.describeMissing(missing));
     ArrayList<String> pending = new ArrayList<>(missing.keySet());
+    if (!this.config.isAutoInstallDeps()) {
+      this.logLine("   可在「设置 → 启动器」打开自动补装，或去「下载」页手动安装");
+      return;
+    }
     this.logLine("   可自动从 Modrinth 安装这 " + pending.size() + " 个前置");
     VersionFit.Target target = this.currentVersionTarget();
     InAppDialog.confirm(

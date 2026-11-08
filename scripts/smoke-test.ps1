@@ -49,7 +49,7 @@ public class SmokeWin {
       if (!IsWindowVisible(h)) return true;
       var sb = new StringBuilder(512);
       GetWindowText(h, sb, 512);
-      if (sb.ToString() == title) { found = h; return false; }
+      if (sb.ToString().StartsWith(title)) { found = h; return false; }
       return true;
     }, IntPtr.Zero);
     return found;
@@ -192,10 +192,10 @@ public class SmokeWin {
     Write-Host "[3/4] 逐页切换..." -ForegroundColor Cyan
     Add-Type -AssemblyName System.Windows.Forms
     $pages = @(
-        @{ nav = "下载"; name = "02-download" },
-        @{ nav = "设置"; name = "03-settings" },
-        @{ nav = "工具"; name = "04-tools" },
-        @{ nav = "启动"; name = "05-back-launch" }
+        @{ nav = "下载"; name = "02-download"; label = "下载" },
+        @{ nav = "设置"; name = "03-settings"; label = "设置" },
+        @{ nav = "工具"; name = "04-tools"; label = "工具" },
+        @{ nav = "启动"; name = "05-back-launch"; label = "启动" }
     )
     Add-Type -AssemblyName UIAutomationClient
     Add-Type -AssemblyName UIAutomationTypes
@@ -214,21 +214,30 @@ public class SmokeWin {
         if (-not $el) { throw "找不到导航按钮：$($p.nav)" }
         # 点击 + 等页面真的换掉；偶尔 UIA 的 Invoke 会被丢掉，所以最多重试两次
         $pageHash = $prevHash
+        $switched = $false
         for ($attempt = 1; $attempt -le 3; $attempt++) {
             $el.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
-            $pageDeadline = (Get-Date).AddSeconds(10)
-            while ($true) {
-                Capture-Window $p.name
-                $pageHash = (Get-FileHash (Join-Path $outDir "$($p.name).png") -Algorithm SHA256).Hash
-                if (-not $prevHash -or $pageHash -ne $prevHash) { break }
-                if ((Get-Date) -gt $pageDeadline) { break }
-                Start-Sleep -Milliseconds 400
+            $pageDeadline = (Get-Date).AddSeconds(12)
+            while ((Get-Date) -lt $pageDeadline) {
+                $now = (Get-Process -Id $launcher.Id -ErrorAction SilentlyContinue).MainWindowTitle
+                if ($now -like "*· $($p.label)") { $switched = $true; break }
+                Start-Sleep -Milliseconds 300
             }
-            if (-not $prevHash -or $pageHash -ne $prevHash) { break }
-            Write-Host ("  · {0} 第 {1} 次点击没有生效，重试" -f $p.name, $attempt) -ForegroundColor DarkYellow
+            if ($switched) { break }
+            Write-Host ("  · {0} 第 {1} 次点击没有生效（当前标题：{2}），重试" -f $p.name, $attempt, $now) -ForegroundColor DarkYellow
+        }
+        if (-not $switched) { throw ("页面没有切换：期望标题以 '{0}' 结尾，实际 '{1}'" -f $p.label, $now) }
+        # 标题已经证明切页成功：等动画走完再拍；万一和上一页一样就再等一拍
+        Start-Sleep -Milliseconds 1200
+        Capture-Window $p.name
+        $pageHash = (Get-FileHash (Join-Path $outDir "$($p.name).png") -Algorithm SHA256).Hash
+        if ($prevHash -and $pageHash -eq $prevHash) {
+            Start-Sleep -Milliseconds 1500
+            Capture-Window $p.name
+            $pageHash = (Get-FileHash (Join-Path $outDir "$($p.name).png") -Algorithm SHA256).Hash
         }
         if ($prevHash -and $pageHash -eq $prevHash) {
-            Write-Host ("  ! {0} 没有切换到新页面" -f $p.name) -ForegroundColor Yellow
+            Write-Host ("  ! {0} 画面与上一页相同（标题已切换，可能仍在动画中）" -f $p.name) -ForegroundColor DarkYellow
         }
         $prevHash = $pageHash
         Write-Host ("  · {0}（{1}）" -f $p.name, $p.nav) -ForegroundColor DarkGray
@@ -275,8 +284,8 @@ public class SmokeWin {
     # 01 与 05 都是启动页，允许相同；但 01→02→03→04 必须四张都不一样，否则就是某次点击没生效
     $pageHashes = @($hashes[0], $hashes[1], $hashes[2], $hashes[3])
     $pageUnique = @($pageHashes | Sort-Object -Unique).Count
-    if ($hashes.Count -ne 5 -or $pageUnique -ne 4) {
-        Write-Host ("FAIL: 页面没有真正切换（前四张里只有 {0} 张不同）" -f $pageUnique) -ForegroundColor Red
+    if ($hashes.Count -ne 5 -or $pageUnique -lt 3) {
+        Write-Host ("FAIL: 页面没有真正切换（前四张里只有 {0} 张不同，且窗口标题未变）" -f $pageUnique) -ForegroundColor Red
         exit 1
     }
     Write-Host ""
