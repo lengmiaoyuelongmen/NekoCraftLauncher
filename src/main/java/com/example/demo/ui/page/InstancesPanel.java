@@ -404,7 +404,12 @@ public final class InstancesPanel extends HBox {
         star.setMouseTransparent(false);
         star.setCursor(javafx.scene.Cursor.HAND);
         star.setOnMouseClicked(e -> {
-            InstanceMeta.setFavorite(gameDir, instance.id, !InstanceMeta.isFavorite(gameDir, instance.id));
+            boolean nowFavorite = !InstanceMeta.isFavorite(gameDir, instance.id);
+            if (!InstanceMeta.setFavorite(gameDir, instance.id, nowFavorite)) {
+                Toast.error("收藏没能保存（磁盘只读或被占用）");
+                e.consume();
+                return;
+            }
             render();
             e.consume();
         });

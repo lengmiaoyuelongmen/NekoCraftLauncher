@@ -971,6 +971,26 @@ Summary resolve(initialIds, fetcher, scanner, maxInstalls, log)
 （`jei_1.12.2-4.22.0.1034.jar`），行为与上一版一致；递归路径的多轮行为由单测覆盖
 （测试里构造了 a→b 的两级链、失败重试、上限与去重）。
 
+### 可靠性扫尾：失败必须看得见（2026-11-08）
+
+这一轮专门清「操作失败却报成功」的路径，都是实际会误导用户的：
+
+| 位置 | 原来 | 现在 |
+|---|---|---|
+| 批量删模组 / 启用禁用 | 无论删掉几个都弹成功 | `core.mod.BulkDelete` 统计成功/失败，失败用 `Toast.error` 并写明个数 |
+| 删除实例 | 目录删了，`instances.json` 条目还在 | 成功后 `InstanceMeta.remove()` 一并清掉 |
+| 实例重命名/描述保存 | 写盘失败仍显示「已保存 ✓」 | `InstanceMeta.set` 返回布尔，界面显示「保存失败：磁盘只读或被占用」 |
+| 收藏实例 | 写盘失败无提示 | 失败弹错误提示，不重绘成"已收藏" |
+| 导入取消/失败 | 会删掉**复用**的实例目录（mods/saves 全丢） | `core.instance.ImportRollback` 只删本次新建的东西 |
+| 导入成功 | 清单文件没下全也说「安装完成」 | 追加「⚠ 整合包声明 N 个文件，实际下载成功 M 个」 |
+| 克隆实例 | 中途失败留下半成品目录 | `finally` 里清理，源实例不动 |
+| 加载器安装 | 版本与 MC 不匹配也照装 | `core.meta.LoaderCompatibility` 先校验，不匹配直接拦住 |
+| 补前置 | 半截 jar 被当成已安装 | `reuseExisting(实际大小, 期望大小)` 不符就重下 |
+| 补前置 | 下载失败残留 `.part` | catch 里清理 |
+
+对应单测从 227 增至 **241**（BulkDelete、ImportRollback、InstanceMeta 写入失败、
+InstanceCloner 回滚、DependencyInstaller 复用判断等）。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：
