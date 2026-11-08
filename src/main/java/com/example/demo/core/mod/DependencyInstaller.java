@@ -72,7 +72,19 @@ public final class DependencyInstaller {
         }
         File modFile = new File(modsDir, artifact.filename());
         if (modFile.isFile() && modFile.length() > 0) {
-            return Result.ok(modId, artifact.filename() + "（已存在）");
+            if (reuseExisting(modFile.length(), artifact.size())) {
+                return Result.ok(modId, artifact.filename() + "（已存在）");
+            }
+            // 半截文件（上次下载中断留下的）：删掉重下，别把坏 jar 当已安装
+            if (log != null) {
+                log.accept("♻ " + artifact.filename() + " 大小不符（" + modFile.length() + " / "
+                        + artifact.size() + "），重新下载");
+            }
+            try {
+                Files.deleteIfExists(modFile.toPath());
+            } catch (Exception ignored) {
+                // 删不掉就让下面的下载覆盖它
+            }
         }
         Path temp = null;
         try {
@@ -102,6 +114,18 @@ public final class DependencyInstaller {
             }
             return Result.fail(modId, "下载失败：" + e.getMessage());
         }
+    }
+
+    /**
+     * 已经存在的文件能不能直接用。
+     *
+     * <p>期望大小未知（0）时信任本地文件；大小不符说明上次下载中断，需要重下。
+     */
+    public static boolean reuseExisting(long actualSize, long expectedSize) {
+        if (actualSize <= 0) {
+            return false;
+        }
+        return expectedSize <= 0 || actualSize == expectedSize;
     }
 
     private static String fetch(HttpClient http, String url) {
