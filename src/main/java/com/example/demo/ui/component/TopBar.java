@@ -111,10 +111,19 @@ public final class TopBar {
         statusLabel.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 10px;");
         HBox statusChip = new HBox(6.0, statusDot, statusLabel);
         statusChip.setAlignment(Pos.CENTER_LEFT);
-        statusChip.setPadding(new Insets(3.0, 9.0, 3.0, 9.0));
-        statusChip.setStyle("-fx-background-color: rgba(255,255,255,0.045);"
-                + " -fx-background-radius: 10; -fx-border-color: rgba(255,255,255,0.06);"
-                + " -fx-border-radius: 10;");
+        statusChip.setPadding(Insets.EMPTY);
+        // 集成式状态舱：徽标、时钟、运行状态收进同一个胶囊，靠符号分隔而不是三个独立气泡
+        Label dotGap = new Label("·");
+        dotGap.setStyle("-fx-text-fill: rgba(255,255,255,0.22); -fx-font-size: 11px;");
+        Label clockGap = new Label("·");
+        clockGap.setStyle("-fx-text-fill: rgba(255,255,255,0.22); -fx-font-size: 11px;");
+        HBox dock = new HBox(7.0, badge, dotGap, liveClock, clockGap, statusChip);
+        dock.setAlignment(Pos.CENTER_LEFT);
+        dock.setPadding(new Insets(3.0, 10.0, 3.0, 10.0));
+        dock.setStyle("-fx-background-color: rgba(255,255,255,0.05);"
+                + " -fx-background-radius: 12; -fx-border-color: rgba(255,255,255,0.08);"
+                + " -fx-border-radius: 12;");
+        Motion.hoverScale(dock, 1.02);
 
         stopGame.setStyle("-fx-background-color: rgba(248,113,113,0.16); -fx-text-fill: #fecaca;"
                 + " -fx-border-color: rgba(248,113,113,0.55); -fx-border-radius: 8;"
@@ -132,8 +141,8 @@ public final class TopBar {
         cancelLaunch.setManaged(false);
         cancelLaunch.setOnAction(e -> host.stopLaunch());
 
-        HBox brand = new HBox(8.0, mark, appTitle, Icons.node("star", 13.0, "#ffcf6a"), badge,
-                liveClock, statusChip, cancelLaunch, stopGame);
+        HBox brand = new HBox(8.0, mark, appTitle, Icons.node("star", 13.0, "#ffcf6a"), dock,
+                cancelLaunch, stopGame);
         brand.setAlignment(Pos.CENTER_LEFT);
 
         Region spacer = new Region();
@@ -164,6 +173,8 @@ public final class TopBar {
             button.setOnAction(e -> host.switchPage(entry[0]));
             navButtons.put(entry[0], button);
             Motion.press(button);
+            Motion.hoverScale(button, 1.05);
+            button.setTooltip(new javafx.scene.control.Tooltip(entry[1]));
             navBox.getChildren().add(button);
         }
 
@@ -176,13 +187,10 @@ public final class TopBar {
         windowControls.getStyleClass().add("window-controls");
 
         root.widthProperty().addListener((obs, old, width) -> {
-            boolean compact = width.doubleValue() < 1080.0;
-            badge.setVisible(!compact);
-            badge.setManaged(!compact);
-            liveClock.setVisible(!compact);
-            liveClock.setManaged(!compact);
-            statusChip.setVisible(!compact);
-            statusChip.setManaged(!compact);
+            // 1060 默认宽度下也保留集成状态舱；更窄才收起，避免导航被挤
+            boolean compact = width.doubleValue() < 980.0;
+            dock.setVisible(!compact);
+            dock.setManaged(!compact);
             brand.setSpacing(compact ? 5.0 : 8.0);
             navBox.setSpacing(compact ? 0.0 : 2.0);
         });
