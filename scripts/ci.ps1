@@ -1,7 +1,8 @@
 ﻿# 一键跑完整验证链：构建 + 单测 → 架构守卫 → 冒烟（含 UI 自检）。
 # 任何一步失败都立即退出，非 0 退出码可直接给 CI 用。
 param(
-    [switch]$SkipBuild
+    [switch]$SkipBuild,
+    [switch]$SkipSmoke
 )
 
 $ErrorActionPreference = "Stop"
@@ -21,6 +22,12 @@ try {
     & powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "check-architecture.ps1")
     if ($LASTEXITCODE -ne 0) { throw "架构守卫失败" }
 
+    if ($SkipSmoke) {
+        Write-Host "==> 3/3 冒烟已跳过（-SkipSmoke）" -ForegroundColor DarkGray
+        Write-Host ""
+        Write-Host "CI PASS：构建、单测、架构守卫通过（未跑冒烟）" -ForegroundColor Green
+        exit 0
+    }
     Write-Host "==> 3/3 冒烟 + UI 自检" -ForegroundColor Cyan
     & powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "smoke-test.ps1") -SkipBuild
     if ($LASTEXITCODE -ne 0) { throw "冒烟失败" }

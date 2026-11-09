@@ -19,6 +19,15 @@ import java.util.List;
  */
 public final class Motion {
 
+    /** 交错入场的步进与时长：统一在这里调参，避免各处散落魔数。 */
+    private static final long STAGGER_STEP_MS = 40L;
+    private static final long STAGGER_FADE_MS = 260L;
+    private static final long STAGGER_RISE_MS = 320L;
+    private static final long REVEAL_FADE_MS = 240L;
+    private static final long REVEAL_RISE_MS = 300L;
+    private static final double REVEAL_OFFSET_Y = 12.0;
+    private static final double STAGGER_OFFSET_Y = 16.0;
+
     public static final Duration FAST = Duration.millis(120);
     public static final Duration NORMAL = Duration.millis(210);
     public static final Duration SLOW = Duration.millis(420);
@@ -151,19 +160,22 @@ public final class Motion {
             if (Boolean.TRUE.equals(node.getProperties().get("mc.staggered"))) continue;
             node.getProperties().put("mc.staggered", true);
             node.setOpacity(0);
-            node.setTranslateY(16);
+            node.setTranslateY(STAGGER_OFFSET_Y);
             node.setScaleX(0.986);
             node.setScaleY(0.986);
-            PauseTransition delay = new PauseTransition(Duration.millis(40L * i));
+            PauseTransition delay = new PauseTransition(Duration.millis(STAGGER_STEP_MS * i));
             int index = i;
             delay.setOnFinished(e -> {
-                FadeTransition fade = new FadeTransition(scaled(Duration.millis(260)), node);
+                FadeTransition fade = new FadeTransition(scaled(Duration.millis(STAGGER_FADE_MS)), node);
                 fade.setToValue(1);
                 fade.setInterpolator(OUT);
-                TranslateTransition rise = new TranslateTransition(scaled(Duration.millis(320 + index * 8)), node);
+                TranslateTransition rise =
+                        new TranslateTransition(
+                                scaled(Duration.millis(STAGGER_RISE_MS + index * 8L)), node);
                 rise.setToY(0);
                 rise.setInterpolator(OUT);
-                ScaleTransition scale = new ScaleTransition(scaled(Duration.millis(320)), node);
+                ScaleTransition scale =
+                        new ScaleTransition(scaled(Duration.millis(STAGGER_RISE_MS)), node);
                 scale.setToX(1);
                 scale.setToY(1);
                 scale.setInterpolator(SPRING);
@@ -177,13 +189,14 @@ public final class Motion {
     public static void reveal(Node node, long delayMs) {
         if (!enabled) return;
         node.setOpacity(0);
-        node.setTranslateY(12);
+        node.setTranslateY(REVEAL_OFFSET_Y);
         PauseTransition delay = new PauseTransition(Duration.millis(Math.max(0, delayMs)));
         delay.setOnFinished(e -> {
-            FadeTransition fade = new FadeTransition(scaled(Duration.millis(240)), node);
+            FadeTransition fade = new FadeTransition(scaled(Duration.millis(REVEAL_FADE_MS)), node);
             fade.setToValue(1);
             fade.setInterpolator(OUT);
-            TranslateTransition rise = new TranslateTransition(scaled(Duration.millis(300)), node);
+            TranslateTransition rise =
+                    new TranslateTransition(scaled(Duration.millis(REVEAL_RISE_MS)), node);
             rise.setToY(0);
             rise.setInterpolator(OUT);
             new ParallelTransition(fade, rise).play();

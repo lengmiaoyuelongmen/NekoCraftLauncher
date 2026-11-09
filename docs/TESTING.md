@@ -91,6 +91,21 @@ powershell -ExecutionPolicy Bypass -File scripts/ci.ps1 -SkipBuild   # 已有 ja
 
 依次执行：构建+单测 → 架构守卫 → 冒烟（含 UI 自检）。任一步失败立即退出并打印 `CI FAIL：<原因>`，
 成功输出 `CI PASS：…`；退出码可直接被 CI 使用。
+## 9. 动效中间帧连拍
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/capture-motion.ps1 -ClickName "设置" -Frames 30 -IntervalMs 40
+```
+
+单张截图延迟 >300ms，抓不到 200ms 的动画；这个脚本改为**连拍**：每 40ms 抓一帧，第 4 帧时用 UIA
+触发一次点击，最后把每帧与"稳定帧"逐点比较，输出差异序列。实测一次设置页切换：
+
+```
+帧 4: 122   帧 6: 98   帧 11: 79   帧 17: 52   帧 22: 24   帧 28: 0
+```
+
+差异单调收敛到 0，说明确实拍到了过渡过程；帧图保存在 `target/motion*/frame-XX.png`。
+注意：差异也可能来自内容加载（预渲染遮罩、列表填充），需要用眼睛复核具体帧。
 ## 7. 已知限制
 
 - 冒烟里的四角检查常被 **SKIP**：冒烟自己占着前台，`SetForegroundWindow` 常被系统拒绝。
