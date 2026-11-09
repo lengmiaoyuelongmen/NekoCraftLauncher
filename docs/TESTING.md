@@ -95,7 +95,14 @@ powershell -ExecutionPolicy Bypass -File scripts/ci.ps1 -SkipBuild   # 已有 ja
 
 依次执行：构建+单测 → 架构守卫 → 冒烟（含 UI 自检）。任一步失败立即退出并打印 `CI FAIL：<原因>`，
 成功输出 `CI PASS：…`；退出码可直接被 CI 使用。
-## 9. 动效中间帧连拍
+## 9. 动效中间帧连拍与基线刷新
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/refresh-baseline.ps1
+```
+
+连拍 → 生成九宫格 → 覆盖 `docs/images/motion-contact-sheet.png`，跑完请先肉眼确认过渡帧合理再提交。
+
 
 ```powershell
 # 切换动画 + 断言差异单调收敛 + 生成九宫格对比图

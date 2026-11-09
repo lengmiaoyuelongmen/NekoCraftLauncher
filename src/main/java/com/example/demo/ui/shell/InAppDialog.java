@@ -289,7 +289,15 @@ public final class InAppDialog {
         ((ScaleTransition) in.getChildren().get(1)).setToX(1);
         ((ScaleTransition) in.getChildren().get(1)).setToY(1);
         in.play();
-        javafx.application.Platform.runLater(backdrop::requestFocus);
+        // 键盘可达：焦点落到第一个动作按钮，Tab 在按钮间移动，Esc 关闭，Enter 触发默认按钮
+        javafx.application.Platform.runLater(
+                () -> {
+                    if (!created.isEmpty()) {
+                        created.get(0).requestFocus();
+                    } else {
+                        backdrop.requestFocus();
+                    }
+                });
         if (!created.isEmpty()) {
             created.get(created.size() - 1).setDefaultButton(true);
         }

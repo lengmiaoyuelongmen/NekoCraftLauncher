@@ -339,6 +339,43 @@ public class SmokeWin {
         }
     } catch { Write-Host ("  ! 体检弹窗没打开: {0}" -f $_) -ForegroundColor DarkYellow }
 
+    # ---------- 剪贴板断言：体检面板的「复制」必须真的写进剪贴板 ----------
+    $clipOk = $false
+    try {
+        Set-Clipboard -Value "neko-sentinel"
+        $hClip = [SmokeWin]::Find($Title)
+        if ($hClip -ne [IntPtr]::Zero) {
+            $rootClip = [System.Windows.Automation.AutomationElement]::FromHandle($hClip)
+            $byName = {
+                param($name)
+                $cond = New-Object System.Windows.Automation.PropertyCondition(
+                    [System.Windows.Automation.AutomationElement]::NameProperty, $name)
+                $rootClip.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $cond)
+            }
+            $healthBtn = & $byName "一键体检"
+            if ($healthBtn) {
+                $healthBtn.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+                Start-Sleep -Milliseconds 1200
+                $copyBtn = & $byName "复制"
+                if ($copyBtn) {
+                    $copyBtn.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+                    Start-Sleep -Milliseconds 600
+                    $clip = Get-Clipboard -Raw -ErrorAction SilentlyContinue
+                    if ($clip -and $clip.Contains("体检报告")) { $clipOk = $true }
+                }
+                $closeBtn = & $byName "关闭"
+                if ($closeBtn) { $closeBtn.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke() }
+                Start-Sleep -Milliseconds 400
+            }
+        }
+    } catch { Write-Host ("  ! 剪贴板断言异常: {0}" -f $_) -ForegroundColor Yellow }
+    if ($clipOk) {
+        Write-Host "  · 体检报告已复制到剪贴板（内容校验通过）" -ForegroundColor DarkGray
+    } else {
+        Write-Host "FAIL: 体检面板的「复制」没有写入剪贴板" -ForegroundColor Red
+        exit 1
+    }
+
     # ---------- UI 自检（四角 + 描边） ----------
     $uiScript = Join-Path $PSScriptRoot "check-ui.ps1"
     $uiOk = $false
