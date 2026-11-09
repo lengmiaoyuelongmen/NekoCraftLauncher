@@ -361,7 +361,12 @@ public class SmokeWin {
                     $copyBtn.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
                     Start-Sleep -Milliseconds 600
                     $clip = Get-Clipboard -Raw -ErrorAction SilentlyContinue
-                    if ($clip -and $clip.Contains("体检报告")) { $clipOk = $true }
+                    if ($clip -and $clip.Contains("体检报告")) {
+                        # 内容要够完整：报告至少 9 行（8 项检查 + 标题分隔）
+                        $clipLines = @($clip -split "`r?`n" | Where-Object { $_.Trim().Length -gt 0 })
+                        if ($clipLines.Count -ge 9) { $clipOk = $true }
+                        else { Write-Host ("  ! 剪贴板内容只有 {0} 行，可能复制不完整" -f $clipLines.Count) -ForegroundColor Yellow }
+                    }
                 }
                 $closeBtn = & $byName "关闭"
                 if ($closeBtn) { $closeBtn.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke() }

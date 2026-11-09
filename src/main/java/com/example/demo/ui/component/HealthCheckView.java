@@ -64,6 +64,12 @@ public final class HealthCheckView extends VBox {
         for (HealthAdvice.Line line : lines) {
             getChildren().add(row(line, onAction));
         }
+        Label keys = new Label("Esc 关闭  ·  Tab 切换按钮  ·  Enter 确认");
+        keys.setStyle("-fx-text-fill: -app-text-dim-3; -fx-font-size: 10.5px;");
+        HBox footer = new HBox(keys);
+        footer.setAlignment(Pos.CENTER_RIGHT);
+        footer.setPadding(new Insets(2, 4, 0, 4));
+        getChildren().add(footer);
     }
 
     /** 单行：状态符号 + 级别 + 说明；告警行用暖色描边且可点击跳转。 */

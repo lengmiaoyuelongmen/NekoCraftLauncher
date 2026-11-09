@@ -27,7 +27,8 @@ powershell -ExecutionPolicy Bypass -File scripts/smoke-test.ps1 -SkipBuild -Hove
 1. 启动真实进程（带 `-Dmc.uiSelfCheck=1`，会自动开关一个弹窗）；
 2. 用 UIA 逐页点击导航，页面清单与标记来自 `scripts/ui-pages.json`；
 3. 每页截图并检查不是空白页、标题确实切换、**页面标记文案在 UIA 树里出现**；
-4. 调用 `scripts/check-ui.ps1` 做 UI 自检（含「页面过渡完成」计数与耗时断言 `-MinTransitions`，
+4. 打开体检面板点「复制」，断言系统剪贴板里有报告且**至少 9 行**；
+5. 调用 `scripts/check-ui.ps1` 做 UI 自检（含「页面过渡完成」计数与耗时断言 `-MinTransitions`，
    过渡耗时 0ms 或 >3s 都算失败）。
 
 通过时输出类似：
@@ -91,6 +92,7 @@ Start-Process javaw -ArgumentList '-Dmc.failPage=tools','-jar','target\mc-launch
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/ci.ps1
 powershell -ExecutionPolicy Bypass -File scripts/ci.ps1 -SkipBuild   # 已有 jar 时只跑守卫+冒烟
+powershell -ExecutionPolicy Bypass -File scripts/ci.ps1 -Nightly      # 额外跑视觉基线比对（自动起停启动器）
 ```
 
 依次执行：构建+单测 → 架构守卫 → 冒烟（含 UI 自检）。任一步失败立即退出并打印 `CI FAIL：<原因>`，

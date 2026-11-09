@@ -2,7 +2,8 @@
 # 任何一步失败都立即退出，非 0 退出码可直接给 CI 用。
 param(
     [switch]$SkipBuild,
-    [switch]$SkipSmoke
+    [switch]$SkipSmoke,
+    [switch]$Nightly
 )
 
 $ErrorActionPreference = "Stop"
@@ -28,10 +29,19 @@ try {
         Write-Host "CI PASS：构建、单测、架构守卫通过（未跑冒烟）" -ForegroundColor Green
         exit 0
     }
-    Write-Host "==> 3/3 冒烟 + UI 自检" -ForegroundColor Cyan
+    if ($Nightly) {
+        Write-Host "==> 3/3 冒烟 + UI 自检 + 夜间基线比对" -ForegroundColor Cyan
+    } else {
+        Write-Host "==> 3/3 冒烟 + UI 自检" -ForegroundColor Cyan
+    }
     & powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "smoke-test.ps1") -SkipBuild -HoverCheck
     if ($LASTEXITCODE -ne 0) { throw "冒烟失败" }
 
+    if ($Nightly) {
+        Write-Host "==> 夜间基线比对" -ForegroundColor Cyan
+        & powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "check-baseline.ps1") -Launch
+        if ($LASTEXITCODE -ne 0) { throw "夜间基线比对失败" }
+    }
     Write-Host ""
     Write-Host "CI PASS：构建、单测、架构守卫、冒烟、UI 自检全部通过" -ForegroundColor Green
     exit 0
