@@ -502,6 +502,11 @@ public final class SettingsPanel extends VBox {
         if (page == null) return;
         content.getChildren().setAll(page);
         Motion.pageIn(page, 8);
+        // 卡片错落入场：切换分栏时每张卡延迟 30ms 淡入，别整页同时出现
+        List<javafx.scene.Node> cards = new ArrayList<>(page.lookupAll(".settings-card"));
+        if (!cards.isEmpty()) {
+            Motion.stagger(cards);
+        }
         if (page instanceof ScrollPane scroll) {
             Platform.runLater(() -> scroll.setVvalue(0));
         }
@@ -1567,6 +1572,7 @@ public final class SettingsPanel extends VBox {
                 + " -fx-background-radius: 16; -fx-border-color: -app-border-soft; -fx-border-radius: 16;"
                 + " -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.16), 18, 0.10, 0, 6);");
         box.getChildren().addAll(children);
+        box.getStyleClass().add("settings-card");
         // 设置卡片轻轻抬起一点，鼠标掠过时能感觉到"这张卡是活的"
         com.example.demo.ui.shell.Motion.hoverCard(box);
         return box;

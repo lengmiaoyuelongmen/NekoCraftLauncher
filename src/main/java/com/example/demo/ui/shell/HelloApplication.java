@@ -1102,7 +1102,22 @@ public class HelloApplication extends Application {
                 default -> pageName;
               });
     }
-    Node target = this.pages.computeIfAbsent(pageName, this::createPage);
+    Node target;
+    try {
+      target = this.pages.computeIfAbsent(pageName, this::createPage);
+    } catch (Exception e) {
+      // 页面构造抛异常时不能白屏：记日志、弹提示、退回启动页
+      this.logLine("❌ 页面「" + pageName + "」创建失败: " + e);
+      InAppDialog.error("页面「" + pageName + "」创建失败：" + e.getMessage());
+      if (!"launch".equals(pageName)) {
+        this.switchPage("launch");
+      }
+      return;
+    }
+    if (target == null) {
+      this.logLine("❌ 页面「" + pageName + "」没有创建出来");
+      return;
+    }
     if (!this.contentStack.getChildren().contains(target)) {
       target.setVisible(false);
       target.setOpacity(0.0);

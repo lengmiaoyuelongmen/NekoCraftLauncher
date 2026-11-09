@@ -192,10 +192,10 @@ public class SmokeWin {
     Write-Host "[3/4] 逐页切换..." -ForegroundColor Cyan
     Add-Type -AssemblyName System.Windows.Forms
     $pages = @(
-        @{ nav = "下载"; name = "02-download"; label = "下载" },
-        @{ nav = "设置"; name = "03-settings"; label = "设置" },
-        @{ nav = "工具"; name = "04-tools"; label = "工具" },
-        @{ nav = "启动"; name = "05-back-launch"; label = "启动" }
+        @{ nav = "下载"; name = "02-download"; label = "下载"; marker = "下载中心" },
+        @{ nav = "设置"; name = "03-settings"; label = "设置"; marker = "启动设置" },
+        @{ nav = "工具"; name = "04-tools"; label = "工具"; marker = "百宝箱" },
+        @{ nav = "启动"; name = "05-back-launch"; label = "启动"; marker = "启动游戏" }
     )
     Add-Type -AssemblyName UIAutomationClient
     Add-Type -AssemblyName UIAutomationTypes
@@ -227,6 +227,26 @@ public class SmokeWin {
             Write-Host ("  · {0} 第 {1} 次点击没有生效（当前标题：{2}），重试" -f $p.name, $attempt, $now) -ForegroundColor DarkYellow
         }
         if (-not $switched) { throw ("页面没有切换：期望标题以 '{0}' 结尾，实际 '{1}'" -f $p.label, $now) }
+        if (-not $switched) { throw ("页面没有切换：期望标题以 '{0}' 结尾，实际 '{1}'" -f $p.label, $now) }
+        # 标题变了不代表页面建出来了（页面构造抛异常时标题照样会变）：等页面里的标记文案出现
+        $markerOk = $false
+        $markerDeadline = (Get-Date).AddSeconds(12)
+        while ((Get-Date) -lt $markerDeadline) {
+            $hMark = [SmokeWin]::Find($Title)
+            if ($hMark -ne [IntPtr]::Zero) {
+                $rootMark = [System.Windows.Automation.AutomationElement]::FromHandle($hMark)
+                $textCond = New-Object System.Windows.Automation.PropertyCondition(
+                    [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+                    [System.Windows.Automation.ControlType]::Text)
+                $texts = $rootMark.FindAll([System.Windows.Automation.TreeScope]::Descendants, $textCond)
+                foreach ($textEl in $texts) {
+                    if ($textEl.Current.Name -and $textEl.Current.Name.Contains($p.marker)) { $markerOk = $true; break }
+                }
+            }
+            if ($markerOk) { break }
+            Start-Sleep -Milliseconds 300
+        }
+        if (-not $markerOk) { throw ("页面内容没有出现：{0}（期望包含 '{1}'）" -f $p.name, $p.marker) }
         # 标题已经证明切页成功：等动画走完再拍；万一和上一页一样就再等一拍
         Start-Sleep -Milliseconds 1200
         Capture-Window $p.name
