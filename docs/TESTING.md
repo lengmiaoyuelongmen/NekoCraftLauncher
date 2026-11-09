@@ -82,6 +82,15 @@ Start-Process javaw -ArgumentList '-Dmc.failPage=tools','-jar','target\mc-launch
   （Fabric 元数据对 1.12.2 返回 400），可复现「加载器不可用」的安全失败；
 - **跨加载器**：把带 `fabric.mod.json` 的 jar 放进整合包 `overrides/mods` 再导入原版实例。
 
+## 8. 一键 CI
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/ci.ps1
+powershell -ExecutionPolicy Bypass -File scripts/ci.ps1 -SkipBuild   # 已有 jar 时只跑守卫+冒烟
+```
+
+依次执行：构建+单测 → 架构守卫 → 冒烟（含 UI 自检）。任一步失败立即退出并打印 `CI FAIL：<原因>`，
+成功输出 `CI PASS：…`；退出码可直接被 CI 使用。
 ## 7. 已知限制
 
 - 冒烟里的四角检查常被 **SKIP**：冒烟自己占着前台，`SetForegroundWindow` 常被系统拒绝。

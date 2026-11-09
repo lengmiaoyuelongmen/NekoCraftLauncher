@@ -326,6 +326,10 @@ public final class InstancesPanel extends HBox {
         for (Map.Entry<String, List<Instance>> entry : groups.entrySet()) {
             groupBox.getChildren().add(groupCard(entry.getKey(), entry.getValue()));
         }
+        // 实例分组入场：加载器分组逐组错落淡入
+        if (!groupBox.getChildren().isEmpty()) {
+            com.example.demo.ui.shell.Motion.stagger(groupBox.getChildren());
+        }
     }
 
     private VBox groupCard(String loader, List<Instance> instances) {
