@@ -1272,6 +1272,20 @@ CI PASS：构建、单测、架构守卫、冒烟、UI 自检全部通过
 
 九宫格第 5~7 格是过渡中间态，第 8~9 格已稳定——这就是"动画确实存在"的视觉证据。
 
+### 动效回归进 CI + 视觉基线（2026-11-09 22:50）
+
+- **应用内打点**：`Motion.pageIn(node, fromX, onFinished)` 新增完成回调，`switchPage` 借它在日志里写
+  「页面过渡完成: <页面>」。冒烟通过 `check-ui.ps1 -MinTransitions <页数>` 断言每个页面都真的跑过过渡，
+  动画被删掉或提前中断时 CI 会失败。
+- **视觉基线**：动效九宫格已落盘到 `docs/images/motion-contact-sheet.png`（3×3，前四格启动页、
+  中间三格过渡、最后两格稳定）：
+
+![动效九宫格](../images/motion-contact-sheet.png)
+
+- **悬停断言**：`capture-motion.ps1 -MinHoverDiff <峰值>`，峰值低于阈值判定悬停动效失效。
+  真机两条路径都验证过：`PASS: 悬停差异峰值 683 ≥ 阈值 200`；把阈值提到 900 时
+  `FAIL: 悬停差异峰值只有 775，低于阈值 900`（exit 1）。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：

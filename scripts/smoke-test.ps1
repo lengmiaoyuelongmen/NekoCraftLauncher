@@ -329,7 +329,7 @@ public class SmokeWin {
     $uiScript = Join-Path $PSScriptRoot "check-ui.ps1"
     $uiOk = $false
     if (Test-Path $uiScript) {
-        & powershell -ExecutionPolicy Bypass -File $uiScript -LogPath $stdout -RequireDialog 2>&1 | ForEach-Object { Write-Host $_ }
+        & powershell -ExecutionPolicy Bypass -File $uiScript -LogPath $stdout -RequireDialog -MinTransitions $pages.Count 2>&1 | ForEach-Object { Write-Host $_ }
         $uiOk = ($LASTEXITCODE -eq 0)
     } else {
         Write-Host "FAIL: 缺少 scripts/check-ui.ps1" -ForegroundColor Red

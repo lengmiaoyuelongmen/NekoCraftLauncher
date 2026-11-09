@@ -9,7 +9,8 @@ param(
     [int]$IntervalMs = 40,
     [string]$OutDir = "target\motion",
     [switch]$ExpectDecreasing,
-    [switch]$ContactSheet
+    [switch]$ContactSheet,
+    [int]$MinHoverDiff = 0
 )
 
 $ErrorActionPreference = "Stop"
@@ -144,6 +145,15 @@ $moving = @($after | Where-Object { $_.Diff -gt 10 })
 if ($moving.Count -gt 0) {
     $top = $after | Sort-Object Diff -Descending | Select-Object -First 1
     Write-Host ("抓到动画中间帧 {0} 帧（差异 {1}→0），示例: {2}" -f $moving.Count, $top.Diff, $paths[$top.Frame]) -ForegroundColor Green
+    # 悬停断言：差异太小说明悬停动效没生效
+    if ($HoverName -and $MinHoverDiff -gt 0) {
+        $peak = ($after | Measure-Object -Property Diff -Maximum).Maximum
+        if ($peak -lt $MinHoverDiff) {
+            Write-Host ("FAIL: 悬停差异峰值只有 {0}，低于阈值 {1}（悬停动效可能失效）" -f $peak, $MinHoverDiff) -ForegroundColor Red
+            exit 1
+        }
+        Write-Host ("PASS: 悬停差异峰值 {0} ≥ 阈值 {1}" -f $peak, $MinHoverDiff) -ForegroundColor Green
+    }
     # 可选：断言差异序列单调递减（允许少量抖动）
     if ($ExpectDecreasing) {
         $prev = [int]::MaxValue

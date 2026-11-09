@@ -4,7 +4,8 @@ param(
     [string]$Title = "Neko Craft Launcher",
     [string]$LogPath = "",
     [switch]$SkipCorners,
-    [switch]$RequireDialog
+    [switch]$RequireDialog,
+    [int]$MinTransitions = 0
 )
 
 $ErrorActionPreference = "Continue"
@@ -55,6 +56,13 @@ if ($LogPath) {
             Write-Host "FAIL: 要求至少打开过一次弹窗（弹窗自检 0 次）" -ForegroundColor Red
             $fail++
         }
+        # 页面过渡打点：每切一次页应该有且只有一条「页面过渡完成」
+        $transitionLines = @($text -split "`r?`n" | Where-Object { $_ -match "页面过渡完成: " })
+        if ($MinTransitions -gt 0 -and $transitionLines.Count -lt $MinTransitions) {
+            Write-Host ("FAIL: 页面过渡只完成了 {0} 次，期望至少 {1} 次（动画可能被跳过或中断）" -f $transitionLines.Count, $MinTransitions) -ForegroundColor Red
+            $fail++
+        }
+        Write-Host ("页面过渡完成 {0} 次" -f $transitionLines.Count) -ForegroundColor DarkGray
         $pageFixed = 0
         foreach ($line in $pageLines) {
             if ($line -match "圆角描边修复: (\d+) 个") { $pageFixed += [int]$Matches[1] }

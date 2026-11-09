@@ -65,6 +65,15 @@ public final class Motion {
      * fromX 为正从右侧进入，为负从左侧进入，让前进/后退有方向感。
      */
     public static void pageIn(Node node, double fromX) {
+        pageIn(node, fromX, null);
+    }
+
+    /**
+     * 带完成回调的页面进入：动画结束后回调一次（关闭动画时立即回调）。
+     *
+     * <p>冒烟用它在日志里确认「每个页面都真的跑过过渡」，动画被删掉或提前中断时能发现。
+     */
+    public static void pageIn(Node node, double fromX, Runnable onFinished) {
         stopPending(node);
         int seq = nextSeq(node);
         node.setOpacity(0);
@@ -74,6 +83,9 @@ public final class Motion {
         node.setScaleY(1);
         if (!enabled) {
             resetPage(node);
+            if (onFinished != null) {
+                onFinished.run();
+            }
             return;
         }
         FadeTransition fade = new FadeTransition(scaled(NORMAL), node);
@@ -85,7 +97,12 @@ public final class Motion {
         slide.setInterpolator(OUT);
         ParallelTransition transition = new ParallelTransition(fade, slide);
         transition.setOnFinished(e -> {
-            if (seqOf(node) == seq) resetPage(node);
+            if (seqOf(node) == seq) {
+                resetPage(node);
+            }
+            if (onFinished != null) {
+                onFinished.run();
+            }
         });
         node.getProperties().put(ANIM_KEY, transition);
         transition.play();

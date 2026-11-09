@@ -1180,7 +1180,10 @@ public class HelloApplication extends Application {
       child.setVisible(false);
       child.setOpacity(0.0);
     }
-    Motion.pageIn(target);
+    Motion.pageIn(
+        target,
+        18,
+        () -> System.out.println("页面过渡完成: " + pageName));
     this.applyLaunchBackground();
     if ("launch".equals(pageName)) {
       this.applyAiMode();
