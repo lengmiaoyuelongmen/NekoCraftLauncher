@@ -57,12 +57,21 @@ if ($LogPath) {
             $fail++
         }
         # 页面过渡打点：每切一次页应该有且只有一条「页面过渡完成」
-        $transitionLines = @($text -split "`r?`n" | Where-Object { $_ -match "页面过渡完成: " })
+        $transitionLines = @($text -split "`r?`n" | Where-Object { $_ -match "页面过渡完成: \S+ \d+ms" })
         if ($MinTransitions -gt 0 -and $transitionLines.Count -lt $MinTransitions) {
             Write-Host ("FAIL: 页面过渡只完成了 {0} 次，期望至少 {1} 次（动画可能被跳过或中断）" -f $transitionLines.Count, $MinTransitions) -ForegroundColor Red
             $fail++
         }
         Write-Host ("页面过渡完成 {0} 次" -f $transitionLines.Count) -ForegroundColor DarkGray
+        # 耗时异常（0ms 或超过 3s）说明动画没跑或被卡住
+        $slowOrZero = @($transitionLines | Where-Object {
+            if ($_ -match " (\d+)ms") { $ms = [int]$Matches[1]; $ms -le 0 -or $ms -gt 3000 } else { $true }
+        })
+        if ($slowOrZero.Count -gt 0) {
+            Write-Host ("FAIL: {0} 次页面过渡耗时异常（0ms 或 >3s）" -f $slowOrZero.Count) -ForegroundColor Red
+            $slowOrZero | Select-Object -First 3 | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
+            $fail++
+        }
         $pageFixed = 0
         foreach ($line in $pageLines) {
             if ($line -match "圆角描边修复: (\d+) 个") { $pageFixed += [int]$Matches[1] }

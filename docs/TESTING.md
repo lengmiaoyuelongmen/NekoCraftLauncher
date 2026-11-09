@@ -17,6 +17,9 @@ $env:JAVA_HOME = 'C:\Program Files\Java\jdk-21.0.11'
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/smoke-test.ps1 -SkipBuild
+
+# 额外对每页导航按钮做悬停动效断言（需要窗口在前台，默认关闭）
+powershell -ExecutionPolicy Bypass -File scripts/smoke-test.ps1 -SkipBuild -HoverCheck
 ```
 
 做四件事：
@@ -24,7 +27,8 @@ powershell -ExecutionPolicy Bypass -File scripts/smoke-test.ps1 -SkipBuild
 1. 启动真实进程（带 `-Dmc.uiSelfCheck=1`，会自动开关一个弹窗）；
 2. 用 UIA 逐页点击导航，页面清单与标记来自 `scripts/ui-pages.json`；
 3. 每页截图并检查不是空白页、标题确实切换、**页面标记文案在 UIA 树里出现**；
-4. 调用 `scripts/check-ui.ps1` 做 UI 自检（含「页面过渡完成」计数断言 `-MinTransitions`）。
+4. 调用 `scripts/check-ui.ps1` 做 UI 自检（含「页面过渡完成」计数与耗时断言 `-MinTransitions`，
+   过渡耗时 0ms 或 >3s 都算失败）。
 
 通过时输出类似：
 

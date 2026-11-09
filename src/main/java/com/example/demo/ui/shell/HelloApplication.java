@@ -211,6 +211,7 @@ import com.example.demo.ui.component.CommandPalette;
 import com.example.demo.ui.component.ConsoleToolbar;
 import com.example.demo.ui.component.CrashReportDialog;
 import com.example.demo.ui.component.DownloadFilterBar;
+import com.example.demo.ui.component.HealthCheckView;
 import com.example.demo.ui.component.DownloadNavItem;
 import com.example.demo.ui.component.DownloadStatusBar;
 import com.example.demo.ui.component.StyleRepair;
@@ -1180,10 +1181,17 @@ public class HelloApplication extends Application {
       child.setVisible(false);
       child.setOpacity(0.0);
     }
+    long transitionStart = System.nanoTime();
     Motion.pageIn(
         target,
         18,
-        () -> System.out.println("页面过渡完成: " + pageName));
+        () ->
+            System.out.println(
+                "页面过渡完成: "
+                    + pageName
+                    + " "
+                    + (System.nanoTime() - transitionStart) / 1_000_000L
+                    + "ms"));
     this.applyLaunchBackground();
     if ("launch".equals(pageName)) {
       this.applyAiMode();
@@ -4444,7 +4452,6 @@ private static void setFlexible(Node node, boolean on) {
     VersionFit.Target target = this.currentVersionTarget();
     List<ModLoaderCheck.Finding> loaderMismatch =
         ModLoaderCheck.scan(mods, target == null ? null : target.loader());
-    // Java：该版本要求的主版本 vs 扫描到的最合适 Java
     int requiredJava = HealthAdvice.NO_REQUIREMENT;
     int availableJava = 0;
     try {
@@ -4460,7 +4467,6 @@ private static void setFlexible(Node node, boolean on) {
       // 版本读不出来时，上面「版本文件」那行会报出来
     }
     HealthAdvice.Line javaAdvice = HealthAdvice.javaLine(requiredJava, availableJava);
-    // 内存：自动分配时用建议值，手动设置时用配置值
     MemoryAdvisor.Suggestion memorySuggestion = MemoryAdvisor.suggest(mods);
     boolean autoMemory = this.config.isAutoMemory();
     int configuredMemory =
@@ -4468,11 +4474,6 @@ private static void setFlexible(Node node, boolean on) {
     HealthAdvice.Line memoryAdvice =
         HealthAdvice.memoryLine(
             configuredMemory, memorySuggestion.memoryMb(), autoMemory, memorySuggestion.reason());
-    Dialog<ButtonType> dialog = new Dialog<>();
-    dialog.initOwner(this.stageRef);
-    dialog.setTitle("一键体检");
-    dialog.setHeaderText(id == null ? "还没有选择实例" : "实例 " + id);
-    // 先收集成数据，再渲染：导出的文本和界面上的行是同一份内容
     List<HealthAdvice.Line> lines = new ArrayList<>();
     lines.add(new HealthAdvice.Line(
         versionOk,
@@ -4480,7 +4481,6 @@ private static void setFlexible(Node node, boolean on) {
         versionOk ? "版本文件存在" : "版本 JSON / 客户端文件不完整"));
     lines.add(javaAdvice);
     lines.add(memoryAdvice);
-    lines.add(HealthAdvice.heapLine(configuredMemory, HardwareInfo.totalMemoryMb()));
     long diskFree = 0L;
     long diskTotal = 0L;
     try {
@@ -4491,6 +4491,7 @@ private static void setFlexible(Node node, boolean on) {
       // 读不到就跳过磁盘检查
     }
     lines.add(HealthAdvice.diskLine(diskFree, diskTotal));
+    lines.add(HealthAdvice.heapLine(configuredMemory, HardwareInfo.totalMemoryMb()));
     lines.add(new HealthAdvice.Line(
         versionOk, modCount > 0 || versionOk ? "正常" : "提示", modCount + " 个模组文件"));
     lines.add(new HealthAdvice.Line(
@@ -4509,37 +4510,26 @@ private static void setFlexible(Node node, boolean on) {
         loaderMismatch.isEmpty()
             ? "模组与实例加载器一致"
             : ModLoaderCheck.describe(loaderMismatch, target.loader())));
-    VBox rows = new VBox(8.0);
-    for (HealthAdvice.Line line : lines) {
-      rows.getChildren().add(this.healthRow(line.level(), line.message(), line.ok()));
-    }
-    Button fullCheck = new Button("运行完整性检查");
-    fullCheck.setDisable(id == null);
-    fullCheck.setOnAction(
-        e -> {
-          if (id != null) {
-            this.checkInstance(Instance.of(game, id));
-          }
-        });
-    Button export = new Button("导出体检报告");
-    export.setOnAction(e -> this.exportHealthReport(game, lines));
-    int logLineCount =
-        this.logArea == null ? 0 : this.logArea.getText().split("\\R").length;
-    Label exportHint =
-        new Label(
-            logLineCount <= 0
-                ? "导出时附带最近启动日志"
-                : "导出时附带最近 " + Math.min(50, logLineCount) + " 行启动日志");
-    exportHint.setStyle("-fx-text-fill: -app-text-dim-3; -fx-font-size: 11px;");
-
-    Button openCrash = new Button("打开崩溃目录");
-    openCrash.setDisable(!hasCrash);
-    openCrash.setOnAction(e -> this.openDir(new File(game, "crash-reports")));
-    HBox actions = new HBox(8.0, fullCheck, export, openCrash, exportHint);
-    actions.setAlignment(Pos.CENTER_LEFT);
-    dialog.getDialogPane().setContent(new VBox(12.0, rows, actions));
-    dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
-    dialog.showAndWait();
+    int logLineCount = this.logArea == null ? 0 : this.logArea.getText().split("\\R").length;
+    String exportText =
+        logLineCount <= 0
+            ? "导出报告（附带启动日志）"
+            : "导出报告（附 " + Math.min(50, logLineCount) + " 行日志）";
+    // 集成式：不再弹系统 Dialog，全部走应用内弹层，配色/圆角/字体与主界面一致
+    InAppDialog.custom(
+        null,
+        "一键体检",
+        new HealthCheckView(id, lines),
+        List.of(
+            InAppDialog.Action.secondary("关闭", null),
+            InAppDialog.Action.secondary(
+                "打开崩溃目录",
+                hasCrash ? () -> this.openDir(new File(game, "crash-reports")) : null),
+            InAppDialog.Action.secondary(
+                id == null ? "运行完整性检查" : "运行完整性检查",
+                id == null ? null : () -> this.checkInstance(Instance.of(game, id))),
+            InAppDialog.Action.primary(exportText, () -> this.exportHealthReport(game, lines))),
+        null);
   }
 
   /** 报告末尾附最近 N 行启动日志，方便求助时一次贴全。 */
