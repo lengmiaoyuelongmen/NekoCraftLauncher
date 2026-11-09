@@ -250,14 +250,16 @@ public class SmokeWin {
         if ($HoverCheck) {
             $motionScript = Join-Path $PSScriptRoot "capture-motion.ps1"
             if (Test-Path $motionScript) {
-                & powershell -ExecutionPolicy Bypass -File $motionScript -HoverName $p.nav -Frames 12 -IntervalMs 40 -OutDir "target\motion-smoke-$($p.name)" -MinHoverDiff 150 2>&1 | Out-Null
-                if ($LASTEXITCODE -ne 0) {
-                    Write-Host ("  ! {0} 的悬停断言未通过（可能是窗口未在前台）" -f $p.name) -ForegroundColor Yellow
+                $null = Focus-Launcher
+                & powershell -ExecutionPolicy Bypass -File $motionScript -HoverName $p.nav -Frames 12 -IntervalMs 40 -OutDir "target\motion-smoke-$($p.name)" -MinHoverDiff 150 -RequireForeground 2>&1 | Out-Null
+                if ($LASTEXITCODE -eq 4) {
+                    Write-Host ("  · {0} 悬停断言跳过（窗口切不到前台）" -f $p.name) -ForegroundColor DarkYellow
+                } elseif ($LASTEXITCODE -ne 0) {
+                    Write-Host ("  ! {0} 的悬停断言未通过" -f $p.name) -ForegroundColor Yellow
                     $hoverFailures++
                 }
             }
         }
-        # 标题已经证明切页成功：等动画走完再拍；万一和上一页一样就再等一拍
         Start-Sleep -Milliseconds 1200
         Capture-Window $p.name
         $pageHash = (Get-FileHash (Join-Path $outDir "$($p.name).png") -Algorithm SHA256).Hash

@@ -25,11 +25,14 @@ public final class HealthCheckView extends VBox {
     /**
      * @param instanceLabel 实例名（为空时显示"未选择实例"）
      * @param lines 体检结论
+     * @param onAction 点击告警行时的跳转动作（null 表示不可点）
      */
-    public HealthCheckView(String instanceLabel, List<HealthAdvice.Line> lines) {
+    public HealthCheckView(
+            String instanceLabel, List<HealthAdvice.Line> lines,
+            java.util.function.Consumer<HealthAdvice.Line> onAction) {
         super(0);
-        setPrefWidth(540);
-        setMaxWidth(540);
+        setPrefWidth(510);
+        setMaxWidth(510);
         setSpacing(10);
 
         long warnings = lines.stream().filter(line -> !line.ok()).count();
@@ -59,12 +62,14 @@ public final class HealthCheckView extends VBox {
 
         getChildren().add(header);
         for (HealthAdvice.Line line : lines) {
-            getChildren().add(row(line));
+            getChildren().add(row(line, onAction));
         }
     }
 
-    /** 单行：状态符号 + 级别 + 说明；告警行用暖色描边，正常行保持克制。 */
-    private static Node row(HealthAdvice.Line line) {
+    /** 单行：状态符号 + 级别 + 说明；告警行用暖色描边且可点击跳转。 */
+    private static Node row(
+            HealthAdvice.Line line,
+            java.util.function.Consumer<HealthAdvice.Line> onAction) {
         HBox row = new HBox(10.0);
         row.setAlignment(Pos.CENTER_LEFT);
         row.setPadding(new Insets(8, 12, 8, 12));
@@ -86,6 +91,18 @@ public final class HealthCheckView extends VBox {
         text.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 12px;");
         HBox.setHgrow(text, Priority.ALWAYS);
         row.getChildren().addAll(dot, level, text);
+        if (!line.ok() && onAction != null) {
+            // 告警行可点：崩溃记录 → 打开目录、模组不匹配 → 打开 mods…由调用方决定
+            row.setCursor(javafx.scene.Cursor.HAND);
+            row.getStyleClass().add("health-row-actionable");
+            row.setOnMouseClicked(
+                    e -> {
+                        onAction.accept(line);
+                    });
+            Label go = new Label("›");
+            go.setStyle("-fx-text-fill: #fbbf24; -fx-font-size: 14px;");
+            row.getChildren().add(go);
+        }
         return row;
     }
 }

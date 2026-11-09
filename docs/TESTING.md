@@ -115,6 +115,7 @@ powershell -ExecutionPolicy Bypass -File scripts/capture-motion.ps1 -HoverName "
 | `-ExpectDecreasing` | 断言点击后的差异序列单调收敛（允许 ±5 抖动），否则 exit 1 |
 | `-ContactSheet` | 把关键帧拼成 3×3 对比图 `contact-sheet.png`，可直接贴文档 |
 | `-MinHoverDiff <n>` | 悬停差异峰值低于 n 时判定动效失效并 exit 1 |
+| `-RequireForeground` | 窗口切不到前台时直接返回 4（冒烟据此记为 SKIP，不算失败） |
 
 单张截图延迟 >300ms，抓不到 200ms 的动画；这个脚本改为**连拍**：每 40ms 抓一帧，第 4 帧时用 UIA
 触发一次点击，最后把每帧与"稳定帧"逐点比较，输出差异序列。实测一次设置页切换：

@@ -29,7 +29,7 @@ try {
         exit 0
     }
     Write-Host "==> 3/3 冒烟 + UI 自检" -ForegroundColor Cyan
-    & powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "smoke-test.ps1") -SkipBuild
+    & powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "smoke-test.ps1") -SkipBuild -HoverCheck
     if ($LASTEXITCODE -ne 0) { throw "冒烟失败" }
 
     Write-Host ""

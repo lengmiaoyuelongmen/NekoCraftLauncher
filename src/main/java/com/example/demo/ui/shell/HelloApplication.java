@@ -4516,20 +4516,31 @@ private static void setFlexible(Node node, boolean on) {
             ? "导出报告（附带启动日志）"
             : "导出报告（附 " + Math.min(50, logLineCount) + " 行日志）";
     // 集成式：不再弹系统 Dialog，全部走应用内弹层，配色/圆角/字体与主界面一致
-    InAppDialog.custom(
+    InAppDialog.customSized(
         null,
         "一键体检",
-        new HealthCheckView(id, lines),
+        new HealthCheckView(
+            id,
+            lines,
+            line -> {
+              // 告警行的跳转：崩溃记录 → 目录，模组不匹配 → mods 目录，其余 → 设置页
+              if (line.level().contains("有记录")) {
+                this.openDir(new File(game, "crash-reports"));
+              } else if (line.level().contains("不匹配")) {
+                this.openDir(mods);
+              } else {
+                this.switchPage("settings");
+              }
+            }),
         List.of(
             InAppDialog.Action.secondary("关闭", null),
             InAppDialog.Action.secondary(
-                "打开崩溃目录",
-                hasCrash ? () -> this.openDir(new File(game, "crash-reports")) : null),
-            InAppDialog.Action.secondary(
-                id == null ? "运行完整性检查" : "运行完整性检查",
-                id == null ? null : () -> this.checkInstance(Instance.of(game, id))),
+                "完整性检查", id == null ? null : () -> this.checkInstance(Instance.of(game, id))),
+            InAppDialog.Action.secondary("复制", () -> this.copyHealthReport(lines)),
             InAppDialog.Action.primary(exportText, () -> this.exportHealthReport(game, lines))),
-        null);
+        null,
+        560,
+        -1);
   }
 
   /** 报告末尾附最近 N 行启动日志，方便求助时一次贴全。 */
@@ -4551,6 +4562,18 @@ private static void setFlexible(Node node, boolean on) {
       tail.append(all[i]).append(System.lineSeparator());
     }
     return tail.toString();
+  }
+
+  /** 只复制到剪贴板，不落盘：临时贴给朋友/群里时用。 */
+  private void copyHealthReport(List<HealthAdvice.Line> lines) {
+    String header =
+        "Neko Craft Launcher 体检报告  实例 " + this.currentInstanceId();
+    String text = HealthAdvice.render(header, lines);
+    javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
+    content.putString(text);
+    javafx.scene.input.Clipboard.getSystemClipboard().setContent(content);
+    Toast.ok("体检报告已复制到剪贴板");
+    this.logLine("🩺 体检报告已复制到剪贴板（" + lines.size() + " 项）");
   }
 
   /** 导出体检报告：写进 game/logs 并复制到剪贴板。 */
