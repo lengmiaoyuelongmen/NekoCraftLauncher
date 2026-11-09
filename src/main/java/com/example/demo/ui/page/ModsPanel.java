@@ -395,6 +395,16 @@ public final class ModsPanel extends VBox {
                 localList.getChildren().add(localRow(file));
             }
         }
+        // 列表项入场：错落淡入，避免刷新时整块"啪"地出现
+        java.util.List<javafx.scene.Node> rows = new java.util.ArrayList<>();
+        for (javafx.scene.Node node : localList.getChildren()) {
+            if (node instanceof HBox) {
+                rows.add(node);
+            }
+        }
+        if (!rows.isEmpty()) {
+            com.example.demo.ui.shell.Motion.stagger(rows);
+        }
     }
 
     private Label modsSection(String text) {

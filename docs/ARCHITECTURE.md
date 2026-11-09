@@ -1227,6 +1227,15 @@ PASS: 5 个页面切换完成，stderr 无异常，UI 自检通过
 - **下载列表入场**：`ModpackCell` 首次渲染时 `Motion.reveal`（淡入 + 上移），ListView 复用 cell
   后不再重复播放（`revealed` 标记）。
 
+### 模组列表入场 + 测试手册（2026-11-09 22:00）
+
+- **模组列表**：`ModsPanel.refreshLocal` 重建列表后对每行执行 `Motion.stagger`，
+  刷新时逐行错落淡入；刷新被判为"内容没变"时直接 return，不会重复播。
+- **测试手册**：新增 `docs/TESTING.md`，把构建/单测、冒烟、UI 自检、架构守卫、测试钩子
+  （`-Dmc.uiSelfCheck`、`-Dmc.failPage`、`-Dmc.import`）、手工验证配方与已知限制集中记录。
+- 动效（入场/悬停）仍是代码级证据：截图延迟约 300ms，比动画时长（约 200ms）还长，
+  抓不到中间帧；这一点在 TESTING.md 的「已知限制」里写明了。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：
