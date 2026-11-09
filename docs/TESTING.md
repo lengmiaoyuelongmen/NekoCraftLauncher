@@ -94,8 +94,22 @@ powershell -ExecutionPolicy Bypass -File scripts/ci.ps1 -SkipBuild   # 已有 ja
 ## 9. 动效中间帧连拍
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/capture-motion.ps1 -ClickName "设置" -Frames 30 -IntervalMs 40
+# 切换动画 + 断言差异单调收敛 + 生成九宫格对比图
+powershell -ExecutionPolicy Bypass -File scripts/capture-motion.ps1 -ClickName "设置" -Frames 30 -IntervalMs 40 `
+    -ExpectDecreasing -ContactSheet -OutDir target/motion
+
+# 悬停动效（把鼠标移到指定元素上再连拍）
+powershell -ExecutionPolicy Bypass -File scripts/capture-motion.ps1 -HoverName "设置" -Frames 24 -OutDir target/motion-hover
 ```
+
+参数说明：
+
+| 参数 | 作用 |
+|---|---|
+| `-ClickName` | 第 4 帧用 UIA 触发该元素的 Invoke |
+| `-HoverName` | 第 4 帧把鼠标移到该元素中心（UIA 矩形） |
+| `-ExpectDecreasing` | 断言点击后的差异序列单调收敛（允许 ±5 抖动），否则 exit 1 |
+| `-ContactSheet` | 把关键帧拼成 3×3 对比图 `contact-sheet.png`，可直接贴文档 |
 
 单张截图延迟 >300ms，抓不到 200ms 的动画；这个脚本改为**连拍**：每 40ms 抓一帧，第 4 帧时用 UIA
 触发一次点击，最后把每帧与"稳定帧"逐点比较，输出差异序列。实测一次设置页切换：

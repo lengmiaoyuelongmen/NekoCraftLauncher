@@ -3,10 +3,13 @@
 param(
     [string]$Title = "Neko Craft Launcher",
     [string]$ClickName = "",
+    [string]$HoverName = "",
     [int]$WarmupMs = 300,
     [int]$Frames = 30,
     [int]$IntervalMs = 40,
-    [string]$OutDir = "target\motion"
+    [string]$OutDir = "target\motion",
+    [switch]$ExpectDecreasing,
+    [switch]$ContactSheet
 )
 
 $ErrorActionPreference = "Stop"
@@ -28,6 +31,7 @@ public class MotionWin {
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
   [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
   [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, IntPtr extra);
+  [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
   [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
   public static IntPtr Find(string title) {
     IntPtr found = IntPtr.Zero;
@@ -76,6 +80,22 @@ Write-Host ("连拍 {0} 帧，窗口 {1}x{2}" -f $Frames, $w, $h)
 $clicked = $false
 $paths = @()
 for ($i = 0; $i -lt $Frames; $i++) {
+    if (-not $clicked -and $HoverName -and $i -eq 4) {
+        $root = [System.Windows.Automation.AutomationElement]::FromHandle($hwnd)
+        $cond = New-Object System.Windows.Automation.PropertyCondition(
+            [System.Windows.Automation.AutomationElement]::NameProperty, $HoverName)
+        $el = $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $cond)
+        if ($el) {
+            $r = $el.Current.BoundingRectangle
+            $cx = [int]($r.X + $r.Width / 2)
+            $cy = [int]($r.Y + $r.Height / 2)
+            [MotionWin]::SetCursorPos($cx, $cy) | Out-Null
+            Write-Host ("第 {0} 帧把鼠标移到：{1}" -f $i, $HoverName) -ForegroundColor DarkGray
+        } else {
+            Write-Host ("找不到可悬停元素：{0}" -f $HoverName) -ForegroundColor Yellow
+        }
+        $clicked = $true
+    }
     if (-not $clicked -and $ClickName -and $i -eq 4) {
         $root = [System.Windows.Automation.AutomationElement]::FromHandle($hwnd)
         $cond = New-Object System.Windows.Automation.PropertyCondition(
@@ -124,6 +144,46 @@ $moving = @($after | Where-Object { $_.Diff -gt 10 })
 if ($moving.Count -gt 0) {
     $top = $after | Sort-Object Diff -Descending | Select-Object -First 1
     Write-Host ("抓到动画中间帧 {0} 帧（差异 {1}→0），示例: {2}" -f $moving.Count, $top.Diff, $paths[$top.Frame]) -ForegroundColor Green
+    # 可选：断言差异序列单调递减（允许少量抖动）
+    if ($ExpectDecreasing) {
+        $prev = [int]::MaxValue
+        $violations = @()
+        foreach ($point in $after) {
+            if ($point.Diff -gt $prev + 5) { $violations += $point }
+            $prev = [math]::Min($prev, $point.Diff)
+        }
+        if ($violations.Count -gt 0) {
+            Write-Host ("FAIL: 差异序列没有单调收敛（{0} 处反弹）" -f $violations.Count) -ForegroundColor Red
+            exit 1
+        }
+        Write-Host "PASS: 差异序列单调收敛" -ForegroundColor Green
+    }
+    # 可选：把关键帧拼成一张九宫格，方便直接贴文档
+    if ($ContactSheet) {
+        $pick = @()
+        $afterSorted = $after | Sort-Object Frame
+        $hit = 0
+        foreach ($point in $afterSorted) {
+            if ($point.Diff -gt 0 -and $hit -lt 8) { $pick += $point.Frame; $hit++ }
+        }
+        $pick += ($paths.Count - 1)
+        $cellW = [int]($w / 3)
+        $cellH = [int]($h / 3)
+        $sheet = New-Object System.Drawing.Bitmap(($cellW * 3), ($cellH * 3))
+        $g = [System.Drawing.Graphics]::FromImage($sheet)
+        $g.Clear([System.Drawing.Color]::Black)
+        for ($k = 0; $k -lt [Math]::Min(9, $pick.Count); $k++) {
+            $frame = New-Object System.Drawing.Bitmap($paths[$pick[$k]])
+            $dst = New-Object System.Drawing.Rectangle((($k % 3) * $cellW), ([math]::Floor($k / 3) * $cellH), $cellW, $cellH)
+            $g.DrawImage($frame, $dst)
+            $frame.Dispose()
+        }
+        $g.Dispose()
+        $sheetPath = Join-Path $OutDir "contact-sheet.png"
+        $sheet.Save($sheetPath, [System.Drawing.Imaging.ImageFormat]::Png)
+        $sheet.Dispose()
+        Write-Host ("九宫格对比图: " + $sheetPath) -ForegroundColor Green
+    }
     exit 0
 }
 Write-Host "没有抓到中间帧（可能动画太快或未触发）" -ForegroundColor Yellow

@@ -1260,6 +1260,18 @@ CI PASS：构建、单测、架构守卫、冒烟、UI 自检全部通过
   （`STAGGER_STEP_MS` 等），调参不用再满文件找魔数。
 - **`scripts/ci.ps1 -SkipSmoke`**：只跑构建+单测+架构守卫，提交前快速自查用。
 
+### 动效证据链闭环（2026-11-09 22:40）
+
+`scripts/capture-motion.ps1` 现在能出三类证据：
+
+| 能力 | 参数 | 实测 |
+|---|---|---|
+| 切换动画 + 单调性断言 | `-ClickName 设置 -ExpectDecreasing` | 差异序列 20575→0，`PASS: 差异序列单调收敛` |
+| 悬停动效 | `-HoverName 设置` | 16 帧有差异（最大 520），帧图可见按钮高亮 |
+| 九宫格对比图 | `-ContactSheet` | `target/motion3/contact-sheet.png`（3×3，看出启动页→设置页的过渡） |
+
+九宫格第 5~7 格是过渡中间态，第 8~9 格已稳定——这就是"动画确实存在"的视觉证据。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：
