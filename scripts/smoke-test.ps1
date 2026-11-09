@@ -191,12 +191,10 @@ public class SmokeWin {
     # ---------- 逐页 ----------
     Write-Host "[3/4] 逐页切换..." -ForegroundColor Cyan
     Add-Type -AssemblyName System.Windows.Forms
-    $pages = @(
-        @{ nav = "下载"; name = "02-download"; label = "下载"; marker = "下载中心" },
-        @{ nav = "设置"; name = "03-settings"; label = "设置"; marker = "启动设置" },
-        @{ nav = "工具"; name = "04-tools"; label = "工具"; marker = "百宝箱" },
-        @{ nav = "启动"; name = "05-back-launch"; label = "启动"; marker = "启动游戏" }
-    )
+    # 页面清单与标记来自 scripts/ui-pages.json（与 PageMarkersTest 共用同一份数据）
+    $pagesFile = Join-Path $PSScriptRoot "ui-pages.json"
+    if (-not (Test-Path $pagesFile)) { throw "缺少 scripts/ui-pages.json" }
+    $pages = (Get-Content $pagesFile -Raw -Encoding UTF8 | ConvertFrom-Json).pages
     Add-Type -AssemblyName UIAutomationClient
     Add-Type -AssemblyName UIAutomationTypes
     foreach ($p in $pages) {

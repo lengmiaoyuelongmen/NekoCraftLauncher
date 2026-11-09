@@ -1216,6 +1216,17 @@ PASS: 5 个页面切换完成，stderr 无异常，UI 自检通过
 - **设置卡片错落**：`card()` 打上 `settings-card` 样式类，切换分栏时对页内卡片执行
   `Motion.stagger`（每张延迟 30ms 淡入）。
 
+### 页面标记共享 + 兜底真机验证 + 列表入场（2026-11-09 21:25）
+
+- **标记共享**：页面清单搬到 `scripts/ui-pages.json`，冒烟按 JSON 驱动；新增
+  `PageMarkersTest`（单测 255）把每个 marker 拿去主源码里搜，界面文案一改就会失败，避免
+  冒烟与界面各写一份导致漂移。
+- **兜底真机验证**：加了测试钩子 `-Dmc.failPage=tools`（`createPage` 里主动抛异常）。真机点击
+  工具页得到：日志 `❌ 页面「tools」创建失败: java.lang.IllegalStateException: 测试注入的页面创建失败: tools`、
+  弹窗「页面「tools」创建失败…」、并自动退回启动页——不再是白屏。
+- **下载列表入场**：`ModpackCell` 首次渲染时 `Motion.reveal`（淡入 + 上移），ListView 复用 cell
+  后不再重复播放（`revealed` 标记）。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：

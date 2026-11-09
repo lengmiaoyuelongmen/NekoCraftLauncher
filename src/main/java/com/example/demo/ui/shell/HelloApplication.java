@@ -1039,6 +1039,11 @@ public class HelloApplication extends Application {
   }
 
   private Node createPage(String name) {
+    // 测试钩子：-Dmc.failPage=tools 时让该页构造失败，用来验证 switchPage 的兜底
+    String failPage = System.getProperty("mc.failPage");
+    if (failPage != null && failPage.equals(name)) {
+      throw new IllegalStateException("测试注入的页面创建失败: " + name);
+    }
     File gameDir = new File(this.config.getGameDir());
     return switch (name) {
       case "launch" -> this.launchPanel;

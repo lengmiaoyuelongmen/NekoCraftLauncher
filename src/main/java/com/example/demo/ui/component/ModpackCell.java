@@ -65,6 +65,9 @@ public final class ModpackCell extends ListCell<ModpackProject> {
   private final Button downloadBtn = new Button("下载");
   private final Button starBtn = new Button();
 
+  /** 首次渲染后就不再播入场动画（ListView 会复用 cell）。 */
+  private boolean revealed;
+
   public ModpackCell(Host host, ReadOnlyDoubleProperty listWidth) {
     this.host = host;
     this.listWidth = listWidth;
@@ -148,6 +151,15 @@ public final class ModpackCell extends ListCell<ModpackProject> {
   @Override
   protected void updateItem(ModpackProject project, boolean empty) {
     super.updateItem(project, empty);
+    if (empty || project == null) {
+      setGraphic(null);
+      return;
+    }
+    // 列表项首次出现时淡入 + 上移一点点；cell 复用后不再重复播
+    if (!revealed) {
+      revealed = true;
+      com.example.demo.ui.shell.Motion.reveal(this, 0L);
+    }
     if (empty || project == null) {
       setGraphic(null);
       return;

@@ -1,0 +1,9 @@
+{
+  "comment": "冒烟与单测共用的页面清单：marker 必须能在主源码里找到（PageMarkersTest 会检查漂移）",
+  "pages": [
+    { "nav": "下载", "name": "02-download", "label": "下载", "marker": "下载中心" },
+    { "nav": "设置", "name": "03-settings", "label": "设置", "marker": "启动设置" },
+    { "nav": "工具", "name": "04-tools", "label": "工具", "marker": "百宝箱" },
+    { "nav": "启动", "name": "05-back-launch", "label": "启动", "marker": "启动游戏" }
+  ]
+}
