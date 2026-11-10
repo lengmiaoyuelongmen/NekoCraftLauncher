@@ -152,7 +152,8 @@ public final class InstanceSettingsPanel extends HBox {
         tabScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         tabScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         tabScroll.setStyle("-fx-background: transparent; -fx-background-color: transparent; -fx-border-color: transparent;");
-        VBox headerArea = new VBox(6, headerWrap, tabScroll);
+        // 顶部实例胶囊行没有实际用途，去掉只留模块头
+        VBox headerArea = new VBox(6, headerWrap);
         VBox right = new VBox(headerArea, content);
         VBox.setVgrow(content, Priority.ALWAYS);
         HBox.setHgrow(right, Priority.ALWAYS);
@@ -171,6 +172,7 @@ public final class InstanceSettingsPanel extends HBox {
     }
 
     private void refreshInstanceTabs() {
+        if (true) return; // 胶囊行已移除
         if (instanceTabs == null) return;
         instanceTabs.getChildren().clear();
         java.util.List<Instance> instances = Instance.list(gameDir);
@@ -243,25 +245,41 @@ public final class InstanceSettingsPanel extends HBox {
                 });
     }
 
-    private void applyNavStyles(String tabName) {
-        for (Node node : navBox.getChildren()) {
-            if (node.getUserData() instanceof String key) {
-                boolean active = key.equals(tabName);
-                node.setStyle("-fx-background-color: "
-                        + (active ? (Theme.isLight() ? "#ffffff" : "#232730") : "transparent") + ";");
-                if (node instanceof HBox box) {
-                    box.getChildren().get(0).setStyle("-fx-fill: " + (active ? "#9ca3af" : "transparent") + ";");
-                    for (javafx.scene.Node child : box.getChildren()) {
-                        if (child instanceof Label label) {
-                            label.setStyle("-fx-text-fill: " + (active ? "-app-text" : "-app-text-dim")
-                                    + "; -fx-font-size: 12px;");
-                            break;
-                        }
-                    }
-                }
+    /** 单个导航项按「选中 > 悬停 > 普通」重绘，悬停色与页面底色拉开对比。 */
+    private void paintNavItem(HBox item) {
+        if (!(item.getUserData() instanceof String key)) return;
+        boolean active = key.equals(tab);
+        boolean hovered = item.isHover();
+        String background;
+        if (active) {
+            background = Theme.isLight() ? "#ffffff" : "#2b303a";
+        } else if (hovered) {
+            background = Theme.isLight() ? "#dbe7f3" : "-app-hover-3";
+        } else {
+            background = "transparent";
+        }
+        item.setStyle("-fx-background-color: " + background + ";");
+        if (item.getChildren().size() > 0
+                && item.getChildren().get(0) instanceof Rectangle bar) {
+            bar.setFill(active ? Color.web("#4b5563") : (hovered ? Color.web("#9ca3af") : Color.TRANSPARENT));
+        }
+        for (javafx.scene.Node child : item.getChildren()) {
+            if (child instanceof Label label) {
+                label.setStyle("-fx-text-fill: "
+                        + (active ? "-app-text" : (hovered ? "-app-text-2" : "-app-text-dim"))
+                        + "; -fx-font-size: 12px;");
+                break;
             }
         }
     }
+
+    private void applyNavStyles(String tabName) {
+        for (Node node : navBox.getChildren()) {
+            if (node instanceof HBox item) paintNavItem(item);
+        }
+        return;
+    }
+
 
     private void buildPage(String tabName) {
         String id = instanceId == null ? "" : instanceId;
@@ -1076,13 +1094,8 @@ public final class InstanceSettingsPanel extends HBox {
         };
         item.getChildren().addAll(bar, Icons.node(iconName, 13, "#7b818b"), label);
 
-        item.setOnMouseEntered(e -> {
-            if (!key.equals(tab)) item.setStyle("-fx-background-color: "
-                    + (Theme.isLight() ? "#eef2f7" : "-app-hover-2") + ";");
-        });
-        item.setOnMouseExited(e -> {
-            if (!key.equals(tab)) item.setStyle("-fx-background-color: transparent;");
-        });
+        item.setOnMouseEntered(e -> paintNavItem(item));
+        item.setOnMouseExited(e -> paintNavItem(item));
         item.setOnMouseClicked(e -> select(key));
         navBox.getChildren().add(item);
         return item;
@@ -1092,12 +1105,7 @@ public final class InstanceSettingsPanel extends HBox {
     private void refreshNavStyles() {
         if (navBox == null) return;
         for (javafx.scene.Node node : navBox.getChildren()) {
-            if (!(node instanceof HBox item) || !(node.getUserData() instanceof String key)) continue;
-            boolean active = key.equals(tab);
-            boolean hovered = node instanceof HBox box && box.isHover();
-            String activeColor = Theme.isLight() ? "#ffffff" : "#232730";
-            item.setStyle("-fx-background-color: "
-                    + (active ? activeColor : (hovered ? "-app-hover-2" : "transparent")) + ";");
+            if (node instanceof HBox item) paintNavItem(item);
         }
     }
 
@@ -1157,9 +1165,11 @@ public final class InstanceSettingsPanel extends HBox {
         form.setMaxWidth(620);
 
         HBox actions = new HBox(10, saved, save);
-        actions.setAlignment(Pos.CENTER_LEFT);
+        actions.setAlignment(Pos.CENTER_RIGHT);
+        form.getChildren().add(actions);
+        form.setPadding(new Insets(16));
 
-        page.getChildren().addAll(head, hint, form, actions);
+        page.getChildren().addAll(head, hint, form);
         return page;
     }
 
