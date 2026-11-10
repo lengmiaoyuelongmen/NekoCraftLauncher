@@ -1362,6 +1362,27 @@ CI PASS：构建、单测、架构守卫、冒烟、UI 自检全部通过
 结果: PASS
 ```
 
+### CI 摘要结构化 + 基线元信息（2026-11-11 22:20）
+
+`ci.ps1` 结束时写 `target/ci-summary.txt`，格式改为 **key=value**，并补充基线元信息：
+
+```
+time=2026-11-10 22:19:32
+duration_sec=91
+build=skipped
+architecture=pass
+smoke=pass
+nightly=pass
+baseline_hash=70C513348D9F
+baseline_mtime=2026-11-10 00:05:28
+baseline_diff_percent=0.47
+result=pass
+```
+
+- 失败时追加 `failure=`、`evidence=<左右对照图>`、`heatmap=<热力图>`；实测把阈值压到 0.01
+  复现：`nightly=fail`、`result=fail`、两条证据路径都写进摘要。
+- `nightly` / `smoke` 状态按实际结果写，不再写死；新增 `-BaselineMaxDiff` 参数便于演练失败。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：
