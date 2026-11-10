@@ -277,3 +277,16 @@
     -fx-border-color: -app-accent;
     -fx-text-fill: #16324a;
 }
+
+/* 体检面板告警行（浅色主题） */
+.health-row-warn {
+    -fx-background-color: rgba(245,158,11,0.10);
+    -fx-border-color: rgba(245,158,11,0.30);
+    -fx-border-radius: 10;
+    -fx-background-radius: 10;
+}
+
+.health-row-warn:hover {
+    -fx-background-color: rgba(245,158,11,0.18);
+    -fx-border-color: rgba(245,158,11,0.55);
+}

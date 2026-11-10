@@ -688,3 +688,16 @@
     -fx-background-color: -app-accent-soft;
     -fx-border-color: -app-accent;
 }
+
+/* 体检面板：告警行可点击，悬停时背景与描边提亮 */
+.health-row-warn {
+    -fx-background-color: rgba(251,191,36,0.08);
+    -fx-border-color: rgba(251,191,36,0.28);
+    -fx-border-radius: 10;
+    -fx-background-radius: 10;
+}
+
+.health-row-warn:hover {
+    -fx-background-color: rgba(251,191,36,0.16);
+    -fx-border-color: rgba(251,191,36,0.55);
+}

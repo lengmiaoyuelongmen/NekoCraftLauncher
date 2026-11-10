@@ -111,12 +111,8 @@ public final class HealthCheckView extends VBox {
         if (!line.ok() && onAction != null) {
             // 告警行可点：崩溃记录 → 打开目录、模组不匹配 → 打开 mods…由调用方决定
             row.setCursor(javafx.scene.Cursor.HAND);
-            // 反馈：悬停时提亮背景与边框，暗示"这行可以点"
-            String baseStyle = row.getStyle();
-            row.setOnMouseEntered(
-                    e -> row.setStyle(baseStyle.replace("rgba(251,191,36,0.08)", "rgba(251,191,36,0.16)")
-                            .replace("rgba(251,191,36,0.28)", "rgba(251,191,36,0.55)")));
-            row.setOnMouseExited(e -> row.setStyle(baseStyle));
+            // 反馈交给样式类（.health-row-warn:hover），不靠字符串替换
+            row.getStyleClass().add("health-row-warn");
             row.getStyleClass().add("health-row-actionable");
             row.setOnMouseClicked(
                     e -> {

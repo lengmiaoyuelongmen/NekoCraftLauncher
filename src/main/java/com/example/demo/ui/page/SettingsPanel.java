@@ -442,7 +442,7 @@ public final class SettingsPanel extends VBox {
                     scaleIcon(icon, 1.18);
                     if (!name.equals(currentTab)) {
                         // 反馈：未选中的分栏悬停时给一点底色，暗示可点
-                        item.setStyle("-fx-background-color: rgba(255,255,255,0.05);"
+                        item.setStyle("-fx-background-color: -app-hover-2;"
                                 + " -fx-background-radius: 8;");
                     }
                 });
