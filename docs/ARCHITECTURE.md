@@ -1642,6 +1642,18 @@ result=pass
   返回键 hover 改成主题强调色。
 - 基线 0.60%（启动页新增卡片属设计变更）。
 
+### 悬停反馈连拍验证（2026-11-11 05:45）
+
+用 `capture-motion.ps1 -HoverName` 对三处新改的悬停做了连拍 + 峰值断言：
+
+| 位置 | 峰值 | 说明 |
+|---|---|---|
+| 实例选择侧栏「导入整合包」 | 438 | 悬停帧可见浅蓝底（`target/hover-instances/frame-06.png`） |
+| 实例设置导航「资源包」 | 1088 | 悬停帧可见灰底，同时「概览」保持选中白底（`target/hover-nav2/frame-06.png`） |
+| 下载侧栏「模组」 | 406 | 悬停底 + 加深后的文字（`target/hover-download/frame-06.png`） |
+
+结论：`paintNavItem` / `paintSideItem` / 下载侧栏的悬停样式都真的生效，不是只改代码没渲染。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：
