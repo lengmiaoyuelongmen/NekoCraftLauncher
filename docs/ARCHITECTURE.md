@@ -1343,6 +1343,25 @@ CI PASS：构建、单测、架构守卫、冒烟、UI 自检全部通过
 - **CI 落地文档**：新增 `docs/CI-EXAMPLES.md`，给出 GitHub Actions（自托管 Windows runner，
   需已登录且不锁屏）与 Windows 计划任务（`-LogonType Interactive`）两种配置，以及失败产物对照表。
 
+### 键盘提示实测 + 对照图 + CI 摘要（2026-11-11 21:35）
+
+- **键盘提示开关实测**：把 `config.showKeyHints` 置 false 重启，体检面板底部的
+  `Esc 关闭 · Tab 切换按钮 · Enter 确认` 确实消失（截图 r134），之后已把配置还原为 true。
+- **左右对照图**：夜间基线失败时除热力图外再生成 `compare-<时间>.png`（左基线 / 右当前），
+  实测两图并排，差异只有时钟与内存数值，一眼可判。
+- **CI 摘要**：`ci.ps1` 结束时写 `target/ci-summary.txt`（时间、耗时、各步结果、失败原因），
+  `-SkipSmoke` 等提前退出的分支也会写。实测：
+
+```
+时间: 2026-11-10 21:30:02
+耗时: 93 秒
+构建/单测: 跳过
+架构守卫: 通过
+冒烟: 通过
+夜间基线: 通过
+结果: PASS
+```
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：

@@ -106,8 +106,29 @@ try {
             $baseBmp.Dispose()
             $heat.Save($heatPath, [System.Drawing.Imaging.ImageFormat]::Png)
             $heat.Dispose()
+            # 左右对照图：左边基线、右边当前，一眼看出哪里变了
+            $comparePath = Join-Path $outDir ("compare-" + $stamp + ".png")
+            try {
+                $baseImg = New-Object System.Drawing.Bitmap((Resolve-Path $Baseline).Path)
+                $curImg = New-Object System.Drawing.Bitmap((Resolve-Path $current).Path)
+                $gap = 12
+                $cmp = New-Object System.Drawing.Bitmap(($baseImg.Width * 2 + $gap), $baseImg.Height)
+                $g2 = [System.Drawing.Graphics]::FromImage($cmp)
+                $g2.Clear([System.Drawing.Color]::Black)
+                $g2.DrawImage($baseImg, 0, 0)
+                $g2.DrawImage($curImg, $baseImg.Width + $gap, 0)
+                $g2.Dispose()
+                $baseImg.Dispose(); $curImg.Dispose()
+                $cmp.Save($comparePath, [System.Drawing.Imaging.ImageFormat]::Png)
+                $cmp.Dispose()
+            } catch {
+                Write-Host ("对照图生成失败: {0}" -f $_) -ForegroundColor DarkYellow
+            }
             Write-Host ("当前截图: " + $shotCopy) -ForegroundColor DarkYellow
             Write-Host ("差异热力图: " + $heatPath) -ForegroundColor DarkYellow
+            if (Test-Path $comparePath) {
+                Write-Host ("左右对照: " + $comparePath) -ForegroundColor DarkYellow
+            }
         } catch {
             Write-Host ("热力图生成失败: {0}" -f $_) -ForegroundColor DarkYellow
         }
