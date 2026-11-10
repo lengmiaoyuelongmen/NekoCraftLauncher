@@ -1472,6 +1472,14 @@ result=pass
 - **深色次要文字提亮**：`-app-text-dim` `#bb9c98 → #d3b9b5`、`-app-text-muted` `#946f6b → #ad8a86`，
   在深红卡片底上更易读（浅色主题不受影响）。
 
+### 内联卡片收口 + 深色对比复核（2026-11-11 00:50）
+
+- 三处内联卡片迁入 `.neko-card`：账号卡片（`LaunchAccountColumn`）、安装页卡片（`InstallerPage`）、
+  实例信息表单卡（`InstanceSettingsPanel`）。账号卡片重新渲染正常（r149）。
+- 启动概览、顾问页卡片加 `Motion.hoverCard`，与 `.neko-card:hover` 描边配合。
+- 深色主题复核（r150）：提亮后的次要文字（`#d3b9b5` / `#ad8a86`）在深红卡片上清晰可读，
+  卡片与页面背景也有明确边界。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：

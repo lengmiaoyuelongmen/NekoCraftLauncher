@@ -71,11 +71,7 @@ public final class LaunchAccountColumn extends VBox {
     setMaxWidth(380.0);
     setMaxHeight(Double.MAX_VALUE);
     setAlignment(Pos.CENTER);
-    setStyle(
-        "-fx-background-color: -app-card; -fx-background-radius: 16; -fx-padding: 14 16 6"
-            + " 16; -fx-border-color: -app-border-2; -fx-border-width: 1;"
-            + " -fx-border-radius: 16; -fx-effect: dropshadow(gaussian,"
-            + " rgba(15,23,42,0.07), 20, 0.08, 0, 6);");
+    getStyleClass().add("neko-card");
 
     avatarPane =
         new AvatarPane(

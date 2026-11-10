@@ -1132,8 +1132,7 @@ public final class InstanceSettingsPanel extends HBox {
                 labeledField("实例名", nameField),
                 labeledField("实例描述", descField),
                 labeledField("实例 ID（只读）", new javafx.scene.control.Label(id)));
-        form.setStyle("-fx-background-color: -app-card; -fx-background-radius: 10; -fx-border-color: -app-border;"
-                + " -fx-border-radius: 10; -fx-padding: 16;");
+        form.getStyleClass().add("neko-card");
         form.setMaxWidth(620);
 
         HBox actions = new HBox(10, saved, save);

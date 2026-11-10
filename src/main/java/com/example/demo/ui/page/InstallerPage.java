@@ -149,9 +149,7 @@ public final class InstallerPage {
         card.setPadding(new Insets(14.0));
         card.setMaxWidth(780.0);
         card.setMaxHeight(Double.MAX_VALUE);
-        card.setStyle("-fx-background-color: -app-card; -fx-background-radius: 12;"
-                + " -fx-border-color: -app-border-2; -fx-border-radius: 12;");
-        panel.getChildren().addAll(top, card);
+        card.getStyleClass().add("neko-card");
 
         // 默认展开 Fabric，但必须等「用户显式点了某个分类」之后再判断：
         // 否则先同步展开用户点的那个、再被这里的 runLater 覆盖回 Fabric
