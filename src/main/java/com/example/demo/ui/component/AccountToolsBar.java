@@ -12,7 +12,7 @@ import com.example.demo.ui.shell.Motion;
  *
  * <p>从 HelloApplication 抽出，动作通过回调传入。
  */
-public final class AccountToolsBar extends VBox {
+public final class AccountToolsBar extends HBox {
 
   private final Button logoutButton;
 
@@ -26,14 +26,9 @@ public final class AccountToolsBar extends VBox {
     Button account = button("账户", "user", "account", onAccountManager);
     this.logoutButton = button("退出登录", "back", "logout", onLogout);
     Button health = button("体检", "check", "health", onHealthCheck);
-    // 4 个按钮在 340px 宽的卡片里排一行会被截断：拆成两行，每行两个
-    HBox row1 = new HBox(6.0, skin, account);
-    HBox row2 = new HBox(6.0, logoutButton, health);
-    row1.setAlignment(Pos.CENTER);
-    row2.setAlignment(Pos.CENTER);
     setAlignment(Pos.CENTER);
     setSpacing(6.0);
-    getChildren().setAll(row1, row2);
+    getChildren().setAll(skin, account, logoutButton, health);
   }
 
   /** 未登录时由外层隐藏，登录后恢复显示。 */

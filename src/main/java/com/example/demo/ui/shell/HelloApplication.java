@@ -1728,7 +1728,8 @@ private static void setFlexible(Node node, boolean on) {
     boolean on = this.config.isAiEnabled();
     this.commandBar.setAiMode(on);
     if (this.aiChatArea != null) {
-      this.aiChatArea.setPrefHeight(on ? 160.0 : 120.0);
+      this.aiChatArea.setPrefHeight(on ? 220.0 : 120.0);
+      this.aiChatArea.setMaxHeight(on ? Double.MAX_VALUE : 160.0);
       this.aiChatArea.setPromptText(
           this.config.getAiApiKey().isBlank()
               ? "还没填 DeepSeek API Key：点左边的 Key 按钮去 设置 → AI 填写"

@@ -1585,6 +1585,16 @@ result=pass
 - **AI 区**：对话区默认高度降到 160，未填 Key 时占位文案指向「Key」按钮。
 - 冒烟仍通过（8 次过渡，`missing_borders=0`）；基线差异 0.40%。
 
+### 概览填空 + 工具行单排 + AI 区展开（2026-11-11 04:30）
+
+- **工具行单排**：`AccountToolsBar` 回到 HBox 单行，四个短标签（皮肤 / 账户 / 退出登录 / 体检）
+  在 340px 卡片里放得下，不再堆叠（r175）。
+- **启动概览填空**：两张统计卡设 `HBox.setHgrow(ALWAYS)` + `maxWidth=MAX`，等宽撑满整行。
+- **当前实例补充信息**：卡片里新增「分配内存 8704 MB」「目录 …/game」两行。
+- **AI 区展开**：`ConsoleContainer.setFlexible` 之前只改 maxHeight，没设 `VBox.setVgrow`，所以
+  AI 模式聊天区永远停在 140px；补上 VGrow 后撑满命令栏以上区域（r178）。
+- 冒烟 9 次过渡通过；基线差异 0.40%。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：

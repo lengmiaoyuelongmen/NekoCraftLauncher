@@ -75,6 +75,11 @@ public final class LaunchOverviewPane extends VBox {
 
         VBox statCard = card("启动记录", statValue, statSub);
         VBox lastCard = card("最近一次启动", lastValue, lastSub);
+        // 两张统计卡等宽撑满一行，右侧不再留空
+        statCard.setMaxWidth(Double.MAX_VALUE);
+        lastCard.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(statCard, Priority.ALWAYS);
+        HBox.setHgrow(lastCard, Priority.ALWAYS);
         HBox statRow = new HBox(12.0, statCard, lastCard);
         statRow.setFillHeight(true);
         statRow.setMinHeight(89.0);
@@ -93,6 +98,15 @@ public final class LaunchOverviewPane extends VBox {
         HBox.setHgrow(historyCard, Priority.ALWAYS);
 
         VBox instanceCard = card("当前实例", instanceValue, instanceSub);
+        Label instanceMem = new Label();
+        instanceMem.setStyle("-fx-text-fill: -app-text-dim-2; -fx-font-size: 11px;");
+        instanceMem.setText("分配内存 " + config.getMemoryMb() + " MB");
+        Label instanceDir = new Label();
+        instanceDir.setStyle("-fx-text-fill: -app-text-dim-2; -fx-font-size: 11px;");
+        instanceDir.setText("目录 " + config.getGameDir());
+        instanceDir.setTextOverrun(OverrunStyle.ELLIPSIS);
+        instanceDir.setMaxWidth(Double.MAX_VALUE);
+        instanceCard.getChildren().addAll(instanceMem, instanceDir);
 
         GridPane quick = new GridPane();
         quick.setHgap(8.0);

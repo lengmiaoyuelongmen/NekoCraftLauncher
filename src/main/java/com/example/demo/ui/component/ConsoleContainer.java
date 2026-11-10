@@ -97,6 +97,7 @@ public final class ConsoleContainer {
         }
         node.setVisible(on);
         node.setManaged(on);
+        VBox.setVgrow(node, on ? Priority.ALWAYS : Priority.NEVER);
         if (node instanceof Region region) {
             region.setMinHeight(0.0);
             region.setPrefHeight(on ? -1.0 : 0.0);
