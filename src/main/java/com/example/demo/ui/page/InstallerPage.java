@@ -159,6 +159,7 @@ public final class InstallerPage {
                 expand("Fabric");
             }
         });
+        panel.getChildren().addAll(top, card);
         return panel;
     }
 

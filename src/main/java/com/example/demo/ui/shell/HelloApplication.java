@@ -810,6 +810,7 @@ public class HelloApplication extends Application {
     // 关闭动画时给根节点挂标记，CSS 里据此停用悬停提亮等过渡
     if (!this.config.isAnimations()) {
       rootWrap.getStyleClass().add("animations-off");
+      System.out.println("动画已关闭: 悬停提亮与过渡动效已停用");
     }
     Theme.bindScene(scene);
     Toast.install(rootWrap);

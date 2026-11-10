@@ -1490,6 +1490,17 @@ result=pass
   `installerPanel` 已创建并 `showDownloadPanel` 切换（见 `onSelect` 2273-2285）。
   截图为 r151/r152，下一轮优先定位（怀疑与版本清单为空、面板可见性切换有关）。
 
+### 修复安装页空白 + 动画开关验证（2026-11-11 01:25）
+
+- **根因**：`InstallerPage.build()` 创建了 `top` 与 `card`，却**从未加进 `panel`**，返回的是空 VBox，
+  所以「下载 → 安装包 → Fabric」永远是空白页。该缺陷从 Phase 5f 抽取 InstallerPage 时就存在
+  （`git log -S 'panel.getChildren'` 只匹配到抽取提交）。
+- **修复**：`panel.getChildren().addAll(top, card)`。修后安装页正常渲染：标题「安装 Minecraft 26.3」、
+  版本/实例名、加载器手风琴（Fabric 展开列出 0.20.1…）、开始下载按钮（r153）。
+- **动画关闭验证**：把 `animations` 置 false 启动，日志输出
+  `动画已关闭: 悬停提亮与过渡动效已停用`，且 `页面过渡完成: launch 0ms`（过渡被跳过），
+  证明 `animations-off` 类与 CSS 停用规则已经生效。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：
