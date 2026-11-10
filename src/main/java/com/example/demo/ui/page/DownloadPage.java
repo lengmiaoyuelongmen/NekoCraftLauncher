@@ -208,7 +208,7 @@ public final class DownloadPage {
 
     private Label group(String text, boolean indented) {
         Label label = new Label(text);
-        label.setStyle("-fx-text-fill: -app-text-muted-2; -fx-font-size: 13px; -fx-font-weight: bold;"
+        label.setStyle("-fx-text-fill: -app-text-dim; -fx-font-size: 13px; -fx-font-weight: bold;"
                 + " -fx-padding: " + (indented ? "25 20 5 25;" : "10 20 5 25;"));
         return label;
     }

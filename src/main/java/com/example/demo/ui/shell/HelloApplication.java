@@ -4592,7 +4592,7 @@ private static void setFlexible(Node node, boolean on) {
     VBox card = new VBox(14.0, view, actions);
     card.getStyleClass().add("neko-card");
     card.setPadding(new Insets(20.0));
-    card.setMaxWidth(760.0);
+    card.setMaxWidth(Double.MAX_VALUE);
 
     VBox content = new VBox(16.0, head, card);
     content.setPadding(new Insets(22.0));

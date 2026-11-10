@@ -56,9 +56,9 @@ public final class CommandBar extends HBox {
     field.setPromptText("命令：help 查看启动器命令；/give @s diamond 64 发送到游戏");
     field.setPrefHeight(32.0);
     field.setStyle(
-        "-fx-background-color: transparent; -fx-text-fill: -app-text;"
-            + " -fx-prompt-text-fill: -app-text-muted; -fx-background-radius: 8;"
-            + " -fx-border-color: transparent; -fx-border-radius: 8;"
+        "-fx-background-color: -app-input; -fx-text-fill: -app-text;"
+            + " -fx-prompt-text-fill: -app-text-muted; -fx-background-radius: 10;"
+            + " -fx-border-color: -app-border-soft; -fx-border-radius: 10;"
             + " -fx-padding: 6 10; -fx-font-size: 12px; -fx-font-family: 'Microsoft"
             + " YaHei UI', 'Segoe UI';");
     HBox.setHgrow(field, Priority.ALWAYS);
@@ -226,7 +226,7 @@ public final class CommandBar extends HBox {
           }
         });
 
-    Button apiKey = new Button("Key");
+    Button apiKey = new Button("密钥");
     apiKey.setTooltip(new Tooltip("前往 设置 → AI 填写 DeepSeek API Key"));
     apiKey.getStyleClass().add("icon-ghost");
     apiKey.setStyle("-fx-text-fill: -app-text-dim; -fx-font-size: 11px;");

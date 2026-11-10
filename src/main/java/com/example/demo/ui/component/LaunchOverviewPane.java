@@ -40,7 +40,9 @@ public final class LaunchOverviewPane extends VBox {
     private final Label statValue = new Label("—");
     private final Label statSub = caption("—");
     private final Label lastValue = new Label("—");
+    private final Label totalValue = new Label("—");
     private final Label lastSub = caption("—");
+    private final Label totalSub = caption("—");
     private final Label instanceValue = new Label("—");
     private final Label instanceSub = caption("—");
     private final VBox historyBox = new VBox(2.0);
@@ -75,12 +77,15 @@ public final class LaunchOverviewPane extends VBox {
 
         VBox statCard = card("启动记录", statValue, statSub);
         VBox lastCard = card("最近一次启动", lastValue, lastSub);
+        VBox totalCard = card("累计游玩", totalValue, totalSub);
         // 两张统计卡等宽撑满一行，右侧不再留空
         statCard.setMaxWidth(Double.MAX_VALUE);
         lastCard.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(statCard, Priority.ALWAYS);
         HBox.setHgrow(lastCard, Priority.ALWAYS);
-        HBox statRow = new HBox(12.0, statCard, lastCard);
+        totalCard.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(totalCard, Priority.ALWAYS);
+        HBox statRow = new HBox(12.0, statCard, lastCard, totalCard);
         statRow.setFillHeight(true);
         statRow.setMinHeight(89.0);
         statRow.setPrefHeight(89.0);
@@ -205,6 +210,22 @@ public final class LaunchOverviewPane extends VBox {
             instanceValue.setText(instance);
             String mc = InstanceId.mcVersion(instance);
             instanceSub.setText("MC " + (mc == null ? "—" : mc) + " · " + loader(instance));
+        }
+
+        long totalSession = 0L;
+        int played = 0;
+        for (LaunchHistory.Entry entry : entries) {
+            if (entry.sessionSeconds() > 0L) {
+                totalSession += entry.sessionSeconds();
+                played++;
+            }
+        }
+        if (played == 0) {
+            totalValue.setText("—");
+            totalSub.setText(entries.isEmpty() ? "还没有记录" : "记录里没有游玩时长");
+        } else {
+            totalValue.setText(LaunchFormat.clock(totalSession));
+            totalSub.setText("共 " + played + " 次有游玩时长");
         }
 
         historyBox.getChildren().clear();

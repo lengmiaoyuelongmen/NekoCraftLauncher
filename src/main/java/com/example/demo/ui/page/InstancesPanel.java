@@ -34,6 +34,7 @@ import com.example.demo.core.app.LauncherConfig;
 import com.example.demo.ui.shell.Icons;
 import com.example.demo.ui.shell.ModuleHeader;
 import com.example.demo.ui.shell.Motion;
+import com.example.demo.ui.shell.Theme;
 import com.example.demo.ui.shell.Toast;
 import com.example.demo.core.model.InstanceSettings;
 /**
@@ -162,7 +163,7 @@ public final class InstancesPanel extends HBox {
         Label back = new Label("‹ 返回启动页");
         back.setStyle("-fx-text-fill: -app-text-dim; -fx-font-size: 12px; -fx-cursor: hand;"
                 + " -fx-padding: 2 18 10 18;");
-        back.setOnMouseEntered(e -> back.setStyle("-fx-text-fill: #ffffff; -fx-font-size: 12px;"
+        back.setOnMouseEntered(e -> back.setStyle("-fx-text-fill: -app-accent; -fx-font-size: 12px;"
                 + " -fx-cursor: hand; -fx-padding: 2 18 10 18;"));
         back.setOnMouseExited(e -> back.setStyle("-fx-text-fill: -app-text-dim; -fx-font-size: 12px;"
                 + " -fx-cursor: hand; -fx-padding: 2 18 10 18;"));
@@ -553,11 +554,33 @@ public final class InstancesPanel extends HBox {
         label.setStyle("-fx-text-fill: " + (active ? "-app-text-2" : "-app-text-dim") + "; -fx-font-size: 12px;");
         item.getChildren().addAll(bar, icon, label);
 
-        if (!active) {
-            item.setOnMouseEntered(e -> item.setStyle("-fx-background-color: -app-hover-2;"));
-            item.setOnMouseExited(e -> item.setStyle("-fx-background-color: transparent;"));
-            item.setOnMouseClicked(e -> action.run());
-        }
+        // 选中项也要有明确的悬停反馈：统一按「选中 > 悬停 > 普通」重绘
+        item.setOnMouseEntered(e -> paintSideItem(item, active, true));
+        item.setOnMouseExited(e -> paintSideItem(item, active, false));
+        item.setOnMouseClicked(e -> action.run());
         return item;
+    }
+
+    /** 侧栏项状态重绘：底色 + 左侧色条 + 文字颜色。 */
+    private void paintSideItem(HBox item, boolean active, boolean hovered) {
+        String bg;
+        if (active) {
+            bg = Theme.isLight() ? "#ffffff" : "-app-card";
+        } else if (hovered) {
+            bg = Theme.isLight() ? "#dbe7f3" : "-app-hover-3";
+        } else {
+            bg = "transparent";
+        }
+        item.setStyle("-fx-background-color: " + bg + ";");
+        if (item.getChildren().size() >= 3) {
+            if (item.getChildren().get(0) instanceof Rectangle bar) {
+                bar.setFill(active ? Color.web("#4b5563") : (hovered ? Color.web("#9ca3af") : Color.TRANSPARENT));
+            }
+            if (item.getChildren().get(2) instanceof Label label) {
+                label.setStyle("-fx-text-fill: "
+                        + (active ? "-app-text-2" : (hovered ? "-app-text" : "-app-text-dim"))
+                        + "; -fx-font-size: 12px;");
+            }
+        }
     }
 }

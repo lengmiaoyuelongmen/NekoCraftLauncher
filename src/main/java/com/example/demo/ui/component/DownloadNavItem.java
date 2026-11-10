@@ -103,7 +103,7 @@ public final class DownloadNavItem extends HBox {
             ? "-fx-text-fill: "
                 + (Theme.isLight() ? "#111827" : "#ffffff")
                 + "; -fx-font-size: 15px; -fx-font-weight: bold;"
-            : "-fx-text-fill: #999; -fx-font-size: 15px;");
+            : "-fx-text-fill: " + (Theme.isLight() ? "#475569" : "#a8b0bd") + "; -fx-font-size: 15px;");
     iconNode.setOpacity(active ? 1.0 : 0.72);
     setStyle(active ? ACTIVE_ITEM : IDLE_ITEM);
   }
