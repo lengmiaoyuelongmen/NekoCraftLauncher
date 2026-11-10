@@ -31,6 +31,8 @@ public final class Icons {
                 || "dot".equals(name);
         String content = switch (name) {
             case "play" -> "M8 5 L19 12 L8 19 Z";
+            // 启动页徽标：猫头（耳朵 + 脸），比三角/加号更像"这只猫娘"
+            case "cat" -> "M5 10 L7 4 L11 8 H13 L17 4 L19 10 V15 A7 7 0 0 1 5 15 Z M9 12 H9.2 M14.8 12 H15.2";
             case "download" -> "M12 4 V15 M7.5 10.5 L12 15 L16.5 10.5 M5 20 H19";
             case "tools" -> "M14.5 6.5 A3.5 3.5 0 0 0 9.5 11.5 L4 17 L7 20 L12.5 14.5"
                     + " A3.5 3.5 0 0 0 17.5 9.5 L15 8 Z";

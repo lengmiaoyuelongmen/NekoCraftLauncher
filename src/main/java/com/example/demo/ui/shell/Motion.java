@@ -33,9 +33,9 @@ public final class Motion {
     public static final Duration SLOW = Duration.millis(420);
 
     /** ease-out-expo，起步快、收尾慢，比默认曲线更有“质感”。 */
-    public static final Interpolator OUT = Interpolator.SPLINE(0.16, 1, 0.3, 1);
-    public static final Interpolator IN_OUT = Interpolator.SPLINE(0.65, 0, 0.35, 1);
-    public static final Interpolator SPRING = Interpolator.SPLINE(0.22, 1.0, 0.36, 1.0);
+    public static final Interpolator OUT = Interpolator.LINEAR;
+    public static final Interpolator IN_OUT = Interpolator.LINEAR;
+    public static final Interpolator SPRING = Interpolator.LINEAR;
 
     private static boolean enabled = true;
     private static double speed = 1.0;

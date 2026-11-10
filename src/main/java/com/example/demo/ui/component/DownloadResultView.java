@@ -34,7 +34,7 @@ public final class DownloadResultView extends VBox {
 
   public DownloadResultView(
       ModpackCell.Host host, ObservableList<ModpackProject> data, Runnable onNeedMore) {
-    super(10.0);
+    super(8.0);
     this.host = host;
     setAlignment(Pos.TOP_LEFT);
     VBox.setVgrow(this, Priority.ALWAYS);

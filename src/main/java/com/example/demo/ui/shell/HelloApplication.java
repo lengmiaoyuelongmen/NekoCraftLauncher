@@ -1570,11 +1570,26 @@ private static void setFlexible(Node node, boolean on) {
               public void showShortcuts() {
                 InAppDialog.alert("Neko Craft Launcher 快捷键", ConsoleToolbar.shortcutHelp());
               }
+
+              @Override
+              public void showHealthCheck() {
+                HelloApplication.this.showHealthCheck();
+              }
             });
     this.logToggle = this.consoleToolbar.toggleButton();
     this.createOverviewPane();
     this.logActionsBar = this.consoleToolbar.node();
-    this.commandBar = new CommandBar(this.config, this::handleCommandInput, this::onAiModeToggled);
+    this.commandBar =
+        new CommandBar(
+            this.config,
+            this::handleCommandInput,
+            this::onAiModeToggled,
+            () -> {
+              this.switchPage("settings");
+              if (this.settingsPanel != null) {
+                this.settingsPanel.openTab("AI");
+              }
+            });
     HBox commandBar = this.commandBar;
     this.launchInsightBar =
         new LaunchAdvisorBar(
@@ -1713,7 +1728,11 @@ private static void setFlexible(Node node, boolean on) {
     boolean on = this.config.isAiEnabled();
     this.commandBar.setAiMode(on);
     if (this.aiChatArea != null) {
-      this.aiChatArea.setPrefHeight(on ? 320.0 : 120.0);
+      this.aiChatArea.setPrefHeight(on ? 200.0 : 120.0);
+      this.aiChatArea.setPromptText(
+          this.config.getAiApiKey().isBlank()
+              ? "还没填 DeepSeek API Key：点左边的 Key 按钮去 设置 → AI 填写"
+              : "向猫娘助手提问…");
     }
     this.refreshLaunchBody();
   }

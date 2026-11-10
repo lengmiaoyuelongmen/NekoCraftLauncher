@@ -24,6 +24,9 @@ public final class ConsoleToolbar {
         void openLogDir();
 
         void showShortcuts();
+
+        /** 打开体检页（工具条上常驻入口，AI/日志布局下都能点到）。 */
+        void showHealthCheck();
     }
 
     private final Button toggle = new Button("展开日志");
@@ -33,12 +36,14 @@ public final class ConsoleToolbar {
         toggle.setStyle("-fx-background-color: rgba(255,255,255,0.06); -fx-text-fill: -app-text-2;"
                 + " -fx-background-radius: 6; -fx-padding: 3 10; -fx-font-size: 11px;"
                 + " -fx-cursor: hand;");
+        toggle.getStyleClass().add("log-toggle");
         toggle.setOnAction(e -> host.toggleLog());
 
         Button clear = action("清空日志", host::clearLog);
         Button copy = action("复制日志", host::copyLog);
         Button logDir = action("日志目录", host::openLogDir);
         Button shortcuts = action("快捷键", host::showShortcuts);
+        Button health = action("一键体检", host::showHealthCheck);
 
         Label promise = new Label("NEKO · 为爱发电");
         promise.setStyle("-fx-text-fill: -app-accent; -fx-font-size: 10.5px;"
@@ -46,7 +51,7 @@ public final class ConsoleToolbar {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        node = new HBox(8.0, toggle, clear, copy, logDir, shortcuts, spacer, promise);
+        node = new HBox(8.0, toggle, clear, copy, logDir, shortcuts, health, spacer, promise);
         node.setAlignment(Pos.CENTER_LEFT);
     }
 

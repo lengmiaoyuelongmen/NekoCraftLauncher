@@ -137,8 +137,8 @@ public final class DownloadPage {
                 "download",
                 ModuleHeader.Badge.SQUARE,
                 "Minecraft Java Edition");
-        VBox.setMargin(header, new Insets(12.0, 18.0, 0.0, 18.0));
-        VBox right = new VBox(14.0, header, contentArea);
+        VBox.setMargin(header, new Insets(8.0, 18.0, 0.0, 18.0));
+        VBox right = new VBox(10.0, header, contentArea);
         right.setMinWidth(0);
         right.setPrefWidth(0);
         VBox.setVgrow(contentArea, Priority.ALWAYS);

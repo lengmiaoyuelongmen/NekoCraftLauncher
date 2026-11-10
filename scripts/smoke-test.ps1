@@ -432,6 +432,7 @@ public class SmokeWin {
                 $rootClip.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $cond)
             }
             $healthBtn = & $byName "一键体检"
+            if (-not $healthBtn) { $healthBtn = & $byName "体检" }
             if ($healthBtn) {
                 $healthBtn.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
                 Start-Sleep -Milliseconds 1200

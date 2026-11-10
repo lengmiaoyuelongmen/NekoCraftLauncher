@@ -96,6 +96,8 @@ public final class SettingsPanel extends VBox {
     private final RadioButton autoMemoryRadio;
     private final RadioButton customMemoryRadio;
     private final Slider memorySlider;
+    private Label memoryNowLabel;
+    private HBox memoryScale;
     private final ProgressBar systemMemoryBar;
     private final ProgressBar gameMemoryBar;
     private final Label systemMemoryLabel;
@@ -203,6 +205,21 @@ public final class SettingsPanel extends VBox {
         memorySlider.setShowTickMarks(false);
         memorySlider.setMaxWidth(Double.MAX_VALUE);
 
+        Label memoryMin = new Label("512 MB");
+        memoryMin.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 10.5px;");
+        Label memoryNow = new Label();
+        memoryNow.setStyle("-fx-text-fill: -app-text-strong; -fx-font-size: 11.5px; -fx-font-weight: bold;");
+        Label memoryMax = new Label("16384 MB");
+        memoryMax.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 10.5px;");
+        Region sliderSpacer = new Region();
+        HBox.setHgrow(sliderSpacer, Priority.ALWAYS);
+        Region sliderSpacerRight = new Region();
+        HBox.setHgrow(sliderSpacerRight, Priority.ALWAYS);
+        this.memoryScale = new HBox(8.0, memoryMin, sliderSpacer, memoryNow, sliderSpacerRight, memoryMax);
+        this.memoryScale.setAlignment(Pos.CENTER_LEFT);
+        memoryNow.setText((int) memorySlider.getValue() + " MB");
+        memoryNowLabel = memoryNow;
+
         systemMemoryBar = new ProgressBar(0);
         systemMemoryBar.setMaxWidth(Double.MAX_VALUE);
         systemMemoryBar.setPrefHeight(6);
@@ -217,6 +234,7 @@ public final class SettingsPanel extends VBox {
         memorySlider.valueProperty().addListener((o, ov, nv) -> {
             int value = (int) (Math.round(nv.doubleValue() / 512.0) * 512);
             value = Math.max(512, Math.min(16384, value));
+            if (memoryNowLabel != null) memoryNowLabel.setText(value + " MB");
             if (memorySpinner.getValue() != value) memorySpinner.getValueFactory().setValue(value);
             updateMemoryBars();
         });
@@ -536,7 +554,7 @@ public final class SettingsPanel extends VBox {
     // ================== 各页签内容 ==================
 
     private ScrollPane buildLaunchTab() {
-        VBox memoryBox = new VBox(6, memorySlider,
+        VBox memoryBox = new VBox(6, memorySlider, memoryScale,
                 new HBox(8, memorySpinner, hint("MB")));
         VBox card = card(
                 section("启动设置"),

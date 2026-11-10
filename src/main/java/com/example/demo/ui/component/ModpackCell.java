@@ -177,15 +177,9 @@ public final class ModpackCell extends ListCell<ModpackProject> {
     if (cached != null) {
       iconPane.getChildren().setAll(iconView(cached));
     } else {
-      ProgressIndicator loading = new ProgressIndicator();
-      loading.setPrefSize(22.0, 22.0);
-      loading.setMinSize(22.0, 22.0);
-      loading.setMaxSize(22.0, 22.0);
-      loading.setStyle("-fx-accent: #14b8a6;");
-      iconPane.getChildren().add(loading);
-      if (iconKey == null || iconKey.isEmpty()) {
-        showIconFallback(project);
-      } else {
+      // 先用首字母占位，图下载完再换上去：不再显示虚线转圈
+      showIconFallback(project);
+      if (iconKey != null && !iconKey.isEmpty()) {
         String url = iconKey.startsWith("http") ? iconKey : "https://" + iconKey;
         java.util.concurrent.CompletableFuture.runAsync(() -> loadCellIcon(url, iconKey, project));
       }

@@ -131,3 +131,37 @@
 .icon-ghost:hover {
     -fx-background-color: -app-hover-2;
 }
+
+/* 单选按钮：圆点垂直/水平居中 */
+.radio-button .radio {
+    -fx-background-insets: 0;
+    -fx-padding: 4;
+}
+
+.radio-button:selected .dot {
+    -fx-background-insets: 0;
+    -fx-background-radius: 999;
+    -fx-padding: 3;
+}
+
+/* 展开日志按钮：和工具条其它按钮同一套圆角/底色 */
+.log-toggle {
+    -fx-background-color: rgba(255, 255, 255, 0.06);
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-padding: 4 10;
+    -fx-cursor: hand;
+}
+
+.log-toggle:hover {
+    -fx-background-color: -app-hover-2;
+}
+
+/* 列表更紧凑：去掉多余的顶部留白 */
+.list-view {
+    -fx-padding: 2;
+}
+
+.list-view .list-cell {
+    -fx-padding: 4 14;
+}

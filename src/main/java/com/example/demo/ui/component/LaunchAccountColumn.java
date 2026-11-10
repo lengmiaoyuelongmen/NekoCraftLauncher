@@ -100,7 +100,10 @@ public final class LaunchAccountColumn extends VBox {
 
     AccountToolsBar accountTools =
         new AccountToolsBar(
-            callbacks::openSkinPreview, callbacks::showAccountManager, callbacks::logout);
+            callbacks::openSkinPreview,
+            callbacks::showAccountManager,
+            callbacks::logout,
+            callbacks::showHealthCheck);
     this.logoutButton = accountTools.logoutButton();
     this.logoutButton.setVisible(false);
     this.logoutButton.setManaged(false);

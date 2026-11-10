@@ -40,7 +40,11 @@ public final class CommandBar extends HBox {
 
   private final Runnable onAiToggle;
 
-  public CommandBar(LauncherConfig config, Consumer<String> onSubmit, Runnable onAiToggle) {
+  public CommandBar(
+      LauncherConfig config,
+      Consumer<String> onSubmit,
+      Runnable onAiToggle,
+      Runnable onOpenKeySettings) {
     super(8.0);
     this.config = config;
     this.onAiToggle = onAiToggle;
@@ -222,7 +226,18 @@ public final class CommandBar extends HBox {
           }
         });
 
-    getChildren().addAll(aiToggle, prefix, field, send);
+    Button apiKey = new Button("Key");
+    apiKey.setTooltip(new Tooltip("前往 设置 → AI 填写 DeepSeek API Key"));
+    apiKey.getStyleClass().add("icon-ghost");
+    apiKey.setStyle("-fx-text-fill: -app-text-dim; -fx-font-size: 11px;");
+    apiKey.setOnAction(
+        e -> {
+          if (onOpenKeySettings != null) {
+            onOpenKeySettings.run();
+          }
+        });
+
+    getChildren().addAll(aiToggle, apiKey, prefix, field, send);
     setAlignment(Pos.CENTER_LEFT);
     setPadding(new Insets(5.0, 6.0, 5.0, 6.0));
     setStyle(

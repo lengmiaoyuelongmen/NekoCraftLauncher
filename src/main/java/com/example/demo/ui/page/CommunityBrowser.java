@@ -112,7 +112,7 @@ public final class CommunityBrowser {
                 modpackData,
                 this::loadMore);
 
-        VBox panel = new VBox(10.0);
+        VBox panel = new VBox(8.0);
         panel.setAlignment(javafx.geometry.Pos.TOP_LEFT);
         VBox.setVgrow(panel, Priority.ALWAYS);
         panel.getChildren().addAll(filterBar, resultView);

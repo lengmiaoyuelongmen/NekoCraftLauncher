@@ -15,12 +15,17 @@ public final class AccountToolsBar extends HBox {
 
   private final Button logoutButton;
 
-  public AccountToolsBar(Runnable onSkinPreview, Runnable onAccountManager, Runnable onLogout) {
+  public AccountToolsBar(
+      Runnable onSkinPreview,
+      Runnable onAccountManager,
+      Runnable onLogout,
+      Runnable onHealthCheck) {
     super(6.0);
     Button skin = button("皮肤 / 披风预览", "image", "skin", onSkinPreview);
     Button account = button("账户管理", "user", "account", onAccountManager);
     this.logoutButton = button("退出登录", "back", "logout", onLogout);
-    getChildren().addAll(skin, account, logoutButton);
+    Button health = button("体检", "check", "health", onHealthCheck);
+    getChildren().addAll(skin, account, logoutButton, health);
     setAlignment(Pos.CENTER);
   }
 
