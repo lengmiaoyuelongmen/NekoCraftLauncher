@@ -59,6 +59,24 @@ public class SmokeWin {
 }
 '@ -ErrorAction SilentlyContinue
 
+
+    $mouseCode = @"
+using System;
+using System.Runtime.InteropServices;
+public class SmokeMouse {
+  [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+  [DllImport("user32.dll")] public static extern void mouse_event(uint f, uint dx, uint dy, uint d, IntPtr e);
+  public static void Click(int x, int y) {
+    SetCursorPos(x, y);
+    System.Threading.Thread.Sleep(60);
+    mouse_event(0x0002, 0, 0, 0, IntPtr.Zero);
+    System.Threading.Thread.Sleep(40);
+    mouse_event(0x0004, 0, 0, 0, IntPtr.Zero);
+  }
+}
+"@
+    Add-Type -TypeDefinition $mouseCode -ErrorAction SilentlyContinue
+
     function Focus-Launcher {
         for ($attempt = 1; $attempt -le 5; $attempt++) {
             $h = [SmokeWin]::Find($Title)
@@ -345,6 +363,46 @@ public class SmokeWin {
             }
         }
     } catch { Write-Host ("  ! 体检弹窗没打开: {0}" -f $_) -ForegroundColor DarkYellow }
+
+    # ---------- 安装页：面板必须真的有内容（曾经返回空 VBox） ----------
+    try {
+        $hInst = [SmokeWin]::Find($Title)
+        if ($hInst -ne [IntPtr]::Zero) {
+            $rootInst = [System.Windows.Automation.AutomationElement]::FromHandle($hInst)
+            $findInst = {
+                param($name)
+                $cond = New-Object System.Windows.Automation.PropertyCondition(
+                    [System.Windows.Automation.AutomationElement]::NameProperty, $name)
+                $rootInst.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $cond)
+            }
+            # 侧栏项是 Label，点它所在矩形中心（JavaFX 的 HBox 会收到点击）
+            $clickEl = {
+                param($el)
+                $r = $el.Current.BoundingRectangle
+                [SmokeMouse]::Click([int]($r.X + $r.Width / 2), [int]($r.Y + $r.Height / 2))
+            }
+            $downloadNav = & $findInst "下载"
+            if ($downloadNav) {
+                & $clickEl $downloadNav
+                Start-Sleep -Milliseconds 1000
+                $fabric = & $findInst "Fabric"
+                if ($fabric) {
+                    & $clickEl $fabric
+                    Start-Sleep -Milliseconds 2200
+                    $back = & $findInst "返回列表"
+                    if ($back) {
+                        Write-Host "  · 安装页面板已渲染（返回列表可见）" -ForegroundColor DarkGray
+                    } else {
+                        Write-Host "FAIL: 安装页是空白面板（找不到「返回列表」）" -ForegroundColor Red
+                        exit 1
+                    }
+                }
+            }
+            # 回到启动页，后面的体检断言依赖它
+            $launchNav = & $findInst "启动"
+            if ($launchNav) { & $clickEl $launchNav; Start-Sleep -Milliseconds 900 }
+        }
+    } catch { Write-Host ("  ! 安装页检查异常: {0}" -f $_) -ForegroundColor Yellow }
 
     # ---------- 剪贴板断言：体检面板的「复制」必须真的写进剪贴板 ----------
     $clipOk = $false

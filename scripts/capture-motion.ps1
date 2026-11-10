@@ -4,6 +4,7 @@ param(
     [string]$Title = "Neko Craft Launcher",
     [string]$ClickName = "",
     [string]$HoverName = "",
+    [string]$HoverAt = "",
     [int]$WarmupMs = 300,
     [int]$Frames = 30,
     [int]$IntervalMs = 40,
@@ -81,6 +82,19 @@ Write-Host ("连拍 {0} 帧，窗口 {1}x{2}" -f $Frames, $w, $h)
 $clicked = $false
 $paths = @()
 for ($i = 0; $i -lt $Frames; $i++) {
+    if (-not $clicked -and $HoverAt -and $i -eq 4) {
+        # 按窗口内相对坐标悬停：给没有可访问名的卡片/容器用
+        $parts = $HoverAt -split ","
+        if ($parts.Count -eq 2) {
+            $wr = New-Object MotionWin+RECT
+            [MotionWin]::GetWindowRect($hwnd, [ref]$wr) | Out-Null
+            $cx = $wr.Left + [int]$parts[0].Trim()
+            $cy = $wr.Top + [int]$parts[1].Trim()
+            [MotionWin]::SetCursorPos($cx, $cy) | Out-Null
+            Write-Host ("第 {0} 帧把鼠标移到窗口内坐标：{1}" -f $i, $HoverAt) -ForegroundColor DarkGray
+        }
+        $clicked = $true
+    }
     if (-not $clicked -and $HoverName -and $i -eq 4) {
         $root = [System.Windows.Automation.AutomationElement]::FromHandle($hwnd)
         $cond = New-Object System.Windows.Automation.PropertyCondition(
@@ -146,7 +160,7 @@ if ($moving.Count -gt 0) {
     $top = $after | Sort-Object Diff -Descending | Select-Object -First 1
     Write-Host ("抓到动画中间帧 {0} 帧（差异 {1}→0），示例: {2}" -f $moving.Count, $top.Diff, $paths[$top.Frame]) -ForegroundColor Green
     # 悬停断言：差异太小说明悬停动效没生效
-    if ($HoverName -and $MinHoverDiff -gt 0) {
+    if (($HoverName -or $HoverAt) -and $MinHoverDiff -gt 0) {
         $peak = ($after | Measure-Object -Property Diff -Maximum).Maximum
         if ($peak -lt $MinHoverDiff) {
             Write-Host ("FAIL: 悬停差异峰值只有 {0}，低于阈值 {1}（悬停动效可能失效）" -f $peak, $MinHoverDiff) -ForegroundColor Red
