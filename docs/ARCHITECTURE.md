@@ -1456,6 +1456,14 @@ result=pass
 - **告警行可访问**：体检面板的可点击告警行现在设 `AccessibleRole.BUTTON` + `accessibleText`，
   并支持 `Enter` / `Space` 触发，`Tab` 可聚焦。
 
+### 卡片对比度 + 通用卡片类（2026-11-11 00:20）
+
+- **深色主题提亮**：`-app-card-top` `#2e151a → #38191e`、`-app-card-top2` `#32171c → #3c1b20`、
+  `-app-card-alt2` `#241014 → #2c1317`，设置卡片贴背景的问题缓解（r146）。
+- **`.settings-card:hover`**：悬停时描边改用 `-app-accent-soft`，配合 `Motion.hoverCard` 的抬升。
+- **通用 `.neko-card`**：把「顾问页卡片」「实例分组卡片」的内联背景/圆角/阴影迁到 CSS 类，
+  颜色全部走主题变量（r145 顾问页卡片正常渲染）。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：

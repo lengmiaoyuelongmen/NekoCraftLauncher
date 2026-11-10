@@ -334,7 +334,7 @@ public final class InstancesPanel extends HBox {
 
     private VBox groupCard(String loader, List<Instance> instances) {
         VBox card = new VBox(0);
-        card.setStyle("-fx-background-color: -app-card; -fx-background-radius: 10; -fx-border-color: -app-border; -fx-border-radius: 10;");
+        card.getStyleClass().add("neko-card");
 
         boolean isOpen = expanded.getOrDefault(loader, true);
         HBox header = new HBox(8);

@@ -24,3 +24,16 @@
     -fx-border-radius: 16;
     -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.16), 18, 0.10, 0, 6);
 }
+/* 设置卡片：悬停时描边提亮，配合 Motion.hoverCard 的轻微抬升 */
+.settings-card:hover {
+    -fx-border-color: -app-accent-soft;
+}
+
+/* 通用卡片：页面里那些"一块内容"的容器统一走这里 */
+.neko-card {
+    -fx-background-color: linear-gradient(to bottom, -app-card-top, -app-card-alt2);
+    -fx-background-radius: 16;
+    -fx-border-color: -app-border-soft;
+    -fx-border-radius: 16;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.16), 18, 0.10, 0, 6);
+}

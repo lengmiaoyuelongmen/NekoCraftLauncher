@@ -1248,9 +1248,7 @@ public class HelloApplication extends Application {
     desc.setWrapText(true);
     VBox card = new VBox(12.0, title, desc);
     card.setPadding(new Insets(18.0));
-    card.setStyle(
-        "-fx-background-color: -app-card; -fx-background-radius: 18; -fx-border-color:"
-            + " -app-border-2; -fx-border-radius: 18;");
+    card.getStyleClass().add("neko-card");
     if (this.launchInsightBar != null) {
       card.getChildren().add(this.launchInsightBar);
     }
