@@ -51,7 +51,7 @@ public final class InstanceSettingsPanel extends HBox {
     private final Runnable onBack;
 
     private final StackPane content = new StackPane();
-    private final VBox navBox = new VBox(2);
+    private final java.util.List<HBox> navItems = new java.util.ArrayList<>();
     private final Label breadcrumb = new Label();
     private String tab = "overview";
     private ModuleHeader instanceHeader;
@@ -249,7 +249,7 @@ public final class InstanceSettingsPanel extends HBox {
     private void paintNavItem(HBox item) {
         if (!(item.getUserData() instanceof String key)) return;
         boolean active = key.equals(tab);
-        boolean hovered = item.isHover();
+        boolean hovered = Boolean.TRUE.equals(item.getProperties().get("navHover"));
         String background;
         if (active) {
             background = Theme.isLight() ? "#ffffff" : "#2b303a";
@@ -274,10 +274,13 @@ public final class InstanceSettingsPanel extends HBox {
     }
 
     private void applyNavStyles(String tabName) {
-        for (Node node : navBox.getChildren()) {
-            if (node instanceof HBox item) paintNavItem(item);
+        // 切页时清掉所有悬停标记，再统一重绘：旧选中/旧悬停都不会残留
+        for (HBox item : navItems) {
+            item.getProperties().put("navHover", false);
         }
-        return;
+        for (HBox item : navItems) {
+            paintNavItem(item);
+        }
     }
 
 
@@ -1094,18 +1097,25 @@ public final class InstanceSettingsPanel extends HBox {
         };
         item.getChildren().addAll(bar, Icons.node(iconName, 13, "#7b818b"), label);
 
-        item.setOnMouseEntered(e -> paintNavItem(item));
-        item.setOnMouseExited(e -> paintNavItem(item));
+        // 用显式标记记录悬停：isHover() 在程序化点击/窗口失焦时会残留，导致"点击后颜色变不回去"
+        item.getProperties().put("navHover", false);
+        item.setOnMouseEntered(e -> {
+            item.getProperties().put("navHover", true);
+            paintNavItem(item);
+        });
+        item.setOnMouseExited(e -> {
+            item.getProperties().put("navHover", false);
+            paintNavItem(item);
+        });
         item.setOnMouseClicked(e -> select(key));
-        navBox.getChildren().add(item);
+        navItems.add(item);
         return item;
     }
 
     /** 鼠标移动时重算 hover，避免点击/布局变化后旧 hover 高亮残留。 */
     private void refreshNavStyles() {
-        if (navBox == null) return;
-        for (javafx.scene.Node node : navBox.getChildren()) {
-            if (node instanceof HBox item) paintNavItem(item);
+        for (HBox item : navItems) {
+            paintNavItem(item);
         }
     }
 

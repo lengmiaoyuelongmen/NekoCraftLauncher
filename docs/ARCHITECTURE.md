@@ -1654,6 +1654,15 @@ result=pass
 
 结论：`paintNavItem` / `paintSideItem` / 下载侧栏的悬停样式都真的生效，不是只改代码没渲染。
 
+### 实例设置导航"点击后颜色不还原"的根因（2026-11-11 06:52）
+
+- **根因**：`InstanceSettingsPanel` 里的 `navBox` 是一个从未加入场景的 VBox，导航项实际加在 `side` 上。
+  `applyNavStyles()` 遍历 `navBox.getChildren()` 时**永远是空列表**（埋点实测 `items=0`），
+  所以点击后只有被点的项被染成选中色，旧选中项再也不会被重绘 —— 看起来就是"颜色不回去"。
+- **修复**：改用 `List<HBox> navItems` 作为登记表，`navItem()` 加入列表，`applyNavStyles()` /
+  `refreshNavStyles()` 遍历列表；切换时先把所有 `navHover` 标记清零再统一重绘。
+- **验证**：依次点击 概览 → 修改 → 截图，最终只有「截图」高亮（r190），之前三项会同时发白。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：
