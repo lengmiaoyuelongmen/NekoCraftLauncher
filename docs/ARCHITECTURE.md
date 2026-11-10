@@ -1383,6 +1383,15 @@ result=pass
   复现：`nightly=fail`、`result=fail`、两条证据路径都写进摘要。
 - `nightly` / `smoke` 状态按实际结果写，不再写死；新增 `-BaselineMaxDiff` 参数便于演练失败。
 
+### CI 摘要加计数 + 自定义基线（2026-11-11 22:45）
+
+- 冒烟与 UI 自检分别写 `target/smoke-stats.txt`、`target/ui-stats.txt`，`ci.ps1` 汇总进摘要：
+  `smoke_pages`、`page_checks`、`page_transitions`、`ui_fixes`、`dialog_checks`、`missing_borders`。
+  实测一次夜间运行：`smoke_pages=4`、`page_checks=5`、`ui_fixes=5`、`dialog_checks=3`、
+  `missing_borders=0`。
+- `check-baseline.ps1 -Baseline <路径>` 可对比任意基线（例如上一版），实测用
+  `target\prev-baseline.png` 比对：差异 0.53% → PASS。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：

@@ -103,8 +103,10 @@ powershell -ExecutionPolicy Bypass -File scripts/ci.ps1 -Nightly      # 额外�
 成功输出 `CI PASS：…`；退出码可直接被 CI 使用。
 
 结束时写 `target/ci-summary.txt`（key=value）：`time` `duration_sec` `build` `architecture`
-`smoke` `nightly` `baseline_hash` `baseline_mtime` `baseline_diff_percent` `result`，
-失败时另有 `failure` `evidence`（左右对照图）`heatmap`。
+`smoke` `nightly` `baseline_hash` `baseline_mtime` `baseline_diff_percent` `smoke_pages`
+`page_checks` `page_transitions` `ui_fixes` `dialog_checks` `missing_borders` `result`，
+失败时另有 `failure` `evidence`（左右对照图）`heatmap`。计数来自冒烟与 UI 自检写出的
+`target/smoke-stats.txt`、`target/ui-stats.txt`。
 ## 9. 动效中间帧连拍与基线刷新
 
 ```powershell

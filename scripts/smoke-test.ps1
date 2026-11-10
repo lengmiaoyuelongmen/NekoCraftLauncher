@@ -402,6 +402,7 @@ public class SmokeWin {
         Write-Host "FAIL: UI 自检未通过（圆角或描边）" -ForegroundColor Red
         exit 1
     }
+    try { Set-Content -Path "target\smoke-stats.txt" -Value ("smoke_pages=" + $pages.Count) -Encoding UTF8 } catch { }
     Write-Host "PASS: 5 个页面切换完成，stderr 无异常，UI 自检通过" -ForegroundColor Green
     exit 0
 }

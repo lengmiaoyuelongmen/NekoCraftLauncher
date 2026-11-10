@@ -18,6 +18,7 @@ $script:evidenceHeat = ""
 $script:baselinePercent = ""
 $script:smokeResult = "fail"
 $script:nightlyResult = "fail"
+$script:statLines = @{ smoke_pages = ""; page_checks = ""; page_transitions = ""; ui_fixes = ""; dialog_checks = ""; missing_borders = "" }
 
 function Write-CiSummary {
     param([string]$result, [string]$failure = "")
@@ -39,6 +40,12 @@ function Write-CiSummary {
         ("baseline_hash=" + $baselineHash),
         ("baseline_mtime=" + $baselineTime),
         ("baseline_diff_percent=" + $script:baselinePercent),
+        ("smoke_pages=" + $script:statLines["smoke_pages"]),
+        ("page_checks=" + $script:statLines["page_checks"]),
+        ("page_transitions=" + $script:statLines["page_transitions"]),
+        ("ui_fixes=" + $script:statLines["ui_fixes"]),
+        ("dialog_checks=" + $script:statLines["dialog_checks"]),
+        ("missing_borders=" + $script:statLines["missing_borders"]),
         ("result=" + $result)
     )
     if ($failure) { $lines += ("failure=" + $failure) }
@@ -94,6 +101,13 @@ try {
         $script:nightlyResult = "pass"
     }
 
+    foreach ($statsFile in @("target\smoke-stats.txt", "target\ui-stats.txt")) {
+        if (Test-Path $statsFile) {
+            foreach ($line in (Get-Content $statsFile -Encoding UTF8)) {
+                if ($line -match "^([^=]+)=(.+)$") { $script:statLines[$Matches[1].Trim()] = $Matches[2].Trim() }
+            }
+        }
+    }
     $summaryPath = Write-CiSummary -result "pass"
     Write-Host ""
     Write-Host "CI PASS：构建、单测、架构守卫、冒烟、UI 自检全部通过" -ForegroundColor Green

@@ -77,6 +77,15 @@ if ($LogPath) {
             if ($line -match "圆角描边修复: (\d+) 个") { $pageFixed += [int]$Matches[1] }
         }
         Write-Host ("页面自检 {0} 次（累计修复 {1} 个）、弹窗自检 {2} 次" -f $pageLines.Count, $pageFixed, $dialogLines.Count) -ForegroundColor DarkGray
+        # 机器可读计数，供 ci-summary 汇总
+        $stats = @(
+            ("page_checks=" + $pageLines.Count),
+            ("ui_fixes=" + $pageFixed),
+            ("dialog_checks=" + $dialogLines.Count),
+            ("page_transitions=" + $transitionLines.Count),
+            ("missing_borders=" + ($pageLines | Where-Object { $_ -notmatch "剩余缺失: 0 个" }).Count)
+        )
+        try { Set-Content -Path "target\ui-stats.txt" -Value $stats -Encoding UTF8 } catch { }
     }
 }
 
