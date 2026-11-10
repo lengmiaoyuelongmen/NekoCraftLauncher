@@ -97,9 +97,8 @@ public final class DownloadFilterBar extends VBox {
     Button refreshBtn = iconButton("refresh", "刷新列表");
     refreshBtn.setOnAction(e -> fireSearch());
     Button speedBtn = new Button("测速");
-    speedBtn.setStyle(
-        "-fx-background-color: transparent; -fx-text-fill: #9ca3af; -fx-font-size: 11px;"
-            + " -fx-cursor: hand; -fx-padding: 2 6;");
+    speedBtn.getStyleClass().add("icon-ghost");
+    speedBtn.setStyle("-fx-text-fill: -app-text-dim; -fx-font-size: 11px;");
     speedBtn.setTooltip(new Tooltip("测试 Modrinth / MCIM / CurseForge 镜像延迟"));
     speedBtn.setAccessibleText("测速");
     speedBtn.setOnAction(e -> runSpeedTest(speedBtn));
@@ -193,9 +192,7 @@ public final class DownloadFilterBar extends VBox {
   private Button iconButton(String icon, String tooltip) {
     Button button = new Button();
     button.setGraphic(Icons.node(icon, 15.0, "#9ca3af"));
-    button.setStyle(
-        "-fx-background-color: transparent; -fx-text-fill: #aaa; -fx-font-size: 16px;"
-            + " -fx-cursor: hand;");
+    button.getStyleClass().add("icon-ghost");
     button.setTooltip(new Tooltip(tooltip));
     // 图标按钮本身没有文字：给无障碍/UIA 一个名字，自动化与读屏都能定位
     button.setAccessibleText(tooltip);

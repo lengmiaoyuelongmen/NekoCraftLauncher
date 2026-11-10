@@ -44,8 +44,8 @@ public final class DownloadStatusBar {
         statsLabel.setVisible(false);
         statsLabel.setManaged(false);
 
-        telemetry.setStyle("-fx-text-fill: #ff8a72; -fx-font-size: 8.5px;"
-                + " -fx-font-family: 'Cascadia Mono', 'Consolas', monospace;");
+        // 别指定等宽字体：机器上缺字体会被 fallback 成奇怪的符号字体，整行变成乱码
+        telemetry.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 9.5px;");
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 

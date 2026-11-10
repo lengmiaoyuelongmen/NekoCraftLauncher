@@ -64,8 +64,19 @@ if ($LogPath) {
         }
         Write-Host ("页面过渡完成 {0} 次" -f $transitionLines.Count) -ForegroundColor DarkGray
         # 耗时异常（0ms 或超过 3s）说明动画没跑或被卡住
+        # 耗时异常（0ms 或超过 3s）说明动画没跑或被卡住；
+        # 首次 launch 是冷启动，把首帧构建/资源解码都算进去了，单独放宽到 8s
+        $firstLaunchSkipped = $false
         $slowOrZero = @($transitionLines | Where-Object {
-            if ($_ -match " (\d+)ms") { $ms = [int]$Matches[1]; $ms -le 0 -or $ms -gt 3000 } else { $true }
+            if ($_ -match " (\d+)ms") {
+                $ms = [int]$Matches[1]
+                if (-not $firstLaunchSkipped -and $_ -match "页面过渡完成: launch ") {
+                    $firstLaunchSkipped = $true
+                    return ($ms -le 0 -or $ms -gt 8000)
+                }
+                return ($ms -le 0 -or $ms -gt 3000)
+            }
+            return $true
         })
         if ($slowOrZero.Count -gt 0) {
             Write-Host ("FAIL: {0} 次页面过渡耗时异常（0ms 或 >3s）" -f $slowOrZero.Count) -ForegroundColor Red

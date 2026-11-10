@@ -72,6 +72,8 @@ public final class LaunchAccountColumn extends VBox {
     setMaxHeight(Double.MAX_VALUE);
     setAlignment(Pos.CENTER);
     getStyleClass().add("neko-card");
+    // 卡片自身留一点内边距，底部两个按钮不会顶到圆角边上
+    setPadding(new Insets(6, 16, 14, 16));
 
     avatarPane =
         new AvatarPane(
