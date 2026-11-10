@@ -1400,6 +1400,15 @@ result=pass
   少页或漏字段直接 throw（用模拟数据验过两条错误分支）。
 - **描边硬断言**：`check-ui.ps1` 里 `missing_borders` 从"只记录"改为"必须为 0"，否则 FAIL。
 
+### 清单自检端到端验证 + 提交信息进摘要（2026-11-11 23:20）
+
+- **清单自检真机失败验证**：把 `ui-pages.json` 临时改成 1 项后跑冒烟，立刻在启动前失败：
+  `页面清单只有 1 项（至少 4 项：下载/设置/工具/启动）`；随后已还原（4 项）。
+- **`-WarnBaselineAgeDays`**：阈值可调，实测 `-WarnBaselineAgeDays 0` 时输出
+  `提示: 视觉基线已 1 天未更新`，摘要写 `baseline_stale=true`；默认 30 天。
+- **`commit` / `worktree_dirty`**：摘要记录当前提交短哈希与工作区是否干净，实测
+  `commit=c7df6bc`、`worktree_dirty=true`（有未提交改动时如实体现在摘要里）。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：

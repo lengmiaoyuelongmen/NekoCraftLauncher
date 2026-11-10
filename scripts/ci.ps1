@@ -5,7 +5,8 @@ param(
     [switch]$SkipBuild,
     [switch]$SkipSmoke,
     [switch]$Nightly,
-    [double]$BaselineMaxDiff = 2.0
+    [double]$BaselineMaxDiff = 2.0,
+    [int]$WarnBaselineAgeDays = 30
 )
 
 $ErrorActionPreference = "Stop"
@@ -13,6 +14,15 @@ $root = Split-Path -Parent $PSScriptRoot
 Push-Location $root
 
 $script:started = Get-Date
+try {
+    $script:commitHash = (& git rev-parse --short HEAD 2>$null | Select-Object -First 1)
+    if (-not $script:commitHash) { $script:commitHash = "unknown" }
+    $dirty = (& git status --porcelain 2>$null | Measure-Object).Count
+    if ($dirty -gt 0) { $script:worktreeDirty = "true" } else { $script:worktreeDirty = "false" }
+} catch {
+    $script:commitHash = "unknown"
+    $script:worktreeDirty = "unknown"
+}
 $script:evidence = ""
 $script:evidenceHeat = ""
 $script:baselinePercent = ""
@@ -34,7 +44,7 @@ function Write-CiSummary {
         $baselineTime = $item.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss")
         $script:baselineAgeDays = [int]((Get-Date) - $item.LastWriteTime).TotalDays
         # 超过 30 天提醒刷新基线（只提醒，不判失败）
-        if ($script:baselineAgeDays -gt 30) {
+        if ($script:baselineAgeDays -gt $WarnBaselineAgeDays) {
             $script:baselineStale = "true"
             Write-Host ("提示: 视觉基线已 {0} 天未更新，建议跑 scripts/refresh-baseline.ps1" -f $script:baselineAgeDays) -ForegroundColor DarkYellow
         }
@@ -50,6 +60,8 @@ function Write-CiSummary {
         ("baseline_mtime=" + $baselineTime),
         ("baseline_age_days=" + $script:baselineAgeDays),
         ("baseline_stale=" + $script:baselineStale),
+        ("commit=" + $script:commitHash),
+        ("worktree_dirty=" + $script:worktreeDirty),
         ("baseline_diff_percent=" + $script:baselinePercent),
         ("smoke_pages=" + $script:statLines["smoke_pages"]),
         ("page_checks=" + $script:statLines["page_checks"]),
