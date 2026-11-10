@@ -1409,6 +1409,19 @@ result=pass
 - **`commit` / `worktree_dirty`**：摘要记录当前提交短哈希与工作区是否干净，实测
   `commit=c7df6bc`、`worktree_dirty=true`（有未提交改动时如实体现在摘要里）。
 
+### 环境信息进摘要 + 页数断言 + DryRun + 反馈打磨（2026-11-11 23:35）
+
+- **摘要补环境**：`os`、`java`（java -version 首行）、`pages_expected`（清单条数）。实测
+  `os=Microsoft Windows NT 10.0.26200.0`、`java=java version "21.0.11" 2026-04-21 LTS`、
+  `pages_expected=4`。环境探测各步独立 try/catch，任何一项失败都不影响验证链。
+- **页数断言**：`smoke_pages` 与 `pages_expected` 不一致直接判失败（目前 4 = 4）。
+- **`refresh-baseline.ps1 -DryRun`**：只生成截图、不覆盖基线，实测输出
+  `DryRun: 只生成截图，不覆盖基线。预览: target\baseline\settings.png`。
+- **反馈打磨**：
+  - 筛选带的刷新/测速按钮补 `Motion.press` + `hoverScale`；
+  - 体检面板告警行悬停时背景与描边提亮（暗示可点）；
+  - 设置分栏未选中项悬停加 `rgba(255,255,255,0.05)` 底色，选中项切走时清掉内联样式。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：

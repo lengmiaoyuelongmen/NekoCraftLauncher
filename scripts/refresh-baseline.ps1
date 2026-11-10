@@ -2,7 +2,8 @@
 # 需要启动器已打开并停在启动页。
 param(
     [string]$Title = "Neko Craft Launcher",
-    [string]$OutFile = "docs\images\settings-settled.png"
+    [string]$OutFile = "docs\images\settings-settled.png",
+    [switch]$DryRun
 )
 
 $ErrorActionPreference = "Stop"
@@ -17,6 +18,10 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "截图失败（启动器是否已打开并停在启动页？）" }
     if (-not (Test-Path $sheet)) { throw "没有生成稳定态截图" }
 
+    if ($DryRun) {
+        Write-Host ("DryRun: 只生成截图，不覆盖基线。预览: " + (Resolve-Path $sheet).Path) -ForegroundColor Yellow
+        exit 0
+    }
     $dest = Join-Path $root $OutFile
     $destDir = Split-Path -Parent $dest
     if (-not (Test-Path $destDir)) { New-Item -ItemType Directory -Force -Path $destDir | Out-Null }

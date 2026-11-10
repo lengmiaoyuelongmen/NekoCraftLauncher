@@ -102,6 +102,11 @@ public final class DownloadFilterBar extends VBox {
             + " -fx-cursor: hand; -fx-padding: 2 6;");
     speedBtn.setTooltip(new Tooltip("测试 Modrinth / MCIM / CurseForge 镜像延迟"));
     speedBtn.setOnAction(e -> runSpeedTest(speedBtn));
+    // 反馈：三个工具按钮统一"按下回弹 + 悬停放大 + 手型光标"
+    com.example.demo.ui.shell.Motion.press(refreshBtn);
+    com.example.demo.ui.shell.Motion.hoverScale(refreshBtn, 1.08);
+    com.example.demo.ui.shell.Motion.press(speedBtn);
+    com.example.demo.ui.shell.Motion.hoverScale(speedBtn, 1.06);
     Button taskBtn = iconButton("download", "下载任务与最近下载位置");
     if (onShowTasks != null) {
       taskBtn.setOnAction(e -> onShowTasks.run());

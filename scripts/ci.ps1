@@ -14,15 +14,38 @@ $root = Split-Path -Parent $PSScriptRoot
 Push-Location $root
 
 $script:started = Get-Date
+$script:started = Get-Date
+# 环境信息：每一步单独保护，任何一项失败都不能影响整条验证链
+$script:commitHash = "unknown"
+$script:worktreeDirty = "unknown"
+$script:osName = [System.Environment]::OSVersion.VersionString
+$script:javaVersion = "unknown"
+$script:pagesExpected = ""
 try {
-    $script:commitHash = (& git rev-parse --short HEAD 2>$null | Select-Object -First 1)
-    if (-not $script:commitHash) { $script:commitHash = "unknown" }
-    $dirty = (& git status --porcelain 2>$null | Measure-Object).Count
-    if ($dirty -gt 0) { $script:worktreeDirty = "true" } else { $script:worktreeDirty = "false" }
-} catch {
-    $script:commitHash = "unknown"
-    $script:worktreeDirty = "unknown"
-}
+    $hash = & git rev-parse --short HEAD 2>$null
+    if ($LASTEXITCODE -eq 0 -and $hash) { $script:commitHash = ($hash | Select-Object -First 1).Trim() }
+} catch { }
+try {
+    $dirtyCount = @(& git status --porcelain 2>$null).Count
+    if ($LASTEXITCODE -eq 0) { $script:worktreeDirty = if ($dirtyCount -gt 0) { "true" } else { "false" } }
+} catch { }
+try {
+    $javaHome = if ($env:JAVA_HOME) { $env:JAVA_HOME } else { "C:\Program Files\Java\jdk-21.0.11" }
+    $javaExe = Join-Path $javaHome "bin\java.exe"
+    if (Test-Path $javaExe) {
+        $old = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        $ver = (& $javaExe -version 2>&1 | Select-Object -First 1)
+        $ErrorActionPreference = $old
+        if ($ver) { $script:javaVersion = ([string]$ver).Trim() }
+    }
+} catch { }
+try {
+    $pagesFile = Join-Path $root "scripts\ui-pages.json"
+    if (Test-Path $pagesFile) {
+        $script:pagesExpected = (Get-Content $pagesFile -Raw -Encoding UTF8 | ConvertFrom-Json).pages.Count
+    }
+} catch { }
 $script:evidence = ""
 $script:evidenceHeat = ""
 $script:baselinePercent = ""
@@ -61,6 +84,9 @@ function Write-CiSummary {
         ("baseline_age_days=" + $script:baselineAgeDays),
         ("baseline_stale=" + $script:baselineStale),
         ("commit=" + $script:commitHash),
+        ("os=" + $script:osName),
+        ("java=" + $script:javaVersion),
+        ("pages_expected=" + $script:pagesExpected),
         ("worktree_dirty=" + $script:worktreeDirty),
         ("baseline_diff_percent=" + $script:baselinePercent),
         ("smoke_pages=" + $script:statLines["smoke_pages"]),

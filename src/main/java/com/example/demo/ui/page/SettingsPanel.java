@@ -437,8 +437,22 @@ public final class SettingsPanel extends VBox {
         bar.setMouseTransparent(true);
         item.getChildren().addAll(bar, icon, text);
         item.setOnMouseClicked(e -> selectTab(name));
-        item.setOnMouseEntered(e -> scaleIcon(icon, 1.18));
-        item.setOnMouseExited(e -> scaleIcon(icon, 1.0));
+        item.setOnMouseEntered(
+                e -> {
+                    scaleIcon(icon, 1.18);
+                    if (!name.equals(currentTab)) {
+                        // 反馈：未选中的分栏悬停时给一点底色，暗示可点
+                        item.setStyle("-fx-background-color: rgba(255,255,255,0.05);"
+                                + " -fx-background-radius: 8;");
+                    }
+                });
+        item.setOnMouseExited(
+                e -> {
+                    scaleIcon(icon, 1.0);
+                    if (!name.equals(currentTab)) {
+                        item.setStyle("");
+                    }
+                });
         // 记下图标，切换分栏时由 selectTab 提亮
         tabItems.put(name, item);
         return item;
@@ -499,6 +513,11 @@ public final class SettingsPanel extends VBox {
                 box.getChildren().get(2).setStyle("-fx-text-fill: " + (active ? "-app-text-strong" : "-app-text-dim")
                         + "; -fx-font-size: 13px;" + (active ? " -fx-font-weight: bold;" : ""));
             }
+        }
+        // 选中分栏交给 CSS 的 app-tab-active，清掉悬停留下的内联样式
+        Node activeItem = tabItems.get(name);
+        if (activeItem != null) {
+            activeItem.setStyle("");
         }
         Node page = tabPages.get(name);
         if (page == null) return;
