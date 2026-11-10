@@ -1464,6 +1464,14 @@ result=pass
 - **通用 `.neko-card`**：把「顾问页卡片」「实例分组卡片」的内联背景/圆角/阴影迁到 CSS 类，
   颜色全部走主题变量（r145 顾问页卡片正常渲染）。
 
+### 启动概览迁入 .neko-card + 深色文字对比度（2026-11-11 00:35）
+
+- **启动概览**：容器从内联 `-app-card-alt` + 圆角 16 迁到 `.neko-card`；展开日志时概览隐藏，
+  收起后卡片背景/描边正常（r148）。
+- **`.neko-card:hover`**：新增悬停描边（`-app-accent-soft`），与 `.settings-card` 行为一致。
+- **深色次要文字提亮**：`-app-text-dim` `#bb9c98 → #d3b9b5`、`-app-text-muted` `#946f6b → #ad8a86`，
+  在深红卡片底上更易读（浅色主题不受影响）。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：

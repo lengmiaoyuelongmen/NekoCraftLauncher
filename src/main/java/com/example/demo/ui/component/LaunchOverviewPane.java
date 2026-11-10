@@ -272,10 +272,7 @@ public final class LaunchOverviewPane extends VBox {
         card.setPadding(new Insets(14.0));
         card.setMaxWidth(Double.MAX_VALUE);
         card.setMaxHeight(Double.MAX_VALUE);
-        card.setStyle(
-                "-fx-background-color: -app-card-alt; -fx-background-radius: 16; -fx-border-color:"
-                        + " -app-border-soft; -fx-border-radius: 14;");
-        HBox.setHgrow(card, Priority.ALWAYS);
+        card.getStyleClass().add("neko-card");
         VBox.setVgrow(card, Priority.ALWAYS);
         return card;
     }

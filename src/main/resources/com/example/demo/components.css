@@ -24,6 +24,10 @@
     -fx-border-radius: 16;
     -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.16), 18, 0.10, 0, 6);
 }
+
+.neko-card:hover {
+    -fx-border-color: -app-accent-soft;
+}
 /* 设置卡片：悬停时描边提亮，配合 Motion.hoverCard 的轻微抬升 */
 .settings-card:hover {
     -fx-border-color: -app-accent-soft;
@@ -36,4 +40,8 @@
     -fx-border-color: -app-border-soft;
     -fx-border-radius: 16;
     -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.16), 18, 0.10, 0, 6);
+}
+
+.neko-card:hover {
+    -fx-border-color: -app-accent-soft;
 }
