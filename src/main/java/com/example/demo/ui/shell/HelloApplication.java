@@ -807,6 +807,10 @@ public class HelloApplication extends Application {
     } catch (Exception e2) {
       System.err.println("[theme] 全局样式加载失败，界面会回退到默认样式");
     }
+    // 关闭动画时给根节点挂标记，CSS 里据此停用悬停提亮等过渡
+    if (!this.config.isAnimations()) {
+      rootWrap.getStyleClass().add("animations-off");
+    }
     Theme.bindScene(scene);
     Toast.install(rootWrap);
     return scene;

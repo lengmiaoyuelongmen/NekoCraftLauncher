@@ -279,9 +279,7 @@ public final class InstanceFileManager {
             this.panes = panes;
             this.activeRef = activeRef;
             root.setPadding(new Insets(8));
-            root.setStyle(
-                    "-fx-background-color: -app-card-alt; -fx-background-radius: 12;"
-                            + " -fx-border-color: -app-border-soft; -fx-border-radius: 12;");
+            root.getStyleClass().add("neko-card");
 
             path.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 10px;");
             path.setWrapText(true);
@@ -420,10 +418,10 @@ public final class InstanceFileManager {
         }
 
         void applyActive(boolean active) {
-            root.setStyle(
-                    "-fx-background-color: -app-card-alt; -fx-background-radius: 12;"
-                            + " -fx-border-color: " + (active ? "-app-accent" : "-app-border-soft") + ";"
-                            + " -fx-border-radius: 12; -fx-border-width: " + (active ? "1.5" : "1") + ";");
+            root.getStyleClass().remove("neko-card-active");
+            if (active) {
+                root.getStyleClass().add("neko-card-active");
+            }
         }
 
         void refresh() {

@@ -45,3 +45,14 @@
 .neko-card:hover {
     -fx-border-color: -app-accent-soft;
 }
+/* 文件管理器：被选中的卡片用强调色描边 */
+.neko-card-active {
+    -fx-border-color: -app-accent;
+    -fx-border-width: 1.5;
+}
+
+/* 关闭动画时，悬停不再提亮描边，避免"静不下来的界面" */
+.animations-off .neko-card:hover,
+.animations-off .settings-card:hover {
+    -fx-border-color: -app-border-soft;
+}

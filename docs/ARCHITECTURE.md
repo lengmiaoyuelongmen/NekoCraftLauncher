@@ -1480,6 +1480,16 @@ result=pass
 - 深色主题复核（r150）：提亮后的次要文字（`#d3b9b5` / `#ad8a86`）在深红卡片上清晰可读，
   卡片与页面背景也有明确边界。
 
+### 工具/文件管理器卡片迁移 + 动画关闭标记（2026-11-11 01:05）
+
+- `ToolsPanel.card()`、`InstanceFileManager` 的目录卡片迁入 `.neko-card`；选中态改用
+  `.neko-card-active`（强调色描边 1.5px），不再用内联 style 覆盖。
+- 关闭动画时给根节点挂 `animations-off` 类，CSS 里 `.animations-off .neko-card:hover`
+  与 `.settings-card:hover` 退回普通描边，避免"关了动画还在闪"。
+- **发现一个待查问题**：下载 → 安装包 → Fabric 后，内容区整片空白；日志里没有异常，
+  `installerPanel` 已创建并 `showDownloadPanel` 切换（见 `onSelect` 2273-2285）。
+  截图为 r151/r152，下一轮优先定位（怀疑与版本清单为空、面板可见性切换有关）。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：

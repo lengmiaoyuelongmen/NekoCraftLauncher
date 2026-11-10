@@ -1149,9 +1149,7 @@ public final class ToolsPanel extends VBox {
     private VBox card(Node... children) {
         VBox box = new VBox(13);
         box.setPadding(new Insets(20));
-        box.setStyle("-fx-background-color: linear-gradient(to bottom, -app-card-top, -app-card-alt2);"
-                + " -fx-background-radius: 18; -fx-border-color: -app-border-soft; -fx-border-radius: 18;"
-                + " -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.28), 22, 0.12, 0, 7);");
+        box.getStyleClass().add("neko-card");
         box.getChildren().addAll(children);
         box.setMaxWidth(780);
         return box;
