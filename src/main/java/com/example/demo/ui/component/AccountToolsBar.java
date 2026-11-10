@@ -7,27 +7,26 @@ import javafx.scene.layout.HBox;
 import com.example.demo.ui.shell.Icons;
 import com.example.demo.ui.shell.Motion;
 /**
- * 账户卡里头像下方那排小按钮：皮肤 / 披风预览、账户管理、一键体检。
+ * 账户卡里头像下方那排小按钮：皮肤 / 披风预览、账户管理、退出登录。
  *
  * <p>从 HelloApplication 抽出，动作通过回调传入。
  */
 public final class AccountToolsBar extends HBox {
 
-  private static final String BUTTON_STYLE =
-      "-fx-background-color: transparent; -fx-text-fill: -app-text-muted;"
-          + " -fx-font-size: 10.5px; -fx-border-color: -app-border-soft;"
-          + " -fx-border-radius: 8; -fx-background-radius: 8; -fx-padding: 3 10;"
-          + " -fx-cursor: hand;";
+  private final Button logoutButton;
 
-  public AccountToolsBar(
-      Runnable onSkinPreview, Runnable onAccountManager, Runnable onHealthCheck) {
+  public AccountToolsBar(Runnable onSkinPreview, Runnable onAccountManager, Runnable onLogout) {
     super(6.0);
-    getChildren()
-        .addAll(
-            button("皮肤 / 披风预览", "image", "skin", onSkinPreview),
-            button("账户管理", "user", "account", onAccountManager),
-            button("一键体检", "check", "health", onHealthCheck));
+    Button skin = button("皮肤 / 披风预览", "image", "skin", onSkinPreview);
+    Button account = button("账户管理", "user", "account", onAccountManager);
+    this.logoutButton = button("退出登录", "back", "logout", onLogout);
+    getChildren().addAll(skin, account, logoutButton);
     setAlignment(Pos.CENTER);
+  }
+
+  /** 未登录时由外层隐藏，登录后恢复显示。 */
+  public Button logoutButton() {
+    return logoutButton;
   }
 
   /** 符号化按钮：左边一个图标，右边保留文字（无障碍与 UIA 仍能按名字找到）。 */
@@ -37,6 +36,7 @@ public final class AccountToolsBar extends HBox {
     button.getStyleClass().add("btn-ghost");
     button.setGraphicTextGap(6.0);
     button.setId("account-tool-" + key);
+    button.setAccessibleText(text);
     button.setTooltip(new javafx.scene.control.Tooltip(text));
     if (action != null) {
       button.setOnAction(e -> action.run());

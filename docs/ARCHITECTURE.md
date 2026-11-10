@@ -1521,6 +1521,28 @@ result=pass
 - **公共脚本**：`SmokeMouse`（窗口查找 + 坐标点击）与 `Click-UiElement` 抽到
   `scripts/ui-common.ps1`，冒烟改为 dot-source，避免每个脚本各写一份。
 
+### 按标注改造一轮（2026-11-11 02:35）
+
+按用户截图标注完成的改动：
+
+- **删除 OptiFine**：侧栏安装包、安装器加载器列表、`onDownloadSelect`/`startInstallerFromPanel` 里的
+  OptiFine 分支全部移除，现在只剩 Fabric / Quilt / Forge / NeoForge / LabyMod。
+- **一键体检改为独立页面**：新增 `health` 页（`createHealthPage()`），带「返回」按钮、
+  标题+副标题、体检卡片与三个动作（完整性检查/复制/导出）；启动页快捷操作新增「一键体检」入口，
+  旧的弹窗入口 `showHealthCheck()` 现在只是切页。
+- **退出登录挪位**：`AccountToolsBar` 第三个按钮从「一键体检」换成「退出登录」，
+  与账号管理同排；未登录时仍隐藏。
+- **启动页徽标换图标**：`ModuleHeader` 的 glyph 从 `play`（看起来像 ▶ 字符）换成 `sparkles`。
+- **启动记录悬停反馈**：每行加 `.history-row`，悬停出现淡底。
+- **输入框/单选圆角**：`components.css` 补 `.spinner` 容器圆角、内部输入透明、
+  上下按钮只圆外侧角；`.radio-button .radio` / `.check-box .box` 圆角对齐。
+- **预渲染进度条**：改主题色渐变 + 圆角 + 循环扫光（`PrewarmOverlay` 内 `shimmer`），
+  停在同一百分比时也能看出仍在加载。
+- 冒烟的体检步骤从「弹窗关闭」改为「页面返回」，并保持剪贴板断言。
+
+尚未完成（下一轮继续）：日志区乱码、下载页筛选卡与列表之间的空白、测速/刷新/任务三键的
+样式一致性、启动页底部排版错位与「实例选择/实例设置」超出显示范围。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：

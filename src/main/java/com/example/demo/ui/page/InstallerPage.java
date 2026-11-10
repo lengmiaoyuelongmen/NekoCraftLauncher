@@ -114,7 +114,7 @@ public final class InstallerPage {
         versionRow.setAlignment(Pos.CENTER_LEFT);
 
         for (String loader : new String[]{"原版", "Fabric", "Forge", "NeoForge", "Quilt",
-                "OptiFine", "LabyMod"}) {
+                "LabyMod"}) {
             accordion.getChildren().add(createLoaderRow(loader));
         }
 

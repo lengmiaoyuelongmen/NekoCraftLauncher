@@ -51,7 +51,8 @@ public final class LaunchOverviewPane extends VBox {
             Runnable openInstances,
             Runnable openInstanceSettings,
             Runnable openDownload,
-            Runnable openAdvisor) {
+            Runnable openAdvisor,
+            Runnable openHealth) {
         super(12.0);
         this.config = config;
         this.currentInstance = currentInstance;
@@ -100,6 +101,8 @@ public final class LaunchOverviewPane extends VBox {
         quick.add(quickButton("实例设置", openInstanceSettings), 1, 0);
         quick.add(quickButton("下载", openDownload), 0, 1);
         quick.add(quickButton("启动顾问", openAdvisor), 1, 1);
+        Button health = quickButton("一键体检", openHealth);
+        quick.add(health, 0, 2, 2, 1);
         for (int i = 0; i < 2; i++) {
             ColumnConstraints column = new ColumnConstraints();
             column.setPercentWidth(50.0);
@@ -231,7 +234,9 @@ public final class LaunchOverviewPane extends VBox {
         cost.setStyle("-fx-text-fill: -app-text-dim-2; -fx-font-size: 10.5px;");
         HBox row = new HBox(10.0, state, rowTime, instance, cost);
         row.setAlignment(Pos.CENTER_LEFT);
-        row.setPadding(new Insets(3.0, 2.0, 3.0, 2.0));
+        row.setPadding(new Insets(3.0, 6.0, 3.0, 6.0));
+        // 反馈：整行悬停时给底色，鼠标经过能看出"这一行是一条记录"
+        row.getStyleClass().add("history-row");
         return row;
     }
 

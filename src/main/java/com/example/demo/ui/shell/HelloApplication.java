@@ -1053,6 +1053,7 @@ public class HelloApplication extends Application {
     File gameDir = new File(this.config.getGameDir());
     return switch (name) {
       case "launch" -> this.launchPanel;
+      case "health" -> this.createHealthPage();
       case "download" -> this.downloadPanel;
       case "advisor" -> this.createAdvisorPanel();
       case "instances" -> {
@@ -1104,6 +1105,7 @@ public class HelloApplication extends Application {
           "Neko Craft Launcher · "
               + switch (pageName) {
                 case "launch" -> "启动";
+                case "health" -> "体检";
                 case "download" -> "下载";
                 case "settings" -> "设置";
                 case "tools" -> "工具";
@@ -1520,7 +1522,8 @@ private static void setFlexible(Node node, boolean on) {
             () -> this.switchPage("instances"),
             () -> this.openInstanceSettings("overview"),
             () -> this.switchPage("download"),
-            () -> this.switchPage("advisor"));
+            () -> this.switchPage("advisor"),
+            this::showHealthCheck);
     this.launchOverviewScroll = new javafx.scene.control.ScrollPane(this.launchOverviewPane);
     this.launchOverviewScroll.setFitToWidth(true);
     this.launchOverviewScroll.setHbarPolicy(
@@ -2269,14 +2272,8 @@ private static void setFlexible(Node node, boolean on) {
         text.equals("Fabric")
             || text.equals("Quilt")
             || text.equals("Forge")
-            || text.equals("NeoForge")
-            || text.equals("OptiFine");
+            || text.equals("NeoForge");
     if (installer) {
-      if (text.equals("OptiFine")) {
-        this.openBrowser("https://optifine.net/downloads");
-        Toast.info("OptiFine 官网安装器需要手动运行");
-        return;
-      }
       if (this.installerPanel == null) {
         this.installerPanel = this.createInstallerPanel();
         this.downloadContentArea().getChildren().add(this.installerPanel);
@@ -2475,11 +2472,6 @@ private static void setFlexible(Node node, boolean on) {
     }
     String loader = this.installerPage.expandedLoader() == null
         ? "原版" : this.installerPage.expandedLoader();
-    if ("OptiFine".equals(loader)) {
-      this.openBrowser("https://optifine.net/downloads");
-      this.installerPage.setStatus("已打开 OptiFine 官网，下载后手动安装。");
-      return;
-    }
     if ("LabyMod".equals(loader)) {
       this.openBrowser("https://labymod.net/download");
       this.installerPage.setStatus("已打开 LabyMod 官网，下载后手动安装。");
@@ -4432,7 +4424,7 @@ private static void setFlexible(Node node, boolean on) {
     return LoginCardParser.normalizeServer(server);
   }
 
-  private void showHealthCheck() {
+  private HealthReport computeHealthReport() {
     File[] reports;
     String id = this.currentInstanceId();
     File game = new File(this.config.getGameDir());
@@ -4518,36 +4510,80 @@ private static void setFlexible(Node node, boolean on) {
         logLineCount <= 0
             ? "导出报告（附带启动日志）"
             : "导出报告（附 " + Math.min(50, logLineCount) + " 行日志）";
-    // 集成式：不再弹系统 Dialog，全部走应用内弹层，配色/圆角/字体与主界面一致
-    HealthCheckView healthView =
+    return new HealthReport(game, id, mods, lines, exportText);
+  }
+
+  /** 体检数据：页面与复制/导出共用同一份，避免两处逻辑漂移。 */
+  private record HealthReport(
+      File game, String id, File mods, List<HealthAdvice.Line> lines, String exportText) {}
+
+  /** 兼容旧入口：现在体检是独立页面，不再是弹层。 */
+  private void showHealthCheck() {
+    this.navHighlight = "launch";
+    this.switchPage("health");
+  }
+
+  private VBox createHealthPage() {
+    HealthReport report = this.computeHealthReport();
+    HealthCheckView view =
         new HealthCheckView(
-            id,
-            lines,
+            report.id(),
+            report.lines(),
             line -> {
               // 告警行的跳转：崩溃记录 → 目录，模组不匹配 → mods 目录，其余 → 设置页
               if (line.level().contains("有记录")) {
-                this.openDir(new File(game, "crash-reports"));
+                this.openDir(new File(report.game(), "crash-reports"));
               } else if (line.level().contains("不匹配")) {
-                this.openDir(mods);
+                this.openDir(report.mods());
               } else {
                 this.switchPage("settings");
               }
             });
-    healthView.setKeyboardHintVisible(this.config.isShowKeyHints());
-    // 集成式：不再弹系统 Dialog，全部走应用内弹层，配色/圆角/字体与主界面一致
-    InAppDialog.customSized(
-        null,
-        "一键体检",
-        healthView,
-        List.of(
-            InAppDialog.Action.secondary("关闭", null),
-            InAppDialog.Action.secondary(
-                "完整性检查", id == null ? null : () -> this.checkInstance(Instance.of(game, id))),
-            InAppDialog.Action.secondary("复制", () -> this.copyHealthReport(lines)),
-            InAppDialog.Action.primary(exportText, () -> this.exportHealthReport(game, lines))),
-        null,
-        560,
-        -1);
+    view.setKeyboardHintVisible(this.config.isShowKeyHints());
+
+    Button back = new Button("返回");
+    back.setGraphic(Icons.node("back", 13.0, "#9ca3af"));
+    back.setGraphicTextGap(6.0);
+    back.getStyleClass().add("btn-ghost");
+    back.setOnAction(e -> this.switchPage("launch"));
+
+    Label title = new Label("一键体检");
+    title.setStyle("-fx-text-fill: -app-text; -fx-font-size: 18px; -fx-font-weight: bold;");
+    Label subtitle = new Label("版本 / Java / 内存 / 磁盘 / 模组一致性，一次性看完");
+    subtitle.setStyle("-fx-text-fill: -app-text-dim-2; -fx-font-size: 11px;");
+    Region spacer = new Region();
+    HBox.setHgrow(spacer, Priority.ALWAYS);
+    HBox head = new HBox(10.0, back, title, subtitle, spacer);
+    head.setAlignment(Pos.CENTER_LEFT);
+
+    Button integrity = new Button("完整性检查");
+    integrity.getStyleClass().add("btn-ghost");
+    integrity.setDisable(report.id() == null);
+    integrity.setOnAction(e -> this.checkInstance(Instance.of(report.game(), report.id())));
+    Button copy = new Button("复制");
+    copy.getStyleClass().add("btn-ghost");
+    copy.setOnAction(e -> this.copyHealthReport(report.lines()));
+    Button export = new Button(report.exportText());
+    export.getStyleClass().add("btn-ghost");
+    export.setOnAction(e -> this.exportHealthReport(report.game(), report.lines()));
+    HBox actions = new HBox(8.0, integrity, copy, export);
+    actions.setAlignment(Pos.CENTER_RIGHT);
+
+    VBox card = new VBox(14.0, view, actions);
+    card.getStyleClass().add("neko-card");
+    card.setPadding(new Insets(20.0));
+    card.setMaxWidth(760.0);
+
+    VBox content = new VBox(16.0, head, card);
+    content.setPadding(new Insets(22.0));
+    content.setMaxWidth(Double.MAX_VALUE);
+    ScrollPane scroll = new ScrollPane(content);
+    scroll.setFitToWidth(true);
+    scroll.setStyle(
+        "-fx-background: transparent; -fx-background-color: transparent; -fx-border-color: transparent;");
+    VBox wrapper = new VBox(scroll);
+    VBox.setVgrow(scroll, Priority.ALWAYS);
+    return wrapper;
   }
 
   /** 报告末尾附最近 N 行启动日志，方便求助时一次贴全。 */

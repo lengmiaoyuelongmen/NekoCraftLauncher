@@ -107,7 +107,7 @@ public final class DownloadPage {
             navBox.getChildren().add(node);
         }
         navBox.getChildren().add(group("安装包", true));
-        for (String loader : new String[]{"OptiFine", "Fabric", "Quilt", "Forge", "NeoForge"}) {
+        for (String loader : new String[]{"Fabric", "Quilt", "Forge", "NeoForge"}) {
             DownloadNavItem node = navItem(loader, "tools");
             installerItems.add(node);
             navBox.getChildren().add(node);

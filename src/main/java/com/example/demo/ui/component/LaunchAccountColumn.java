@@ -59,7 +59,7 @@ public final class LaunchAccountColumn extends VBox {
   private final Label userTypeLabel = new Label("请在下方登录");
   private final Label uuidLabel = new Label("");
   private LoginFormPane loginForm;
-  private final Button logoutButton = new Button("退出登录");
+  private final Button logoutButton;
   private final AccountInfoCard accountInfo = new AccountInfoCard();
   private final LaunchHeroButton launchButton;
   private final HBox bottomRow;
@@ -96,17 +96,12 @@ public final class LaunchAccountColumn extends VBox {
             () -> callbacks.submitLogin(loginForm),
             callbacks::loginTypeChanged);
 
-    logoutButton.setStyle(
-        "-fx-background-color: transparent; -fx-text-fill: -app-text-muted;"
-            + " -fx-font-size: 11px; -fx-cursor: hand; -fx-padding: 0;");
-    logoutButton.setVisible(false);
-    logoutButton.setManaged(false);
-    logoutButton.setOnAction(e -> callbacks.logout());
-
-    HBox accountTools =
+    AccountToolsBar accountTools =
         new AccountToolsBar(
-            callbacks::openSkinPreview, callbacks::showAccountManager, callbacks::showHealthCheck);
-
+            callbacks::openSkinPreview, callbacks::showAccountManager, callbacks::logout);
+    this.logoutButton = accountTools.logoutButton();
+    this.logoutButton.setVisible(false);
+    this.logoutButton.setManaged(false);
     launchButton = new LaunchHeroButton(this);
 
     Button instSelect = new Button("实例选择");
@@ -149,7 +144,6 @@ public final class LaunchAccountColumn extends VBox {
             uuidLabel,
             accountTools,
             loginForm,
-            logoutButton,
             accountInfo,
             profileSpacer,
             launchButton,

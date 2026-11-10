@@ -54,7 +54,7 @@ public final class LaunchPage {
                 "01 / NEKO",
                 "启动",
                 "猫娘助手 · 今天也要一起冒险",
-                "play",
+                "sparkles",
                 ModuleHeader.Badge.CIRCLE,
                 "为爱发电 · 永远免费更新");
         panel.getChildren().addAll(header, mainContent);

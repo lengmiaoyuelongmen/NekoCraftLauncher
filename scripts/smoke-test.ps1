@@ -447,8 +447,8 @@ public class SmokeWin {
                         else { Write-Host ("  ! 剪贴板内容只有 {0} 行，可能复制不完整" -f $clipLines.Count) -ForegroundColor Yellow }
                     }
                 }
-                $closeBtn = & $byName "关闭"
-                if ($closeBtn) { $closeBtn.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke() }
+                # 体检现在是独立页面：复制完点「返回」回到启动页
+                $closeBtn = & $byName "返回"
                 Start-Sleep -Milliseconds 400
             }
         }

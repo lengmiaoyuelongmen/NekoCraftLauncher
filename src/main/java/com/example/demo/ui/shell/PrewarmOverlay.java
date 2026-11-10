@@ -9,29 +9,49 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.shape.Rectangle;
 import javafx.util.Duration;
 
 /**
  * 下载页首次打开时的「正在预渲染社区资源…」遮罩：进度条 + 百分比文案。
  *
  * <p>进度条用 450ms 线性补间往目标值追，避免 20% 一跳的僵硬感；
- * 文案跟进度条同步刷新，不会出现「条走字不走」。
+ * 文案跟进度条同步刷新，不会出现「条走字不走」。条上还有一道循环扫光，
+ * 让"停在同一百分比等待"时也能看出仍在工作。
  */
 public final class PrewarmOverlay extends StackPane {
 
   private static final Duration EASE = Duration.millis(450);
+  private static final double BAR_WIDTH = 300.0;
 
   private final Label label = new Label("正在预渲染社区资源… 0%");
   private final ProgressBar bar = new ProgressBar(0.0);
+  private final Rectangle shine = new Rectangle(64, 7);
   private Timeline tween;
+  private Timeline shimmer;
   private double target = 0;
 
   public PrewarmOverlay() {
-    bar.setPrefWidth(300.0);
-    bar.setPrefHeight(6.0);
-    bar.setStyle("-fx-accent: -app-accent;");
+    bar.setPrefWidth(BAR_WIDTH);
+    bar.setPrefHeight(7.0);
+    bar.getStyleClass().add("prewarm-bar");
+
+    shine.setArcWidth(7);
+    shine.setArcHeight(7);
+    shine.setFill(javafx.scene.paint.Color.rgb(255, 255, 255, 0.38));
+    shine.setMouseTransparent(true);
+    StackPane barWrap = new StackPane(bar, shine);
+    barWrap.setAlignment(Pos.CENTER_LEFT);
+    barWrap.setMaxWidth(BAR_WIDTH);
+    barWrap.setPrefWidth(BAR_WIDTH);
+    // 扫光不能超出进度条本身
+    Rectangle clip = new Rectangle(BAR_WIDTH, 7);
+    clip.setArcWidth(7);
+    clip.setArcHeight(7);
+    barWrap.setClip(clip);
+
     label.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 12px;");
-    VBox box = new VBox(10.0, label, bar);
+    VBox box = new VBox(10.0, label, barWrap);
     box.setAlignment(Pos.CENTER);
     box.setStyle(
         "-fx-background-color: -app-card; -fx-background-radius: 14; -fx-border-color:"
@@ -59,6 +79,7 @@ public final class PrewarmOverlay extends StackPane {
     label.setText("正在预渲染社区资源… 0%");
     setVisible(true);
     setManaged(true);
+    startShimmer();
   }
 
   /** 更新百分比（0-100）：用线性补间追到目标值。 */
@@ -84,10 +105,32 @@ public final class PrewarmOverlay extends StackPane {
         new javafx.animation.PauseTransition(Duration.millis(520));
     wait.setOnFinished(
         e -> {
+          stopShimmer();
           setVisible(false);
           setManaged(false);
         });
     wait.play();
+  }
+
+  /** 条上循环扫光：即使百分比停住，也能看出还在加载。 */
+  private void startShimmer() {
+    stopShimmer();
+    shine.setTranslateX(-64);
+    shimmer =
+        new Timeline(
+            new KeyFrame(Duration.ZERO, new KeyValue(shine.translateXProperty(), -64)),
+            new KeyFrame(
+                Duration.millis(1100),
+                new KeyValue(shine.translateXProperty(), BAR_WIDTH, Interpolator.LINEAR)));
+    shimmer.setCycleCount(Timeline.INDEFINITE);
+    shimmer.play();
+  }
+
+  private void stopShimmer() {
+    if (shimmer != null) {
+      shimmer.stop();
+      shimmer = null;
+    }
   }
 
   private void stopTween() {
@@ -96,5 +139,4 @@ public final class PrewarmOverlay extends StackPane {
       tween = null;
     }
   }
-
 }

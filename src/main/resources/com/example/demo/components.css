@@ -56,3 +56,56 @@
 .animations-off .settings-card:hover {
     -fx-border-color: -app-border-soft;
 }
+/* 启动记录行：悬停给一层淡底，提示这是一条记录 */
+.history-row {
+    -fx-background-radius: 7;
+}
+
+.history-row:hover {
+    -fx-background-color: -app-hover-2;
+}
+/* 数字输入框：外框圆角，内部输入区透明，上下按钮只圆外侧两角 */
+.spinner {
+    -fx-background-color: -app-input;
+    -fx-background-radius: 9;
+    -fx-border-radius: 9;
+    -fx-border-color: -app-border-4;
+}
+
+.spinner .text-field {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-background-radius: 9 0 0 9;
+}
+
+.spinner .increment-arrow-button {
+    -fx-background-radius: 0 9 0 0;
+}
+
+.spinner .decrement-arrow-button {
+    -fx-background-radius: 0 0 9 0;
+}
+
+/* 单选/复选：外圈也用圆角，和输入框保持一致 */
+.radio-button .radio {
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+}
+
+.check-box .box {
+    -fx-background-radius: 5;
+    -fx-border-radius: 5;
+}
+
+/* 预渲染进度条：低调的底色 + 主题色进度 */
+.prewarm-bar .track {
+    -fx-background-color: -app-input;
+    -fx-background-radius: 999;
+}
+
+.prewarm-bar .bar {
+    -fx-background-color: linear-gradient(to right, -app-accent-soft, -app-accent);
+    -fx-background-radius: 999;
+    -fx-background-insets: 0;
+    -fx-padding: 2;
+}
