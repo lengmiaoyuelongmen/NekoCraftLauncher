@@ -18,6 +18,8 @@ $script:evidenceHeat = ""
 $script:baselinePercent = ""
 $script:smokeResult = "fail"
 $script:nightlyResult = "fail"
+$script:baselineAgeDays = ""
+$script:baselineStale = "false"
 $script:statLines = @{ smoke_pages = ""; page_checks = ""; page_transitions = ""; ui_fixes = ""; dialog_checks = ""; missing_borders = "" }
 
 function Write-CiSummary {
@@ -28,7 +30,14 @@ function Write-CiSummary {
     $baselineTime = ""
     if (Test-Path $baselineFile) {
         $baselineHash = (Get-FileHash $baselineFile -Algorithm SHA256).Hash.Substring(0, 12)
-        $baselineTime = (Get-Item $baselineFile).LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss")
+        $item = Get-Item $baselineFile
+        $baselineTime = $item.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss")
+        $script:baselineAgeDays = [int]((Get-Date) - $item.LastWriteTime).TotalDays
+        # 超过 30 天提醒刷新基线（只提醒，不判失败）
+        if ($script:baselineAgeDays -gt 30) {
+            $script:baselineStale = "true"
+            Write-Host ("提示: 视觉基线已 {0} 天未更新，建议跑 scripts/refresh-baseline.ps1" -f $script:baselineAgeDays) -ForegroundColor DarkYellow
+        }
     }
     $lines = @(
         ("time=" + (Get-Date -Format "yyyy-MM-dd HH:mm:ss")),
@@ -39,6 +48,8 @@ function Write-CiSummary {
         ("nightly=" + $(if (-not $Nightly) { "not-run" } elseif ($script:nightlyResult -eq "pass") { "pass" } else { "fail" })),
         ("baseline_hash=" + $baselineHash),
         ("baseline_mtime=" + $baselineTime),
+        ("baseline_age_days=" + $script:baselineAgeDays),
+        ("baseline_stale=" + $script:baselineStale),
         ("baseline_diff_percent=" + $script:baselinePercent),
         ("smoke_pages=" + $script:statLines["smoke_pages"]),
         ("page_checks=" + $script:statLines["page_checks"]),

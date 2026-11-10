@@ -85,6 +85,12 @@ if ($LogPath) {
             ("page_transitions=" + $transitionLines.Count),
             ("missing_borders=" + ($pageLines | Where-Object { $_ -notmatch "剩余缺失: 0 个" }).Count)
         )
+        # 硬性断言：描边缺失必须为 0
+        $missingBorders = @($pageLines | Where-Object { $_ -notmatch "剩余缺失: 0 个" }).Count
+        if ($missingBorders -gt 0) {
+            Write-Host ("FAIL: 还有 {0} 次页面自检存在缺失的 border-radius" -f $missingBorders) -ForegroundColor Red
+            $fail++
+        }
         try { Set-Content -Path "target\ui-stats.txt" -Value $stats -Encoding UTF8 } catch { }
     }
 }

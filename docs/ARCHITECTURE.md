@@ -1392,6 +1392,14 @@ result=pass
 - `check-baseline.ps1 -Baseline <路径>` 可对比任意基线（例如上一版），实测用
   `target\prev-baseline.png` 比对：差异 0.53% → PASS。
 
+### 基线时效 + 清单自检 + 描边硬断言（2026-11-11 23:10）
+
+- **基线时效**：摘要新增 `baseline_age_days`、`baseline_stale`；超过 30 天只提示不判失败。
+  实测 `baseline_age_days=1`、`baseline_stale=false`。
+- **页面清单自检**：冒烟读 `ui-pages.json` 后立刻校验「至少 4 项 + 四个必填字段」，
+  少页或漏字段直接 throw（用模拟数据验过两条错误分支）。
+- **描边硬断言**：`check-ui.ps1` 里 `missing_borders` 从"只记录"改为"必须为 0"，否则 FAIL。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：

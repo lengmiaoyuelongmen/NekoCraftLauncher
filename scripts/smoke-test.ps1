@@ -196,6 +196,13 @@ public class SmokeWin {
     $pagesFile = Join-Path $PSScriptRoot "ui-pages.json"
     if (-not (Test-Path $pagesFile)) { throw "缺少 scripts/ui-pages.json" }
     $pages = (Get-Content $pagesFile -Raw -Encoding UTF8 | ConvertFrom-Json).pages
+    # 页面清单自检：条目数、必填字段、导航名都不能少
+    if ($pages.Count -lt 4) { throw ("页面清单只有 {0} 项（至少 4 项：下载/设置/工具/启动）" -f $pages.Count) }
+    foreach ($pageDef in $pages) {
+        foreach ($field in @("nav", "name", "label", "marker")) {
+            if (-not $pageDef.$field) { throw ("ui-pages.json 里 {0} 缺少字段 {1}" -f $pageDef.name, $field) }
+        }
+    }
     Add-Type -AssemblyName UIAutomationClient
     Add-Type -AssemblyName UIAutomationTypes
     foreach ($p in $pages) {
