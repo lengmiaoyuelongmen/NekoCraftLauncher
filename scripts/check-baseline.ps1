@@ -56,6 +56,7 @@ try {
     $block = 24
     $total = 0
     $diff = 0
+    $hotBlocks = New-Object System.Collections.Generic.List[object]
     for ($y = 0; $y -lt $a.Height - $block; $y += $block) {
         for ($x = 0; $x -lt $a.Width - $block; $x += $block) {
             $total++
@@ -71,7 +72,10 @@ try {
             $n = [math]::Pow([math]::Ceiling($block / 6.0), 2)
             $dr = ($ar - $br) / $n; $dg = ($ag - $bg) / $n; $db = ($ab - $bb) / $n
             $dist = [math]::Sqrt($dr * $dr + $dg * $dg + $db * $db)
-            if ($dist -gt 22) { $diff++ }
+            if ($dist -gt 22) {
+                $diff++
+                $hotBlocks.Add([pscustomobject]@{ X = $x; Y = $y })
+            }
         }
     }
     $width = $a.Width
@@ -83,6 +87,30 @@ try {
         $total, $width, $height, $diff, $percent, $MaxDiffPercent) -ForegroundColor Cyan
 
     if ($percent -gt $MaxDiffPercent) {
+        # 留证据：当前截图 + 差异热力图，方便直接看哪里变了
+        $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+        $shotCopy = Join-Path $outDir ("diff-" + $stamp + ".png")
+        Copy-Item $current $shotCopy -Force
+        $heatPath = Join-Path $outDir ("heatmap-" + $stamp + ".png")
+        try {
+            $baseBmp = New-Object System.Drawing.Bitmap((Resolve-Path $current).Path)
+            $heat = New-Object System.Drawing.Bitmap($baseBmp.Width, $baseBmp.Height)
+            $g = [System.Drawing.Graphics]::FromImage($heat)
+            $g.DrawImage($baseBmp, 0, 0)
+            $red = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(120, 255, 0, 0))
+            foreach ($hot in $hotBlocks) {
+                $g.FillRectangle($red, $hot.X, $hot.Y, $block, $block)
+            }
+            $red.Dispose()
+            $g.Dispose()
+            $baseBmp.Dispose()
+            $heat.Save($heatPath, [System.Drawing.Imaging.ImageFormat]::Png)
+            $heat.Dispose()
+            Write-Host ("当前截图: " + $shotCopy) -ForegroundColor DarkYellow
+            Write-Host ("差异热力图: " + $heatPath) -ForegroundColor DarkYellow
+        } catch {
+            Write-Host ("热力图生成失败: {0}" -f $_) -ForegroundColor DarkYellow
+        }
         Write-Host "FAIL: 界面与基线差异过大，确认是设计变更后跑 scripts/refresh-baseline.ps1 更新基线" -ForegroundColor Red
         exit 1
     }

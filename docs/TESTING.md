@@ -87,6 +87,10 @@ Start-Process javaw -ArgumentList '-Dmc.failPage=tools','-jar','target\mc-launch
   （Fabric 元数据对 1.12.2 返回 400），可复现「加载器不可用」的安全失败；
 - **跨加载器**：把带 `fabric.mod.json` 的 jar 放进整合包 `overrides/mods` 再导入原版实例。
 
+## 7.5 CI 落地配置
+
+GitHub Actions、Windows 计划任务的完整示例见 [CI-EXAMPLES.md](CI-EXAMPLES.md)。
+
 ## 8. 一键 CI
 
 ```powershell

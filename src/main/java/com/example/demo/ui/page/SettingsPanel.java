@@ -90,6 +90,7 @@ public final class SettingsPanel extends VBox {
     private final CheckBox autoJava;
     private final CheckBox isolationBox;
     private final CheckBox autoDepsBox;
+    private final CheckBox keyHintsBox;
     private final CheckBox autoRepairBox;
     private volatile boolean updateBusy;
     private final RadioButton autoMemoryRadio;
@@ -311,6 +312,7 @@ public final class SettingsPanel extends VBox {
         autoJava = check("自动检测并选择最合适的 Java（推荐）", config.isAutoSelectJava());
         isolationBox = check("开启版本隔离（每个实例独立 mods / config / saves）", config.isIsolation());
         autoDepsBox = check("启动时自动补装缺失的前置依赖（从 Modrinth 下载）", config.isAutoInstallDeps());
+        keyHintsBox = check("体检面板显示键盘提示（Esc/Tab/Enter）", config.isShowKeyHints());
         autoRepairBox = check("启动前自动补全缺失的库文件", config.isAutoRepairLibraries());
         hardwareAccelBox = check("启用硬件加速（显卡渲染；关闭后需重启启动器）", config.isHardwareAcceleration());
         animationsBox = check("界面动画效果（关闭 = 性能模式）", config.isAnimations());
@@ -635,6 +637,7 @@ public final class SettingsPanel extends VBox {
                 labeled("下载策略", downloadRow),
                 section("模组"),
                 autoDepsBox,
+                keyHintsBox,
                 autoRepairBox,
                 labeled("完整性抽样", new HBox(10, assetSampleSpinner, hint("每个实例抽样校验的 assets 对象数，0 = 不抽样"))),
                 hint("自动补装会从 Modrinth 按当前实例的版本与加载器挑选，缺前置时先弹窗确认"));
@@ -1302,6 +1305,7 @@ public final class SettingsPanel extends VBox {
         config.setAssetSampleCount(assetSampleSpinner.getValue());
         config.setIsolation(isolationBox.isSelected());
         config.setAutoInstallDeps(autoDepsBox.isSelected());
+        config.setShowKeyHints(keyHintsBox.isSelected());
         config.setAutoRepairLibraries(autoRepairBox.isSelected());
         config.setHardwareAcceleration(hardwareAccelBox.isSelected());
         config.setAnimations(animationsBox.isSelected());
@@ -1338,6 +1342,7 @@ public final class SettingsPanel extends VBox {
         assetSampleSpinner.getValueFactory().setValue(20);
         isolationBox.setSelected(true);
         autoDepsBox.setSelected(true);
+        keyHintsBox.setSelected(true);
         autoRepairBox.setSelected(true);
         hardwareAccelBox.setSelected(true);
         animationsBox.setSelected(true);
@@ -1410,6 +1415,7 @@ public final class SettingsPanel extends VBox {
             config.setAssetSampleCount(loaded.getAssetSampleCount());
             config.setIsolation(loaded.isIsolation());
             config.setAutoInstallDeps(loaded.isAutoInstallDeps());
+        config.setShowKeyHints(loaded.isShowKeyHints());
             config.setAutoRepairLibraries(loaded.isAutoRepairLibraries());
             config.setHardwareAcceleration(loaded.isHardwareAcceleration());
             config.setAnimations(loaded.isAnimations());

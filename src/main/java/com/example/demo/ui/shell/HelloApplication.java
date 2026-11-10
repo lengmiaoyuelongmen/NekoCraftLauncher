@@ -4516,9 +4516,7 @@ private static void setFlexible(Node node, boolean on) {
             ? "导出报告（附带启动日志）"
             : "导出报告（附 " + Math.min(50, logLineCount) + " 行日志）";
     // 集成式：不再弹系统 Dialog，全部走应用内弹层，配色/圆角/字体与主界面一致
-    InAppDialog.customSized(
-        null,
-        "一键体检",
+    HealthCheckView healthView =
         new HealthCheckView(
             id,
             lines,
@@ -4531,7 +4529,13 @@ private static void setFlexible(Node node, boolean on) {
               } else {
                 this.switchPage("settings");
               }
-            }),
+            });
+    healthView.setKeyboardHintVisible(this.config.isShowKeyHints());
+    // 集成式：不再弹系统 Dialog，全部走应用内弹层，配色/圆角/字体与主界面一致
+    InAppDialog.customSized(
+        null,
+        "一键体检",
+        healthView,
         List.of(
             InAppDialog.Action.secondary("关闭", null),
             InAppDialog.Action.secondary(

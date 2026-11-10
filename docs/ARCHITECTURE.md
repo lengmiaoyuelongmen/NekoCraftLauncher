@@ -1332,6 +1332,17 @@ CI PASS：构建、单测、架构守卫、冒烟、UI 自检全部通过
   `ci.ps1 -Nightly` 已接入。实测：`差异 6 点 = 0.40%（阈值 2.00%）` → PASS。
   动效九宫格仅作文档说明，不参与逐像素比较（每次帧选择会变）。
 
+### 夜间基线证据 + 键盘提示开关 + CI 示例（2026-11-11 21:10）
+
+- **失败留证据**：`check-baseline.ps1` 判定失败时自动保存
+  `target/baseline-nightly/diff-<时间>.png` 与 `heatmap-<时间>.png`（红块标出差异区块）。
+  实测把阈值压到 0.01% 复现：差异 2 点 = 0.13%，热力图红块正好落在"系统内存占用"进度条上
+  ——动态数值造成的差异，说明默认 2% 阈值是合理的。
+- **键盘提示可关**：设置 → 管理新增「体检面板显示键盘提示（Esc/Tab/Enter）」，
+  `config.showKeyHints` 默认 true，关掉后体检面板底部那行提示隐藏。
+- **CI 落地文档**：新增 `docs/CI-EXAMPLES.md`，给出 GitHub Actions（自托管 Windows runner，
+  需已登录且不锁屏）与 Windows 计划任务（`-LogonType Interactive`）两种配置，以及失败产物对照表。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：

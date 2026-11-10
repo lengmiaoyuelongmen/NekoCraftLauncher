@@ -162,6 +162,8 @@ public class LauncherConfig {
     private boolean skipLaunchAdvice = false;
     /** 体检报告附带的日志行数：50 / 200 / 0（0 = 全部）。 */
     private int healthReportLogLines = 50;
+    /** 体检面板底部是否显示键盘提示（Esc/Tab/Enter）。 */
+    private boolean showKeyHints = true;
 
     /** 游戏进程优先级：normal / above / high */
     private String gamePriority = "normal";
@@ -638,6 +640,14 @@ public class LauncherConfig {
 
     public void setSkipLaunchAdvice(boolean skipLaunchAdvice) {
         this.skipLaunchAdvice = skipLaunchAdvice;
+    }
+
+    public boolean isShowKeyHints() {
+        return showKeyHints;
+    }
+
+    public void setShowKeyHints(boolean showKeyHints) {
+        this.showKeyHints = showKeyHints;
     }
 
     public int getHealthReportLogLines() {

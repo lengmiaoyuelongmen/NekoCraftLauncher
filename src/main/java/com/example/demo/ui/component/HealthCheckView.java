@@ -22,6 +22,8 @@ import java.util.List;
  */
 public final class HealthCheckView extends VBox {
 
+    private javafx.scene.Node keyboardHint;
+
     /**
      * @param instanceLabel 实例名（为空时显示"未选择实例"）
      * @param lines 体检结论
@@ -70,6 +72,15 @@ public final class HealthCheckView extends VBox {
         footer.setAlignment(Pos.CENTER_RIGHT);
         footer.setPadding(new Insets(2, 4, 0, 4));
         getChildren().add(footer);
+        this.keyboardHint = footer;
+    }
+
+    /** 设置里关掉提示时隐藏这一行（默认显示）。 */
+    public void setKeyboardHintVisible(boolean visible) {
+        if (keyboardHint != null) {
+            keyboardHint.setVisible(visible);
+            keyboardHint.setManaged(visible);
+        }
     }
 
     /** 单行：状态符号 + 级别 + 说明；告警行用暖色描边且可点击跳转。 */
