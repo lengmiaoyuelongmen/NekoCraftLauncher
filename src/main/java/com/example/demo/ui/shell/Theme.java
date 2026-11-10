@@ -35,6 +35,14 @@ public final class Theme {
 
     public static void bindScene(javafx.scene.Scene scene) {
         boundScene = scene;
+        // 组件样式（只写规则、不写色值）单独一份，便于和主题变量分离维护
+        var components = Theme.class.getResource("/com/example/demo/components.css");
+        if (components != null) {
+            String path = components.toExternalForm();
+            if (!scene.getStylesheets().contains(path)) {
+                scene.getStylesheets().add(path);
+            }
+        }
         syncLightStylesheet();
         syncAccentVariable();
     }
@@ -100,6 +108,11 @@ public final class Theme {
         var base = Theme.class.getResource("/com/example/demo/app.css");
         if (base != null) {
             String path = base.toExternalForm();
+            if (!pane.getStylesheets().contains(path)) pane.getStylesheets().add(path);
+        }
+        var components = Theme.class.getResource("/com/example/demo/components.css");
+        if (components != null) {
+            String path = components.toExternalForm();
             if (!pane.getStylesheets().contains(path)) pane.getStylesheets().add(path);
         }
         if (light) {

@@ -113,6 +113,18 @@ public final class HealthCheckView extends VBox {
             row.setCursor(javafx.scene.Cursor.HAND);
             // 反馈交给样式类（.health-row-warn:hover），不靠字符串替换
             row.getStyleClass().add("health-row-warn");
+            // 键盘/自动化可达：告警行当作按钮，Tab 能聚焦、Enter/Space 触发
+            row.setAccessibleRole(javafx.scene.AccessibleRole.BUTTON);
+            row.setAccessibleText("需要处理：" + line.message());
+            row.setFocusTraversable(true);
+            row.setOnKeyPressed(
+                    ev -> {
+                        if (ev.getCode() == javafx.scene.input.KeyCode.ENTER
+                                || ev.getCode() == javafx.scene.input.KeyCode.SPACE) {
+                            onAction.accept(line);
+                            ev.consume();
+                        }
+                    });
             row.getStyleClass().add("health-row-actionable");
             row.setOnMouseClicked(
                     e -> {

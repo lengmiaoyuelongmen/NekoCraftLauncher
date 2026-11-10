@@ -1446,6 +1446,16 @@ result=pass
   - 筛选带「测速」：`PASS: 悬停差异峰值 119 ≥ 阈值 50`
   帧图可见刷新按钮悬停时的圆角高亮底。
 
+### 组件样式真正生效 + 告警行可访问（2026-11-11 00:15）
+
+- **发现一个静默失败**：上一轮"把体检规则搬进 components.css"其实没生效——`Theme.bindScene`
+  里加加载代码的字符串替换没命中，但脚本仍然打印了成功。用"把 `.settings-card` 背景临时改成
+  纯红"的 A/B 测试才确认真没加载（r141 无红 → 修复后 r142 整块红）。
+- 修复：`Theme.bindScene` 与 `applyDialogStyles` 都显式加载 `components.css`。
+  恢复渐变后，设置卡片在浅色主题下重新有底色/描边/阴影（r143）。
+- **告警行可访问**：体检面板的可点击告警行现在设 `AccessibleRole.BUTTON` + `accessibleText`，
+  并支持 `Enter` / `Space` 触发，`Tab` 可聚焦。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：

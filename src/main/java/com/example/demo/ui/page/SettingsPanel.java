@@ -1593,9 +1593,6 @@ public final class SettingsPanel extends VBox {
     private VBox card(Node... children) {
         VBox box = new VBox(13);
         box.setPadding(new Insets(20));
-        box.setStyle("-fx-background-color: linear-gradient(to bottom, -app-card-top, -app-card-alt2);"
-                + " -fx-background-radius: 16; -fx-border-color: -app-border-soft; -fx-border-radius: 16;"
-                + " -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.16), 18, 0.10, 0, 6);");
         box.getChildren().addAll(children);
         box.getStyleClass().add("settings-card");
         // 设置卡片轻轻抬起一点，鼠标掠过时能感觉到"这张卡是活的"

@@ -15,3 +15,12 @@
     -fx-background-color: -app-warn-bg-hover;
     -fx-border-color: -app-warn-border-hover;
 }
+
+/* 设置页卡片：底色/描边/阴影统一走主题变量 */
+.settings-card {
+    -fx-background-color: linear-gradient(to bottom, -app-card-top, -app-card-alt2);
+    -fx-background-radius: 16;
+    -fx-border-color: -app-border-soft;
+    -fx-border-radius: 16;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.16), 18, 0.10, 0, 6);
+}
