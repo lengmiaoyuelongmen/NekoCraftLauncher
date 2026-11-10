@@ -30,6 +30,10 @@
     -app-hover: #e6ecf3;
     -app-hover-2: #e6ecf3;
     -app-hover-3: #dbe3ec;
+    -app-warn-bg: rgba(245,158,11,0.10);
+    -app-warn-border: rgba(245,158,11,0.30);
+    -app-warn-bg-hover: rgba(245,158,11,0.18);
+    -app-warn-border-hover: rgba(245,158,11,0.55);
     -app-border: #b8d4ee;
     -app-border-2: #c9def4;
     -app-border-3: #c3cedb;
@@ -279,14 +283,3 @@
 }
 
 /* 体检面板告警行（浅色主题） */
-.health-row-warn {
-    -fx-background-color: rgba(245,158,11,0.10);
-    -fx-border-color: rgba(245,158,11,0.30);
-    -fx-border-radius: 10;
-    -fx-background-radius: 10;
-}
-
-.health-row-warn:hover {
-    -fx-background-color: rgba(245,158,11,0.18);
-    -fx-border-color: rgba(245,158,11,0.55);
-}

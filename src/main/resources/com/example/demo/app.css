@@ -51,6 +51,10 @@
     -app-hover: #351a1e;
     -app-hover-2: #2c1418;
     -app-hover-3: #3a1c20;
+    -app-warn-bg: rgba(251,191,36,0.08);
+    -app-warn-border: rgba(251,191,36,0.28);
+    -app-warn-bg-hover: rgba(251,191,36,0.16);
+    -app-warn-border-hover: rgba(251,191,36,0.55);
     -app-border-2: #3a1f23;
     -app-border-3: #3d2226;
     -app-border-4: #4a292d;
@@ -690,14 +694,3 @@
 }
 
 /* 体检面板：告警行可点击，悬停时背景与描边提亮 */
-.health-row-warn {
-    -fx-background-color: rgba(251,191,36,0.08);
-    -fx-border-color: rgba(251,191,36,0.28);
-    -fx-border-radius: 10;
-    -fx-background-radius: 10;
-}
-
-.health-row-warn:hover {
-    -fx-background-color: rgba(251,191,36,0.16);
-    -fx-border-color: rgba(251,191,36,0.55);
-}

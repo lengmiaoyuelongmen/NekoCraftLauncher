@@ -137,6 +137,8 @@ powershell -ExecutionPolicy Bypass -File scripts/capture-motion.ps1 -HoverName "
 | `-MinHoverDiff <n>` | 悬停差异峰值低于 n 时判定动效失效并 exit 1 |
 | `-RequireForeground` | 窗口切不到前台时直接返回 4（冒烟据此记为 SKIP，不算失败） |
 
+悬停断言需要元素有可访问名：图标按钮请设置 `setAccessibleText`，否则 UIA 找不到。
+
 单张截图延迟 >300ms，抓不到 200ms 的动画；这个脚本改为**连拍**：每 40ms 抓一帧，第 4 帧时用 UIA
 触发一次点击，最后把每帧与"稳定帧"逐点比较，输出差异序列。实测一次设置页切换：
 

@@ -101,6 +101,7 @@ public final class DownloadFilterBar extends VBox {
         "-fx-background-color: transparent; -fx-text-fill: #9ca3af; -fx-font-size: 11px;"
             + " -fx-cursor: hand; -fx-padding: 2 6;");
     speedBtn.setTooltip(new Tooltip("测试 Modrinth / MCIM / CurseForge 镜像延迟"));
+    speedBtn.setAccessibleText("测速");
     speedBtn.setOnAction(e -> runSpeedTest(speedBtn));
     // 反馈：三个工具按钮统一"按下回弹 + 悬停放大 + 手型光标"
     com.example.demo.ui.shell.Motion.press(refreshBtn);
@@ -196,6 +197,8 @@ public final class DownloadFilterBar extends VBox {
         "-fx-background-color: transparent; -fx-text-fill: #aaa; -fx-font-size: 16px;"
             + " -fx-cursor: hand;");
     button.setTooltip(new Tooltip(tooltip));
+    // 图标按钮本身没有文字：给无障碍/UIA 一个名字，自动化与读屏都能定位
+    button.setAccessibleText(tooltip);
     return button;
   }
 

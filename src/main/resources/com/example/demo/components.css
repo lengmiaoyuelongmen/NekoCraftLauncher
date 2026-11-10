@@ -1,0 +1,17 @@
+/*
+ * 组件级样式：与主题变量解耦，颜色全部来自 app.css / app-light.css 里的 -app-* 变量。
+ * 这些规则只描述"什么情况长什么样"，不写死具体色值。
+ */
+
+/* 体检面板：可点击的告警行 */
+.health-row-warn {
+    -fx-background-color: -app-warn-bg;
+    -fx-border-color: -app-warn-border;
+    -fx-border-radius: 10;
+    -fx-background-radius: 10;
+}
+
+.health-row-warn:hover {
+    -fx-background-color: -app-warn-bg-hover;
+    -fx-border-color: -app-warn-border-hover;
+}
