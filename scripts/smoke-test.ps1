@@ -60,22 +60,7 @@ public class SmokeWin {
 '@ -ErrorAction SilentlyContinue
 
 
-    $mouseCode = @"
-using System;
-using System.Runtime.InteropServices;
-public class SmokeMouse {
-  [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
-  [DllImport("user32.dll")] public static extern void mouse_event(uint f, uint dx, uint dy, uint d, IntPtr e);
-  public static void Click(int x, int y) {
-    SetCursorPos(x, y);
-    System.Threading.Thread.Sleep(60);
-    mouse_event(0x0002, 0, 0, 0, IntPtr.Zero);
-    System.Threading.Thread.Sleep(40);
-    mouse_event(0x0004, 0, 0, 0, IntPtr.Zero);
-  }
-}
-"@
-    Add-Type -TypeDefinition $mouseCode -ErrorAction SilentlyContinue
+    . (Join-Path $PSScriptRoot "ui-common.ps1")
 
     function Focus-Launcher {
         for ($attempt = 1; $attempt -le 5; $attempt++) {
@@ -283,6 +268,24 @@ public class SmokeMouse {
                     Write-Host ("  ! {0} 的悬停断言未通过" -f $p.name) -ForegroundColor Yellow
                     $hoverFailures++
                 }
+                # 设置页额外验证卡片悬停：差异必须落在 500~5000 的合理区间
+                if ($p.name -eq "03-settings") {
+                    $cardOut = & powershell -ExecutionPolicy Bypass -File $motionScript -HoverAt "420,300" -Frames 14 -IntervalMs 40 -OutDir "target\motion-smoke-card" -MinHoverDiff 500 -RequireForeground 2>&1
+                    $peak = 0
+                    $m = ($cardOut | Select-String "悬停差异峰值 (\d+)")
+                    if ($m) { $peak = [int]$m.Matches[0].Groups[1].Value }
+                    if ($LASTEXITCODE -eq 4) {
+                        Write-Host "  · 卡片悬停断言跳过（窗口切不到前台）" -ForegroundColor DarkYellow
+                    } elseif ($LASTEXITCODE -ne 0) {
+                        Write-Host ("  ! 卡片悬停差异过低：{0} < 500" -f $peak) -ForegroundColor Yellow
+                        $hoverFailures++
+                    } elseif ($peak -gt 5000) {
+                        Write-Host ("  ! 卡片悬停差异过大：{0} > 5000（可能是整页重绘）" -f $peak) -ForegroundColor Yellow
+                        $hoverFailures++
+                    } else {
+                        Write-Host ("  · 卡片悬停差异 {0}（500~5000 区间内）" -f $peak) -ForegroundColor DarkGray
+                    }
+                }
             }
         }
         Start-Sleep -Milliseconds 1200
@@ -393,6 +396,17 @@ public class SmokeMouse {
                     if ($back) {
                         Write-Host "  · 安装页面板已渲染（返回列表可见）" -ForegroundColor DarkGray
                     } else {
+                        # 面板内容断言：至少 4 个加载器条目可见（原版/Fabric/Forge/NeoForge/Quilt…）
+                        $loaderNames = @("原版", "Fabric", "Forge", "NeoForge", "Quilt", "OptiFine", "LabyMod")
+                        $foundLoaders = 0
+                        foreach ($ln in $loaderNames) {
+                            if (& $findInst $ln) { $foundLoaders++ }
+                        }
+                        if ($foundLoaders -lt 4) {
+                            Write-Host ("FAIL: 安装页加载器条目只有 {0} 个（至少 4 个）" -f $foundLoaders) -ForegroundColor Red
+                            exit 1
+                        }
+                        Write-Host ("  · 安装页加载器条目 {0} 个" -f $foundLoaders) -ForegroundColor DarkGray
                         Write-Host "FAIL: 安装页是空白面板（找不到「返回列表」）" -ForegroundColor Red
                         exit 1
                     }

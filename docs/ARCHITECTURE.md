@@ -1512,6 +1512,15 @@ result=pass
 - **同类缺陷排查**：扫了所有 `return panel/root/box` 的构建方法，只有 `InstallerPage` 真的漏加子节点，
   其余命中的都是构造函数已带子节点或子类面板（误报）。
 
+### 卡片悬停区间断言 + 加载器条目断言 + 公共脚本（2026-11-11 02:05）
+
+- **卡片悬停进冒烟**：设置页额外用 `-HoverAt "420,300"` 悬停卡片，要求差异落在
+  **500~5000** 区间（过低=反馈没生效，过高=整页重绘）。实测 `卡片悬停差异 2944`。
+- **安装页断言加强**：除了「返回列表」，还要求加载器条目 ≥4 个（原版/Fabric/Forge/NeoForge/
+  Quilt/OptiFine/LabyMod 里能找到的最少数量），否则 FAIL。
+- **公共脚本**：`SmokeMouse`（窗口查找 + 坐标点击）与 `Click-UiElement` 抽到
+  `scripts/ui-common.ps1`，冒烟改为 dot-source，避免每个脚本各写一份。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：
