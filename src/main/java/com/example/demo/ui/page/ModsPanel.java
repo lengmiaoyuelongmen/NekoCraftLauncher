@@ -26,6 +26,8 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
+import javafx.stage.FileChooser;
+import java.nio.file.StandardCopyOption;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -80,6 +82,9 @@ public final class ModsPanel extends VBox {
     private final Label localCount = new Label();
     private final VBox remoteList = new VBox(6);
     private final StackPane contentHost = new StackPane();
+    private VBox localPage;
+    private VBox remotePage;
+    private String localQuery = "";
     private HBox listBody;
     private final Label status = new Label("");
     private final TextField searchField = new TextField();
@@ -133,43 +138,29 @@ public final class ModsPanel extends VBox {
         Label subtitle = new Label("本地模组实时监控 · 在线搜索先选版本再下载");
         subtitle.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 12px;");
 
-        HBox body = new HBox(16);
-        HBox.setHgrow(body, Priority.ALWAYS);
-        VBox.setVgrow(body, Priority.ALWAYS);
-
-        // ---------- 左：本地 ----------
+        // 单列布局：搜索 + 工具栏 + 全部列表（对齐 PCL / HMCL 的资源列表观感）
         VBox localCard = new VBox(10);
-        localCard.setStyle("-fx-background-color: -app-panel-2; -fx-background-radius: 12; -fx-padding: 16;"
-                + " -fx-border-color: -app-panel; -fx-border-radius: 12;");
-        localCard.setPrefWidth(420);
-        localCard.setMinWidth(360);
+        localCard.getStyleClass().add("neko-card");
+        localCard.setPadding(new Insets(16));
+        localCard.setMaxWidth(Double.MAX_VALUE);
 
-        HBox localHeader = new HBox(8);
-        localHeader.setAlignment(Pos.CENTER_LEFT);
-        Label localTitle = new Label("已安装");
-        localTitle.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 15px; -fx-font-weight: bold;");
-        localCount.setStyle("-fx-text-fill: -app-text-muted-2; -fx-font-size: 12px;");
-        Region localSpacer = new Region();
-        HBox.setHgrow(localSpacer, Priority.ALWAYS);
-        Button refresh = miniButton("刷新");
-        refresh.setOnAction(e -> {
+        TextField localSearch = new TextField();
+        localSearch.setPromptText("搜索资源：名称 / 描述 / 标签");
+        localSearch.setPrefHeight(36);
+        localSearch.setMaxWidth(Double.MAX_VALUE);
+        localSearch.textProperty().addListener((o, a, b) -> {
+            localQuery = b == null ? "" : b.trim().toLowerCase(Locale.ROOT);
             lastSignature = "";
             refreshLocal(true);
         });
-        Button openDir = miniButton("打开目录");
-        openDir.setOnAction(e -> openModsDir());
-        Button checkUpdate = miniButton("检查更新");
-        checkUpdate.setOnAction(e -> checkUpdates());
 
-        javafx.scene.layout.FlowPane bulkRow = new javafx.scene.layout.FlowPane(8, 6);
-        Button enableAllBtn = miniButton("全启用");
-        enableAllBtn.setOnAction(e -> setAllEnabled(true));
-        Button disableAllBtn = miniButton("全禁用");
-        disableAllBtn.setOnAction(e -> setAllEnabled(false));
-        Button deleteDisabledBtn = miniButton("删除已禁用");
-        deleteDisabledBtn.setStyle("-fx-background-color: #7f1d1d; -fx-text-fill: #fecaca; -fx-cursor: hand;"
-                + " -fx-background-radius: 6; -fx-padding: 4 10; -fx-font-size: 12px;");
-        deleteDisabledBtn.setOnAction(e -> deleteDisabledMods());
+        Button openDir = miniButton("打开文件夹");
+        openDir.setOnAction(e -> openModsDir());
+        Button installFile = miniButton("从文件安装");
+        installFile.setOnAction(e -> installFromFile());
+        Button downloadNew = miniButton("下载新资源");
+        downloadNew.getStyleClass().add("btn-primary");
+        downloadNew.setOnAction(e -> showRemotePage(true));
         CheckBox selectAll = new CheckBox("全选");
         selectAll.setStyle("-fx-text-fill: -app-text-dim; -fx-font-size: 12px;");
         selectAll.selectedProperty().addListener((o, a, b) -> {
@@ -186,6 +177,30 @@ public final class ModsPanel extends VBox {
             lastSignature = "";
             refreshLocal(true);
         });
+        Button exportInfo = miniButton("导出信息");
+        exportInfo.setOnAction(e -> exportModsInfo());
+        Button relations = miniButton("模组关系");
+        relations.setOnAction(e -> showModRelations());
+
+        javafx.scene.layout.FlowPane toolbar = new javafx.scene.layout.FlowPane(
+                8, 6, openDir, installFile, downloadNew, selectAll, exportInfo, relations);
+        toolbar.setAlignment(Pos.CENTER_LEFT);
+
+        Label allTitle = new Label("全部");
+        allTitle.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 14px; -fx-font-weight: bold;");
+        Region headerSpacer = new Region();
+        HBox.setHgrow(headerSpacer, Priority.ALWAYS);
+        Label sortLabel = new Label("排序");
+        sortLabel.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
+        ComboBox<String> sortCombo = new ComboBox<>();
+        sortCombo.getItems().addAll("资源名称", "文件大小");
+        sortCombo.setValue("资源名称");
+        sortCombo.setPrefWidth(110);
+        HBox listHeader = new HBox(8, allTitle, localCount, headerSpacer, sortLabel, sortCombo);
+        listHeader.setAlignment(Pos.CENTER_LEFT);
+
+        // 批量操作收成第二行，保持首行干净
+        javafx.scene.layout.FlowPane bulkRow = new javafx.scene.layout.FlowPane(8, 6);
         Button enableSelected = miniButton("启用选中");
         enableSelected.setOnAction(e -> setSelectedEnabled(true));
         Button disableSelected = miniButton("禁用选中");
@@ -194,12 +209,17 @@ public final class ModsPanel extends VBox {
         deleteSelected.setStyle("-fx-background-color: #7f1d1d; -fx-text-fill: #fecaca; -fx-cursor: hand;"
                 + " -fx-background-radius: 6; -fx-padding: 4 10; -fx-font-size: 12px;");
         deleteSelected.setOnAction(e -> deleteSelectedMods());
-        bulkRow.getChildren().addAll(selectAll, enableSelected, disableSelected, deleteSelected,
+        Button enableAllBtn = miniButton("全启用");
+        enableAllBtn.setOnAction(e -> setAllEnabled(true));
+        Button disableAllBtn = miniButton("全禁用");
+        disableAllBtn.setOnAction(e -> setAllEnabled(false));
+        Button deleteDisabledBtn = miniButton("删除已禁用");
+        deleteDisabledBtn.setStyle("-fx-background-color: #7f1d1d; -fx-text-fill: #fecaca; -fx-cursor: hand;"
+                + " -fx-background-radius: 6; -fx-padding: 4 10; -fx-font-size: 12px;");
+        deleteDisabledBtn.setOnAction(e -> deleteDisabledMods());
+        bulkRow.getChildren().addAll(enableSelected, disableSelected, deleteSelected,
                 enableAllBtn, disableAllBtn, deleteDisabledBtn);
         bulkRow.setAlignment(Pos.CENTER_LEFT);
-        localHeader.getChildren().addAll(localTitle, localSpacer, localCount);
-        HBox localTools = new HBox(8, refresh, checkUpdate, openDir);
-        localTools.setAlignment(Pos.CENTER_LEFT);
 
         localScroll = new ScrollPane(localList);
         localScroll.setFitToWidth(true);
@@ -208,27 +228,33 @@ public final class ModsPanel extends VBox {
 
         depsHint.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
         depsHint.setWrapText(true);
-        HBox.setHgrow(depsHint, Priority.ALWAYS);
         depsHint.setMaxWidth(Double.MAX_VALUE);
         HBox depsRow = new HBox(8, depsHint);
         depsRow.setAlignment(Pos.CENTER_LEFT);
 
-        localCard.getChildren().addAll(localHeader, localTools, bulkRow, updateHint, depsRow, localScroll);
+        localPage = new VBox(10, localSearch, toolbar, listHeader, bulkRow, updateHint, depsRow, localScroll);
+        localPage.setMaxWidth(Double.MAX_VALUE);
 
-        // ---------- 右：在线 ----------
+        // ---------- 在线页：独立集成页面（从「下载新资源」进入） ----------
         VBox remoteCard = new VBox(10);
-        remoteCard.setStyle("-fx-background-color: -app-panel-2; -fx-background-radius: 12; -fx-padding: 16;"
-                + " -fx-border-color: -app-panel; -fx-border-radius: 12;");
-        HBox.setHgrow(remoteCard, Priority.ALWAYS);
-
+        remoteCard.getStyleClass().add("neko-card");
+        remoteCard.setPadding(new Insets(16));
+        Button back = new Button("返回列表");
+        back.setGraphic(Icons.node("back", 12.0, "#9ca3af"));
+        back.setStyle("-fx-background-color: transparent; -fx-text-fill: -app-text-dim;"
+                + " -fx-cursor: hand; -fx-font-size: 12px;");
+        back.setOnAction(e -> showRemotePage(false));
         Label remoteTitle = new Label("在线模组");
         remoteTitle.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 15px; -fx-font-weight: bold;");
+        Region remoteSpacer = new Region();
+        HBox.setHgrow(remoteSpacer, Priority.ALWAYS);
+        HBox remoteHeader = new HBox(10, back, remoteTitle, remoteSpacer);
+        remoteHeader.setAlignment(Pos.CENTER_LEFT);
 
         sourceCombo.getItems().addAll("自动", "Modrinth", "CurseForge");
         sourceCombo.setValue("CurseForge");
         sourceCombo.setPrefWidth(120);
         sourceCombo.setStyle("-fx-background-radius: 8;");
-
         searchField.setPromptText("搜索模组，例如 sodium / jei / create");
         searchField.setPrefHeight(34);
         HBox.setHgrow(searchField, Priority.ALWAYS);
@@ -241,7 +267,6 @@ public final class ModsPanel extends VBox {
         sourceCombo.valueProperty().addListener((o, a, b) -> search());
 
         status.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 12px;");
-
         ScrollPane remoteScroll = new ScrollPane(remoteList);
         remoteScroll.setFitToWidth(true);
         remoteScroll.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
@@ -253,23 +278,20 @@ public final class ModsPanel extends VBox {
                 loadPage();
             }
         });
-
         loadMoreHint.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
-
         Region statusSpacer = new Region();
         HBox.setHgrow(statusSpacer, Priority.ALWAYS);
         Button toTop = miniButton("↑ 顶部");
         toTop.setOnAction(e -> remoteScroll.setVvalue(0));
         HBox statusRow = new HBox(8, status, statusSpacer, loadMoreHint, toTop);
         statusRow.setAlignment(Pos.CENTER_LEFT);
-
         filterHint.setStyle("-fx-text-fill: #9ca3af; -fx-font-size: 11px;");
-        remoteCard.getChildren().addAll(remoteTitle, filterHint, searchBar, statusRow, remoteScroll);
+        remoteCard.getChildren().addAll(remoteHeader, filterHint, searchBar, statusRow, remoteScroll);
+        remotePage = remoteCard;
+        remotePage.setVisible(false);
+        remotePage.setManaged(false);
 
-        body.getChildren().addAll(localCard, remoteCard);
-        listBody = body;
-        contentHost.setAlignment(Pos.TOP_LEFT);
-        contentHost.getChildren().add(body);
+        contentHost.getChildren().addAll(localPage, remotePage);
         VBox.setVgrow(contentHost, Priority.ALWAYS);
         getChildren().addAll(title, subtitle, contentHost);
 
@@ -345,6 +367,74 @@ public final class ModsPanel extends VBox {
         return sb.toString();
     }
 
+    /** 在「本地列表」与「在线页」之间切换（在线页是独立集成页面）。 */
+    private void showRemotePage(boolean online) {
+        if (localPage == null || remotePage == null) return;
+        localPage.setVisible(!online);
+        localPage.setManaged(!online);
+        remotePage.setVisible(online);
+        remotePage.setManaged(online);
+        if (online && remoteList.getChildren().isEmpty()) {
+            search();
+        }
+    }
+
+    /** 从本地 jar 文件安装到 mods 目录。 */
+    private void installFromFile() {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("选择模组 jar");
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("模组文件", "*.jar"));
+        File pick = chooser.showOpenDialog(getScene() == null ? null : getScene().getWindow());
+        if (pick == null) return;
+        try {
+            File target = new File(modsDir, pick.getName());
+            Files.copy(pick.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            log.accept("已从文件安装 " + pick.getName());
+            Toast.ok("已安装 " + pick.getName());
+            lastSignature = "";
+            refreshLocal(true);
+        } catch (Exception e) {
+            Toast.error("安装失败：" + e.getMessage());
+        }
+    }
+
+    /** 导出已安装模组清单到 logs/mods-info.txt。 */
+    private void exportModsInfo() {
+        File[] files = modsDir.listFiles((d, n) -> {
+            String lower = n.toLowerCase(Locale.ROOT);
+            return lower.endsWith(".jar") || lower.endsWith(".jar.disabled");
+        });
+        if (files == null) files = new File[0];
+        Arrays.sort(files, Comparator.comparing(File::getName));
+        StringBuilder sb = new StringBuilder("模组清单（" + files.length + " 个）\n");
+        for (File file : files) {
+            boolean disabled = file.getName().toLowerCase(Locale.ROOT).endsWith(".disabled");
+            sb.append(disabled ? "[禁用] " : "[启用] ")
+                    .append(file.getName())
+                    .append("  ")
+                    .append(file.length() / 1024)
+                    .append(" KB\n");
+        }
+        try {
+            File logs = new File(config.getGameDir(), "logs");
+            logs.mkdirs();
+            File out = new File(logs, "mods-info.txt");
+            Files.writeString(out.toPath(), sb.toString(), StandardCharsets.UTF_8);
+            log.accept("已导出模组清单: " + out.getAbsolutePath());
+            Toast.ok("模组清单已导出到 logs/mods-info.txt");
+        } catch (Exception e) {
+            Toast.error("导出失败：" + e.getMessage());
+        }
+    }
+
+    /** 模组关系：把前置依赖扫描结果用弹窗展示。 */
+    private void showModRelations() {
+        String text = depsHint == null || depsHint.getText() == null || depsHint.getText().isBlank()
+                ? "没有检测到需要说明的前置依赖。"
+                : depsHint.getText();
+        InAppDialog.alert("模组关系", text);
+    }
+
     private void refreshLocal(boolean force) {
         try {
             ModpackImport.flattenMods(modsDir, msg -> status.setText(msg));
@@ -356,6 +446,12 @@ public final class ModsPanel extends VBox {
         });
         if (files == null) files = new File[0];
         Arrays.sort(files, Comparator.comparing(File::getName));
+        if (!localQuery.isBlank()) {
+            String q = localQuery;
+            files = Arrays.stream(files)
+                    .filter(f -> f.getName().toLowerCase(Locale.ROOT).contains(q))
+                    .toArray(File[]::new);
+        }
 
         String signature = signature(files);
         if (!force && signature.equals(lastSignature)) return;
