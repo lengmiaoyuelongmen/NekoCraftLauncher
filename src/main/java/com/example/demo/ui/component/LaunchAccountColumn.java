@@ -135,24 +135,13 @@ public final class LaunchAccountColumn extends VBox {
     bottomRow.setAlignment(Pos.CENTER);
     launchButton.setOnAction(e -> callbacks.launch());
 
-    Region profileSpacer = new Region();
-    profileSpacer.setMinHeight(0.0);
-    profileSpacer.setPrefHeight(0.0);
-    profileSpacer.setMaxHeight(Double.MAX_VALUE);
-    VBox.setVgrow(profileSpacer, Priority.ALWAYS);
+    // 身份信息居中，底部按钮组固定：空白被上下分摊，不再是"中间一大块空"
+    VBox identity = new VBox(0.0, avatarPane, usernameLabel, userTypeLabel, uuidLabel, accountTools, loginForm, accountInfo);
+    identity.setAlignment(Pos.CENTER);
+    identity.setMinHeight(0.0);
+    VBox.setVgrow(identity, Priority.ALWAYS);
 
-    getChildren()
-        .addAll(
-            avatarPane,
-            usernameLabel,
-            userTypeLabel,
-            uuidLabel,
-            accountTools,
-            loginForm,
-            accountInfo,
-            profileSpacer,
-            launchButton,
-            bottomRow);
+    getChildren().addAll(identity, launchButton, bottomRow);
     VBox.setMargin(avatarPane, new Insets(6.0, 0.0, 0.0, 0.0));
     VBox.setMargin(usernameLabel, new Insets(6.0, 0.0, 0.0, 0.0));
     VBox.setMargin(accountTools, new Insets(10.0, 0.0, 0.0, 0.0));

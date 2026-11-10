@@ -74,7 +74,7 @@ public final class ModpackCell extends ListCell<ModpackProject> {
     card.setPadding(new Insets(10.0, 14.0, 10.0, 14.0));
     card.setStyle(
         "-fx-background-color: linear-gradient(to bottom, -app-card-top, -app-card-alt2);"
-            + " -fx-background-radius: 16; -fx-border-color: -app-border-soft;"
+            + " -fx-background-radius: 14; -fx-border-color: -app-border-soft;"
             + " -fx-border-radius: 14;");
     card.setCursor(Cursor.HAND);
     card.prefWidthProperty().bind(listWidth.subtract(30));
