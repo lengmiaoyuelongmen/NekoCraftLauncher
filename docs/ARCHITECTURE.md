@@ -1595,6 +1595,16 @@ result=pass
   AI 模式聊天区永远停在 140px；补上 VGrow 后撑满命令栏以上区域（r178）。
 - 冒烟 9 次过渡通过；基线差异 0.40%。
 
+### 实例设置导航"变色延迟"（2026-11-11 04:42）
+
+- **根因**：`InstanceSettingsPanel.select()` 先改选中色、再**同步**构建页面（扫目录/读文件最多
+  109ms）。JavaFX 只在事件处理返回后重绘，所以颜色被页面构建卡住，看起来像"点了半天才变色"。
+- **修复**：`select()` 只做上色（实测 0ms），页面构建放进 `Platform.runLater`；新增
+  `[nav] <tab> 上色 Xms，页面 Yms` 日志便于回归检查。
+- **顺带修复**：`refreshNavStyles()` 里 `hovered` 恒为 false，会清掉真实悬停高亮；改成读
+  `HBox.isHover()`。
+- 实测日志：`overview 上色 0ms，页面 109ms`、`mods 0ms / 23ms`、`resourcepacks 0ms / 30ms`。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：

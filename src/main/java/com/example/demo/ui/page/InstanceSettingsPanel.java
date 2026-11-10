@@ -225,7 +225,25 @@ public final class InstanceSettingsPanel extends HBox {
     }
 
     private void select(String tabName) {
+        long styleStart = System.nanoTime();
         this.tab = tabName;
+        applyNavStyles(tabName);
+        long styleMs = (System.nanoTime() - styleStart) / 1_000_000L;
+        // 页面构建可能扫目录/读文件，放在下一帧：先让选中色画出来，再干活
+        javafx.application.Platform.runLater(
+                () -> {
+                    if (!tabName.equals(this.tab)) {
+                        return;
+                    }
+                    long buildStart = System.nanoTime();
+                    buildPage(tabName);
+                    long buildMs = (System.nanoTime() - buildStart) / 1_000_000L;
+                    System.out.println(
+                            "[nav] " + tabName + " 上色 " + styleMs + "ms，页面 " + buildMs + "ms");
+                });
+    }
+
+    private void applyNavStyles(String tabName) {
         for (Node node : navBox.getChildren()) {
             if (node.getUserData() instanceof String key) {
                 boolean active = key.equals(tabName);
@@ -243,6 +261,9 @@ public final class InstanceSettingsPanel extends HBox {
                 }
             }
         }
+    }
+
+    private void buildPage(String tabName) {
         String id = instanceId == null ? "" : instanceId;
         boolean isolated = effectiveIsolation(id);
         File instanceRoot = InstanceDirs.root(gameDir, id, isolated);
@@ -1073,7 +1094,7 @@ public final class InstanceSettingsPanel extends HBox {
         for (javafx.scene.Node node : navBox.getChildren()) {
             if (!(node instanceof HBox item) || !(node.getUserData() instanceof String key)) continue;
             boolean active = key.equals(tab);
-            boolean hovered = false;
+            boolean hovered = node instanceof HBox box && box.isHover();
             String activeColor = Theme.isLight() ? "#ffffff" : "#232730";
             item.setStyle("-fx-background-color: "
                     + (active ? activeColor : (hovered ? "-app-hover-2" : "transparent")) + ";");
