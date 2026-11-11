@@ -7,6 +7,7 @@
 
 | 文件 | 说明 |
 |---|---|
+| `NekoCraftLauncher-2.9.0.exe` | **安装版**：双击安装，可选目录，自动创建开始菜单与桌面快捷方式（按用户安装，无需管理员） |
 | `NekoCraftLauncher-2.9.0-win64.zip` | 免安装版，解压后双击 `NekoCraftLauncher.exe` |
 
 - 系统要求：Windows 10/11 x64
@@ -55,6 +56,9 @@
 ## 校验
 
 ```
+SHA256  NekoCraftLauncher-2.9.0.exe
+F3C3A4E1C2FD1D3D74CB4C98CD6F8C3DB00D0A6C587CEE65035A924F631FCFE2
+
 SHA256  NekoCraftLauncher-2.9.0-win64.zip
 3B82B16573842E5B08AC79ECAA867DFD90708F349543CF9C6E00E2308AD0B23C
 ```
