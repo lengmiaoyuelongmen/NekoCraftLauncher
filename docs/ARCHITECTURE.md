@@ -1677,6 +1677,14 @@ result=pass
   下载页 40 个结果单元的批量补描边不再发生；实测 `页面自检 9 次（累计修复 1 个）`。
 - **体检页自适应**：`HealthCheckView` 去掉固定 510 宽，行随卡片伸展。
 
+### 「终止启动器」弹窗按钮无色（2026-11-11 22:22）
+
+- **根因**：`InAppDialog.Action.danger/cyan` 给按钮加的是 `btn-danger` / `btn-cyan` 类，但 app.css 里这两个规则
+  只写在 `.dialog-pane .button.btn-danger` 作用域下；应用内弹窗不在 `.dialog-pane` 里，所以**完全没有命中**，
+  两个按钮退化成默认灰白 —— 用户看到的就是"效果消失"。
+- **修复**：在 components.css 补全局的 `.btn-danger` / `.btn-cyan`（含 hover）。
+- **验证**：Alt+F4 触发弹窗，退出启动器=红色、最小化到托盘=青色、取消=灰色（r198）。
+
 ### 只剩「装配」的部分
 
 `start(Stage)`（约 275 行）与 `createLaunchPanel`（187 行）现在读起来就是装配顺序：

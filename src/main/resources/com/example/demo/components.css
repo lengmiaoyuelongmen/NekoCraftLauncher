@@ -167,3 +167,33 @@
     -fx-background-radius: 10;
     -fx-border-radius: 10;
 }
+
+/* 应用内弹窗的危险/青色动作：这些按钮不在 .dialog-pane 里，
+   需要单独的全局规则，否则点开「终止启动器」看不到任何颜色 */
+.btn-danger {
+    -fx-background-color: #e11d2e;
+    -fx-text-fill: #fff5f6;
+    -fx-border-color: transparent;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-font-weight: bold;
+}
+
+.btn-danger:hover {
+    -fx-background-color: #f2303f;
+}
+
+.btn-cyan {
+    -fx-background-color: rgba(20, 184, 166, 0.18);
+    -fx-text-fill: #7de9d9;
+    -fx-border-color: rgba(125, 233, 217, 0.45);
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-font-weight: bold;
+}
+
+.btn-cyan:hover {
+    -fx-background-color: rgba(20, 184, 166, 0.30);
+    -fx-border-color: rgba(125, 233, 217, 0.7);
+}
