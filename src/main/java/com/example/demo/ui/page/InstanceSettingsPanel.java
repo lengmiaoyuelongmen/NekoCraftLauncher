@@ -460,7 +460,7 @@ public final class InstanceSettingsPanel extends HBox {
         });
         personal.getChildren().addAll(rename, setDesc);
 
-        HBox advanced = new HBox(10);
+        javafx.scene.layout.FlowPane advanced = new javafx.scene.layout.FlowPane(10, 8);
         Button repair = ghostButton("补全文件");
         repair.setOnAction(e -> {
             if (onRepair != null) onRepair.accept(instance.id);
@@ -575,10 +575,14 @@ public final class InstanceSettingsPanel extends HBox {
             isolationBox.getSelectionModel().select(0);
             Toast.ok("已恢复为全局设置");
         });
-        launchCard.getChildren().addAll(
-                new HBox(10, useMemory, memorySpinner, smartMemory), jvmField, javaField, gameArgsField,
-                new HBox(10, isolationBox), new HBox(10, saveOverride, clearOverride));
+        HBox memoryRow = new HBox(12, useMemory, memorySpinner, smartMemory);
+        memoryRow.setAlignment(Pos.CENTER_LEFT);
+        HBox saveRow = new HBox(10, saveOverride, clearOverride);
+        saveRow.setAlignment(Pos.CENTER_LEFT);
+        launchCard.getChildren().addAll(memoryRow, jvmField, javaField, gameArgsField,
+                new HBox(10, isolationBox), saveRow);
         VBox advancedCard = card("高级管理", new String[][]{});
+        advanced.setAlignment(Pos.CENTER_LEFT);
         advancedCard.getChildren().add(advanced);
 
         page.getChildren().addAll(head, info, counts, healthCard, shortcuts, personalCard, launchCard, advancedCard);
@@ -1128,8 +1132,19 @@ public final class InstanceSettingsPanel extends HBox {
 
     private Button ghostButton(String text) {
         Button button = new Button(text);
-        button.setStyle("-fx-background-color: -app-row3; -fx-text-fill: -app-text-2; -fx-background-radius: 8;"
-                + " -fx-padding: 7 14; -fx-cursor: hand; -fx-font-size: 12px;");
+        String normal =
+                "-fx-background-color: -app-hover-2; -fx-text-fill: -app-text-2;"
+                        + " -fx-background-radius: 8; -fx-border-color: -app-border-3;"
+                        + " -fx-border-radius: 8; -fx-padding: 6 14; -fx-cursor: hand;"
+                        + " -fx-font-size: 12px;";
+        String hover =
+                "-fx-background-color: -app-hover-3; -fx-text-fill: -app-text;"
+                        + " -fx-background-radius: 8; -fx-border-color: -app-accent;"
+                        + " -fx-border-radius: 8; -fx-padding: 6 14; -fx-cursor: hand;"
+                        + " -fx-font-size: 12px;";
+        button.setStyle(normal);
+        button.setOnMouseEntered(e -> button.setStyle(hover));
+        button.setOnMouseExited(e -> button.setStyle(normal));
         return button;
     }
 

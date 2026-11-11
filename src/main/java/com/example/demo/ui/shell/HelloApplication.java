@@ -158,6 +158,7 @@ import com.example.demo.core.instance.ImportRollback;
 import com.example.demo.core.model.Instance;
 import com.example.demo.core.model.InstanceDirs;
 import com.example.demo.core.model.InstanceSettings;
+import com.example.demo.core.model.LaunchFormat;
 import com.example.demo.core.model.LaunchHistory;
 import com.example.demo.core.model.MinecraftVersion;
 import com.example.demo.core.model.ModpackProject;
@@ -1250,29 +1251,74 @@ public class HelloApplication extends Application {
   private VBox createAdvisorPanel() {
     Label title = new Label("启动顾问");
     title.setStyle("-fx-text-fill: -app-text; -fx-font-size: 22px; -fx-font-weight: bold;");
-    Label desc = new Label("启动建议、稳定性记录和最近异常会在这里独立显示，不再占用启动页。");
+    Label desc = new Label("启动建议、稳定性记录和最近异常集中在这里，点卡片可直接去对应位置。");
     desc.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 12px;");
     desc.setWrapText(true);
-    VBox card = new VBox(12.0, title, desc);
-    card.setPadding(new Insets(18.0));
-    card.getStyleClass().add("neko-card");
+
+    VBox adviceCard = new VBox(12.0, title, desc);
+    adviceCard.setPadding(new Insets(18.0));
+    adviceCard.getStyleClass().add("neko-card");
     if (this.launchInsightBar != null) {
-      card.getChildren().add(this.launchInsightBar);
+      adviceCard.getChildren().add(this.launchInsightBar);
     }
-    Button refresh = new Button("刷新建议");
-    refresh.setStyle(
-        "-fx-background-color: -app-row3; -fx-text-fill: -app-text-2; -fx-background-radius: 8;"
-            + " -fx-padding: 6 14; -fx-cursor: hand;");
+    Button refresh = ghostButton("刷新建议");
     refresh.setOnAction(
         e -> {
           if (this.launchInsightBar != null) {
             this.launchInsightBar.refresh();
           }
         });
-    HBox actions = new HBox(8.0, refresh);
-    card.getChildren().add(actions);
-    VBox page = new VBox(16.0, card);
+    Button runHealth = ghostButton("一键体检");
+    runHealth.setOnAction(e -> this.showHealthCheck());
+    HBox actions = new HBox(8.0, refresh, runHealth);
+    adviceCard.getChildren().add(actions);
+
+    // 稳定性：直接读启动历史
+    File game = new File(this.config.getGameDir());
+    LaunchHistory.Summary summary = LaunchHistory.summary(game);
+    List<LaunchHistory.Entry> recent = LaunchHistory.recent(game);
+    Label stabilityTitle = new Label("稳定性");
+    stabilityTitle.setStyle("-fx-text-fill: -app-text; -fx-font-size: 15px; -fx-font-weight: bold;");
+    Label stabilityText = new Label(
+        "共 " + summary.total() + " 次启动 · 崩溃 " + summary.crashes()
+            + " 次 · 成功率 " + summary.successRate() + "% · 平均准备 "
+            + LaunchFormat.duration(summary.avgPrepMs()));
+    stabilityText.setStyle("-fx-text-fill: -app-text-dim; -fx-font-size: 12px;");
+    Button openLogs = ghostButton("打开启动日志");
+    openLogs.setOnAction(e -> this.openDir(new File(game, "logs")));
+    Button openCrash = ghostButton("打开崩溃记录");
+    openCrash.setOnAction(e -> this.openDir(new File(game, "crash-reports")));
+    HBox stabilityActions = new HBox(8.0, openLogs, openCrash);
+    VBox stabilityCard = new VBox(10.0, stabilityTitle, stabilityText, stabilityActions);
+    stabilityCard.setPadding(new Insets(18.0));
+    stabilityCard.getStyleClass().add("neko-card");
+
+    // 最近异常：最近 5 条崩溃记录
+    Label recentTitle = new Label("最近异常");
+    recentTitle.setStyle("-fx-text-fill: -app-text; -fx-font-size: 15px; -fx-font-weight: bold;");
+    VBox recentBox = new VBox(6.0);
+    int shown = 0;
+    for (LaunchHistory.Entry entry : recent) {
+      if (!LaunchHistory.isCrash(entry) || shown >= 5) continue;
+      Label line = new Label(
+          timeLabel(entry.time()) + " · " + (entry.instanceId() == null ? "—" : entry.instanceId())
+              + " · 准备 " + LaunchFormat.duration(entry.prepMs()));
+      line.setStyle("-fx-text-fill: -app-text-dim; -fx-font-size: 12px;");
+      recentBox.getChildren().add(line);
+      shown++;
+    }
+    if (shown == 0) {
+      Label none = new Label("最近没有崩溃记录，状态良好。");
+      none.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 12px;");
+      recentBox.getChildren().add(none);
+    }
+    VBox recentCard = new VBox(10.0, recentTitle, recentBox);
+    recentCard.setPadding(new Insets(18.0));
+    recentCard.getStyleClass().add("neko-card");
+
+    VBox page = new VBox(14.0, adviceCard, stabilityCard, recentCard);
     page.setPadding(new Insets(22.0));
+    page.setMaxWidth(Double.MAX_VALUE);
     ScrollPane scroll = new ScrollPane(page);
     scroll.setFitToWidth(true);
     scroll.setStyle(
@@ -1281,6 +1327,22 @@ public class HelloApplication extends Application {
     VBox wrapper = new VBox(scroll);
     VBox.setVgrow(scroll, Priority.ALWAYS);
     return wrapper;
+  }
+
+  /** 顾问页里的小按钮：统一底色，避免"看起来像纯文字"。 */
+  private Button ghostButton(String text) {
+    Button button = new Button(text);
+    button.setStyle(
+        "-fx-background-color: -app-row3; -fx-text-fill: -app-text-2; -fx-background-radius: 8;"
+            + " -fx-border-color: -app-border-soft; -fx-border-radius: 8; -fx-padding: 6 14;"
+            + " -fx-font-size: 12px; -fx-cursor: hand;");
+    return button;
+  }
+
+  /** 顾问页的时间格式：MM-dd HH:mm。 */
+  private static String timeLabel(long epochMillis) {
+    return java.time.format.DateTimeFormatter.ofPattern("MM-dd HH:mm")
+        .format(java.time.Instant.ofEpochMilli(epochMillis).atZone(java.time.ZoneId.systemDefault()));
   }
 
   private void applyLogExpanded(boolean expanded) {

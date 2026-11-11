@@ -49,6 +49,8 @@ import java.util.Set;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 import java.util.function.Consumer;
 
 import com.example.demo.core.app.AppPaths;
@@ -85,6 +87,10 @@ public final class ModsPanel extends VBox {
     private VBox localPage;
     private VBox remotePage;
     private String localQuery = "";
+    private final Map<String, ModInfo> modInfoCache = new HashMap<>();
+
+    /** jar 里读出来的模组信息（读不到就回退文件名）。 */
+    private record ModInfo(String name, String version, String loader, String desc) {}
     private HBox listBody;
     private final Label status = new Label("");
     private final TextField searchField = new TextField();
@@ -183,7 +189,7 @@ public final class ModsPanel extends VBox {
         relations.setOnAction(e -> showModRelations());
 
         javafx.scene.layout.FlowPane toolbar = new javafx.scene.layout.FlowPane(
-                8, 6, openDir, installFile, downloadNew, selectAll, exportInfo, relations);
+                6, 4, openDir, installFile, downloadNew, selectAll, exportInfo, relations);
         toolbar.setAlignment(Pos.CENTER_LEFT);
 
         Label allTitle = new Label("全部");
@@ -200,7 +206,7 @@ public final class ModsPanel extends VBox {
         listHeader.setAlignment(Pos.CENTER_LEFT);
 
         // 批量操作收成第二行，保持首行干净
-        javafx.scene.layout.FlowPane bulkRow = new javafx.scene.layout.FlowPane(8, 6);
+        javafx.scene.layout.FlowPane bulkRow = new javafx.scene.layout.FlowPane(6, 4);
         Button enableSelected = miniButton("启用选中");
         enableSelected.setOnAction(e -> setSelectedEnabled(true));
         Button disableSelected = miniButton("禁用选中");
@@ -546,6 +552,62 @@ public final class ModsPanel extends VBox {
         depsHint.setStyle("-fx-text-fill: #ffb74d; -fx-font-size: 11px;");
     }
     /** 新装的模组如果还有缺失前置，按设置自动补装（最多递归两层，防止环）。 */
+    /** 从 jar 的 fabric.mod.json / mods.toml 里读名称、版本、描述。 */
+    private ModInfo readModInfo(File file) {
+        String key = file.getName() + ":" + file.length();
+        ModInfo cached = modInfoCache.get(key);
+        if (cached != null) return cached;
+        String fallback = file.getName().replace(".disabled", "");
+        ModInfo info = new ModInfo(fallback, "", "", "");
+        try (ZipFile zip = new ZipFile(file)) {
+            ZipEntry fabric = zip.getEntry("fabric.mod.json");
+            if (fabric != null) {
+                try (java.io.InputStream in = zip.getInputStream(fabric)) {
+                    JsonObject json = JsonParser.parseString(
+                            new String(in.readAllBytes(), StandardCharsets.UTF_8)).getAsJsonObject();
+                    String name = optString(json, "name", fallback);
+                    String version = optString(json, "version", "");
+                    String desc = optString(json, "description", "");
+                    info = new ModInfo(name, version, "Fabric", desc);
+                }
+            } else {
+                for (String toml : new String[]{"META-INF/mods.toml", "META-INF/neoforge.mods.toml"}) {
+                    ZipEntry entry = zip.getEntry(toml);
+                    if (entry == null) continue;
+                    try (java.io.InputStream in = zip.getInputStream(entry)) {
+                        String text = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+                        String name = tomlValue(text, "displayName", fallback);
+                        String version = tomlValue(text, "version", "");
+                        String desc = tomlValue(text, "description", "");
+                        String loader = toml.contains("neoforge") ? "NeoForge" : "Forge";
+                        info = new ModInfo(name, version, loader, desc);
+                    }
+                    break;
+                }
+            }
+        } catch (Exception ignored) {
+            // jar 损坏/不是模组：保留文件名
+        }
+        modInfoCache.put(key, info);
+        return info;
+    }
+
+    private static String optString(JsonObject json, String key, String fallback) {
+        try {
+            JsonElement e = json.get(key);
+            return e == null || e.isJsonNull() ? fallback : e.getAsString();
+        } catch (Exception ex) {
+            return fallback;
+        }
+    }
+
+    private static String tomlValue(String text, String key, String fallback) {
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("(?m)^\\s*" + key + "\\s*=\\s*\"([^\"]*)\"")
+                .matcher(text);
+        return m.find() ? m.group(1) : fallback;
+    }
+
         private HBox localRow(File file) {
         boolean disabled = file.getName().toLowerCase().endsWith(".disabled");
         String displayName = disabled
@@ -557,16 +619,36 @@ public final class ModsPanel extends VBox {
         row.setPadding(new Insets(8, 10, 8, 10));
         row.setStyle("-fx-background-color: -app-row3; -fx-background-radius: 8;");
 
-        Label name = new Label(displayName);
-        name.setStyle("-fx-text-fill: " + (disabled ? "-app-text-muted" : "-app-text-2") + "; -fx-font-size: 13px;");
+        ModInfo info = readModInfo(file);
+        String titleText = info.name() == null || info.name().isBlank() ? displayName : info.name();
+        Label name = new Label(titleText);
+        name.setStyle("-fx-text-fill: " + (disabled ? "-app-text-muted" : "-app-text-2")
+                + "; -fx-font-size: 13px; -fx-font-weight: bold;");
         name.setMaxWidth(Double.MAX_VALUE);
-        HBox.setHgrow(name, Priority.ALWAYS);
+        Label metaLine = new Label(
+                (info.version().isBlank() ? "" : "v" + info.version() + " · ")
+                        + (info.loader().isBlank() ? "" : info.loader() + " · ")
+                        + displayName + " · " + (file.length() < 1024
+                                ? Math.max(1, file.length()) + " B"
+                                : (file.length() / 1024) + " KB"));
+        metaLine.setStyle("-fx-text-fill: -app-text-muted-2; -fx-font-size: 10.5px;");
+        Label descLine = new Label(info.desc() == null || info.desc().isBlank()
+                ? file.getAbsolutePath()
+                : info.desc().replace("\n", " "));
+        descLine.setStyle("-fx-text-fill: -app-text-dim-2; -fx-font-size: 10.5px;");
+        descLine.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
+        descLine.setMaxWidth(Double.MAX_VALUE);
+        VBox textBox = new VBox(2, name, metaLine, descLine);
+        textBox.setMinWidth(0);
+        HBox.setHgrow(textBox, Priority.ALWAYS);
+        Tooltip.install(textBox, new Tooltip(file.getAbsolutePath()));
 
         Label size = new Label(file.length() < 1024
                 ? Math.max(1, file.length()) + " B"
                 : (file.length() / 1024) + " KB");
         size.setMinWidth(Region.USE_PREF_SIZE);
         size.setStyle("-fx-text-fill: -app-text-muted-2; -fx-font-size: 11px;");
+        size.setTooltip(new Tooltip(file.getAbsolutePath()));
 
         Button toggle = miniButton(disabled ? "启用" : "禁用");
         toggle.setOnAction(e -> {
@@ -616,7 +698,7 @@ public final class ModsPanel extends VBox {
             if (b) selectedMods.add(file.getName());
             else selectedMods.remove(file.getName());
         });
-        row.getChildren().addAll(select, name, size, toggle, delete);
+        row.getChildren().addAll(select, textBox, size, toggle, delete);
         return row;
     }
 

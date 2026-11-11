@@ -33,8 +33,8 @@ public final class HealthCheckView extends VBox {
             String instanceLabel, List<HealthAdvice.Line> lines,
             java.util.function.Consumer<HealthAdvice.Line> onAction) {
         super(0);
-        setPrefWidth(510);
-        setMaxWidth(510);
+        // 别锁死宽度：行要跟着卡片一起伸展，否则右侧留一大块空白
+        setMaxWidth(Double.MAX_VALUE);
         setSpacing(10);
 
         long warnings = lines.stream().filter(line -> !line.ok()).count();

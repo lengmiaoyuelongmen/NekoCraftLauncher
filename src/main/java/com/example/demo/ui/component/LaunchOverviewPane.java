@@ -77,7 +77,12 @@ public final class LaunchOverviewPane extends VBox {
 
         VBox statCard = card("启动记录", statValue, statSub);
         VBox lastCard = card("最近一次启动", lastValue, lastSub);
+        totalValue.setStyle(
+                "-fx-text-fill: -app-text; -fx-font-size: 16px; -fx-font-weight: bold;");
         VBox totalCard = card("累计游玩", totalValue, totalSub);
+        makeCardClickable(statCard, openAdvisor);
+        makeCardClickable(lastCard, openAdvisor);
+        makeCardClickable(totalCard, openAdvisor);
         // 两张统计卡等宽撑满一行，右侧不再留空
         statCard.setMaxWidth(Double.MAX_VALUE);
         lastCard.setMaxWidth(Double.MAX_VALUE);
@@ -99,7 +104,15 @@ public final class LaunchOverviewPane extends VBox {
                         headCell("实例", 0.0, false),
                         headCell("耗时", 74.0, true));
         historyHead.setPadding(new Insets(0.0, 2.0, 2.0, 2.0));
-        VBox historyCard = card("最近启动记录", historyHead, historyBox);
+        Button seeAll = new Button("查看全部记录 →");
+        seeAll.getStyleClass().add("btn-ghost");
+        seeAll.setStyle("-fx-background-color: -app-row3; -fx-text-fill: -app-text-2;"
+                + " -fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 5 12;"
+                + " -fx-font-size: 11px; -fx-cursor: hand;");
+        seeAll.setOnAction(e -> openAdvisor.run());
+        HBox historyFoot = new HBox(seeAll);
+        historyFoot.setAlignment(Pos.CENTER_RIGHT);
+        VBox historyCard = card("最近启动记录", historyHead, historyBox, historyFoot);
         HBox.setHgrow(historyCard, Priority.ALWAYS);
 
         VBox instanceCard = card("当前实例", instanceValue, instanceSub);
@@ -297,6 +310,14 @@ public final class LaunchOverviewPane extends VBox {
         label.setTextOverrun(OverrunStyle.ELLIPSIS);
         label.setMaxWidth(Double.MAX_VALUE);
         return label;
+    }
+
+    /** 统计卡可点：点一下跳到启动记录页。 */
+    private static void makeCardClickable(VBox card, Runnable action) {
+        if (action == null) return;
+        card.setCursor(javafx.scene.Cursor.HAND);
+        card.setOnMouseClicked(e -> action.run());
+        com.example.demo.ui.shell.Motion.hoverCard(card);
     }
 
     private static VBox card(String title, Node... rows) {

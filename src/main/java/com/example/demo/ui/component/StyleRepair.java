@@ -29,8 +29,15 @@ public final class StyleRepair {
         if (root == null) {
             return 0;
         }
+        // 只修当前可见的节点：隐藏页面的节点不需要描边，也避免一次性"修 260 个"的假象
+        if (!root.isVisible()) {
+            return 0;
+        }
         int fixed = fixOne(root) ? 1 : 0;
         for (Node child : root.getChildrenUnmodifiable()) {
+            if (!child.isVisible()) {
+                continue;
+            }
             if (child instanceof Parent parent) {
                 fixed += fixRoundedBorders(parent);
             } else {
@@ -126,8 +133,15 @@ public final class StyleRepair {
         if (root == null) {
             return 0;
         }
+        // 与 fixRoundedBorders 保持一致：隐藏节点既不计入也不修
+        if (!root.isVisible()) {
+            return 0;
+        }
         int missing = needsFix(root) ? 1 : 0;
         for (Node child : root.getChildrenUnmodifiable()) {
+            if (!child.isVisible()) {
+                continue;
+            }
             if (child instanceof Parent parent) {
                 missing += countMissing(parent);
             } else {
