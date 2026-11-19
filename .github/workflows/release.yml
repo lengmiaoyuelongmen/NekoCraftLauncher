@@ -30,10 +30,14 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($version) -or $version -eq 'workflow_dispatch') {
             $version = "1.0.0"
           }
-          $path = "src/main/java/com/example/demo/AppVersion.java"
+          $path = "src/main/java/com/example/demo/core/app/AppVersion.java"
           $content = Get-Content $path -Raw
-          $content = $content -replace 'CURRENT = "[^"]+"', "CURRENT = `"$version`""
-          Set-Content -Path $path -Value $content -Encoding UTF8
+          $updated = $content -replace 'CURRENT = "[^"]+"', "CURRENT = `"$version`""
+          $expected = 'CURRENT = "' + $version + '"'
+          if ($updated -notmatch [regex]::Escape($expected)) {
+            throw "版本号写入失败：$path 里找不到 CURRENT 常量"
+          }
+          Set-Content -Path $path -Value $updated -Encoding UTF8
           "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Build app image and run tests
