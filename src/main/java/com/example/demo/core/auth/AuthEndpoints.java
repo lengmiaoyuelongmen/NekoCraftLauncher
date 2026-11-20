@@ -93,13 +93,48 @@ public final class AuthEndpoints {
                     }
                 }
             }
-            case XBOX_LIVE -> list.add(new AuthEndpoint(stage, "Xbox Live", XBOX_LIVE_URL, null, 0));
-            case XSTS -> list.add(new AuthEndpoint(stage, "XSTS", XSTS_URL, null, 0));
-            case MINECRAFT_LOGIN -> list.add(new AuthEndpoint(stage, "Minecraft 服务",
-                    MINECRAFT_LOGIN_URL, null, 0));
-            case PROFILE -> list.add(new AuthEndpoint(stage, "玩家档案", PROFILE_URL, null, 0));
+            case XBOX_LIVE -> list.addAll(stageUrls(stage, "Xbox Live", XBOX_LIVE_URL, "mc.auth.xboxLiveUrl"));
+            case XSTS -> list.addAll(stageUrls(stage, "XSTS", XSTS_URL, "mc.auth.xstsUrl"));
+            case MINECRAFT_LOGIN -> list.addAll(stageUrls(stage, "Minecraft 服务",
+                    MINECRAFT_LOGIN_URL, "mc.auth.minecraftLoginUrl"));
+            case PROFILE -> list.addAll(stageUrls(stage, "玩家档案", PROFILE_URL, "mc.auth.profileUrl"));
         }
         return list;
+    }
+
+    /**
+     * Xbox / XSTS / Minecraft / 档案这几步官方只有一个地址，但允许用系统属性追加自建镜像：
+     * <pre>
+     *   -Dmc.auth.xboxLiveUrl=https://mirror.example.net/user/authenticate
+     *   -Dmc.auth.xstsUrl=https://mirror.example.net/xsts/authorize
+     *   -Dmc.auth.minecraftLoginUrl=https://mirror.example.net/authentication/login_with_xbox
+     *   -Dmc.auth.profileUrl=https://mirror.example.net/minecraft/profile
+     * </pre>
+     *
+     * <p>顺序固定为「官方优先，镜像其次」：镜像挂了不影响正常用户，官方挂了镜像能顶上。
+     * 只接受 https 地址 —— 登录令牌不能走明文。
+     */
+    static List<AuthEndpoint> stageUrls(AuthStage stage, String label, String defaultUrl, String property) {
+        List<AuthEndpoint> list = new ArrayList<>();
+        list.add(new AuthEndpoint(stage, label, defaultUrl, null, 0));
+        int priority = 1;
+        for (String extra : splitProperty(property)) {
+            if (!extra.startsWith("https://") || extra.equals(defaultUrl)) {
+                continue;
+            }
+            list.add(new AuthEndpoint(stage, label + " / 镜像 " + hostOf(extra), extra, null, priority++));
+        }
+        return list;
+    }
+
+    /** 从一个完整 URL 里取主机名，日志与列表里比全地址好读。 */
+    static String hostOf(String url) {
+        int start = url.indexOf("://");
+        int from = start >= 0 ? start + 3 : 0;
+        int slash = url.indexOf('/', from);
+        String host = slash > 0 ? url.substring(from, slash) : url.substring(from);
+        int colon = host.indexOf(':');
+        return colon > 0 ? host.substring(0, colon) : host;
     }
 
     /** 只保留指定 client id 的线路（设备码与轮询必须成对，不能中途换 id）。 */

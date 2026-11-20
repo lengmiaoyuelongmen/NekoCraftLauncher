@@ -118,6 +118,10 @@ try {
     & powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "check-architecture.ps1")
     if ($LASTEXITCODE -ne 0) { throw "架构守卫失败" }
 
+    Write-Host "==> 2.5/3 界面文案基线（中文字面量只降不升）" -ForegroundColor Cyan
+    & powershell -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "i18n-report.ps1") -Check -Top 5
+    if ($LASTEXITCODE -ne 0) { throw "界面文案基线被突破：新文案请写成 I18n.t(key, 中文)" }
+
     if ($SkipSmoke) {
         Write-Host "==> 3/3 冒烟已跳过（-SkipSmoke）" -ForegroundColor DarkGray
         $summaryPath = Write-CiSummary -result "pass"

@@ -1,5 +1,7 @@
 package com.example.demo.ui.page;
 
+import com.example.demo.core.i18n.I18n;
+
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
@@ -145,7 +147,7 @@ public final class InstancesPanel extends HBox {
         VBox.setVgrow(scroll, Priority.ALWAYS);
         groupBox.setFillWidth(true);
 
-        ModuleHeader instancesHeader = new ModuleHeader("05 / INSTANCES", "实例选择",
+        ModuleHeader instancesHeader = new ModuleHeader("05 / INSTANCES", I18n.t("page.instances.title", "实例选择"),
                 "每个实例独立的 mods / config / saves", "layers", ModuleHeader.Badge.STACK, "版本隔离");
         main.getChildren().addAll(instancesHeader, header, emptyHint, scroll);
         getChildren().addAll(side, main);

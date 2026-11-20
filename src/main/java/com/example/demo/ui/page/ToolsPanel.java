@@ -1,5 +1,7 @@
 package com.example.demo.ui.page;
 
+import com.example.demo.core.i18n.I18n;
+
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -96,7 +98,7 @@ public final class ToolsPanel extends VBox {
         HBox.setHgrow(content, Priority.ALWAYS);
         VBox.setVgrow(content, Priority.ALWAYS);
 
-        ModuleHeader toolsHeader = new ModuleHeader("04 / TOOLBOX", "工具",
+        ModuleHeader toolsHeader = new ModuleHeader("04 / TOOLBOX", I18n.t("nav.tools", "工具"),
                 "环境 · 缓存 · 诊断", "sparkles", ModuleHeader.Badge.DIAMOND, "Windows · Java 21");
         VBox.setMargin(toolsHeader, new Insets(12, 22, 2, 22));
         VBox right = new VBox(toolsHeader, content);

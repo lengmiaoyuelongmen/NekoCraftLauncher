@@ -83,6 +83,22 @@ rem 追加微软 OAuth 主机别名
 set JAVA_TOOL_OPTIONS=-Dmc.auth.extraHosts=login.example-mirror.net
 ```
 
+Xbox / XSTS / Minecraft / 档案这四步官方只有一条地址，但同样可以用属性挂自建镜像
+（官方永远排第一，镜像在后；只接受 `https://`）：
+
+| 属性 | 默认地址 |
+|---|---|
+| `mc.auth.xboxLiveUrl` | `https://user.auth.xboxlive.com/user/authenticate` |
+| `mc.auth.xstsUrl` | `https://xsts.auth.xboxlive.com/xsts/authorize` |
+| `mc.auth.minecraftLoginUrl` | `https://api.minecraftservices.com/authentication/login_with_xbox` |
+| `mc.auth.profileUrl` | `https://api.minecraftservices.com/minecraft/profile` |
+
+```bat
+set JAVA_TOOL_OPTIONS=-Dmc.auth.xstsUrl=https://mirror.example.net/xsts/authorize
+```
+
+镜像进的是同一套健康表：探测不到就跳过，请求失败就换下一条 —— 和微软那三条别名用的是同一套逻辑。
+
 代码入口在 `core/auth/AuthEndpoints.java`：
 
 ```java

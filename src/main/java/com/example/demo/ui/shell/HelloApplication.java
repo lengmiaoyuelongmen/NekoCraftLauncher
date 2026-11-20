@@ -208,6 +208,8 @@ import com.example.demo.core.mod.ModpackExporter;
 import com.example.demo.core.mod.ModpackImport;
 import com.example.demo.core.mod.ServerPackExporter;
 import com.example.demo.core.plugin.PluginContext;
+import com.example.demo.core.plugin.PluginHook;
+import com.example.demo.core.plugin.PluginHooks;
 import com.example.demo.core.plugin.PluginManager;
 import com.example.demo.ui.component.AccountInfoCard;
 import com.example.demo.ui.component.BlockIcons;
@@ -515,7 +517,10 @@ public class HelloApplication extends Application {
 
   /** 启动后的后台工作：插件、日志接管、硬件/内存识别、版本列表与遥测。 */
   private void startBackgroundServices() {
-    CompletableFuture.runAsync(() -> PluginManager.load(this::logMessage));
+    CompletableFuture.runAsync(() -> {
+      PluginHooks.setErrorReporter((where, error) -> this.logMessage("⚠ " + where + ": " + error));
+      PluginManager.load(this::logMessage);
+    });
     Bootstrap.ensureGameDir(
         new File(this.config.getGameDir()),
         message -> Platform.runLater(() -> this.logArea.appendText(message + "\n")));
@@ -1112,14 +1117,14 @@ public class HelloApplication extends Application {
       this.stageRef.setTitle(
           "Neko Craft Launcher · "
               + switch (pageName) {
-                case "launch" -> "启动";
-                case "health" -> "体检";
-                case "download" -> "下载";
-                case "settings" -> "设置";
-                case "tools" -> "工具";
-                case "instances" -> "实例";
-                case "advisor" -> "顾问";
-                case "worlds" -> "世界";
+                case "launch" -> I18n.t("nav.launch", "启动");
+                case "health" -> I18n.t("page.health.title", "体检");
+                case "download" -> I18n.t("nav.download", "下载");
+                case "settings" -> I18n.t("nav.settings", "设置");
+                case "tools" -> I18n.t("nav.tools", "工具");
+                case "instances" -> I18n.t("page.instances.nav", "实例");
+                case "advisor" -> I18n.t("nav.advisor", "顾问");
+                case "worlds" -> I18n.t("page.worlds.title", "世界");
                 default -> pageName;
               });
     }
@@ -1207,6 +1212,7 @@ public class HelloApplication extends Application {
                     + " "
                     + (System.nanoTime() - transitionStart) / 1_000_000L
                     + "ms"));
+    PluginHooks.fire(PluginHook.PAGE_SWITCH, pageName);
     this.applyLaunchBackground();
     if ("launch".equals(pageName)) {
       this.applyAiMode();
@@ -5903,6 +5909,7 @@ private static void setFlexible(Node node, boolean on) {
   }
 
   private void startGame(VersionProfile profile) {
+    PluginHooks.fire(PluginHook.LAUNCH_START, this.config.getLastInstance());
     // 准备阶段是异步的，落地前再确认一次，避免并发准备出两个进程
     if (this.isGameProcessAlive()) {
       this.logLine("⚠ 已有游戏在运行，本次启动已取消");
@@ -6026,6 +6033,7 @@ private static void setFlexible(Node node, boolean on) {
 
   /** 游戏进程退出后的收尾：重启界面状态、记录时长与启动历史、崩溃诊断。 */
   private void handleGameExit(Process exited, File gameDir) {
+    PluginHooks.fire(PluginHook.LAUNCH_FINISH, this.config.getLastInstance());
                   boolean forcedStop = this.launchState.isStopRequested();
                   this.launchState.clearStop();
                   this.launchState.finish();

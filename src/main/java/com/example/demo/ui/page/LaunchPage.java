@@ -1,5 +1,7 @@
 package com.example.demo.ui.page;
 
+import com.example.demo.core.i18n.I18n;
+
 import com.example.demo.ui.shell.ModuleHeader;
 import com.example.demo.ui.shell.Motion;
 import javafx.beans.binding.Bindings;
@@ -52,7 +54,7 @@ public final class LaunchPage {
 
         ModuleHeader header = new ModuleHeader(
                 "01 / NEKO",
-                "启动",
+                I18n.t("nav.launch", "启动"),
                 "猫娘助手 · 今天也要一起冒险",
                 "cat",
                 ModuleHeader.Badge.CIRCLE,

@@ -7,8 +7,8 @@
 - 插件是普通 jar，放在 `plugins/`（程序目录或数据目录，二者都会扫）；
 - 通过 `ServiceLoader` 发现 `com.example.demo.core.plugin.NekoPlugin` 实现；
 - 加载失败只会在日志里记一行，不影响启动器本身；
-- 插件能做的事目前只有两件：写日志、往命令面板（`Ctrl+K`）加一条命令。
-  界面、启动流程不开放 —— 先保证插件不会把主流程改坏。
+- 插件能做四件事：写日志、往命令面板（`Ctrl+K`）加命令、订阅宿主事件、读写自己的配置文件。
+  界面与启动流程不开放 —— 先保证插件不会把主流程改坏。
 
 ```java
 public interface NekoPlugin {
@@ -18,7 +18,27 @@ public interface NekoPlugin {
 }
 ```
 
-`PluginContext` 提供 `log(String)`、`dataDir()`、`addCommand(title, hint, action)`。
+`PluginContext` 提供 `log()`、`dataDir()`、`addCommand(title, hint, action)`、`on(hook, listener)`、`config()`。
+
+### 事件钩子
+
+| 钩子 | 何时触发 | payload |
+|---|---|---|
+| `LAUNCH_START` | 游戏进程即将启动 | 实例 id |
+| `LAUNCH_FINISH` | 游戏进程已退出 | 实例 id |
+| `PAGE_SWITCH` | 页面过渡动画完成 | 页面 key（`launch` / `download` …） |
+
+钩子是「只通知、不干预」：回调抛异常会被吞掉并记一行 `⚠ 插件 X 在钩子上出错`，
+其它插件与主流程照常。回调在宿主线程同步执行，别在里面写盘或联网。
+
+### 配置
+
+```java
+PluginConfig config = context.config();   // <数据目录>/plugins/<插件名>.properties
+int launches = config.getInt("launches", 0);
+config.putInt("launches", launches + 1);
+boolean saved = config.save();            // 返回 false 表示磁盘只读/被占用
+```
 
 ## 2. 示例插件
 
@@ -35,11 +55,12 @@ public interface NekoPlugin {
 
 | 位置 | 现象 |
 |---|---|
-| 启动日志 | `🔌 已加载插件: Hello 插件`、`Hello 插件已加载，宿主版本 2.10.0，数据目录 …` |
-| 命令面板 `Ctrl+K` | 第一条就是 `插件示例：打个招呼 / Hello 插件 · 演示第三方扩展点` |
-| 执行该命令 | 日志出现 `你好，我是插件 example.hello，宿主是 Neko Craft Launcher 2.10.0` |
+| 启动日志 | `🔌 已加载插件: Hello 插件（命令 2 条）`、`[插件] Hello 插件已加载，宿主 2.11.0，累计启动 0 次，配置 …\plugins\Hello_插件.properties` |
+| 命令面板 `Ctrl+K` | `插件示例：打个招呼`、`插件示例：启动计数` |
+| 切换页面 | `[插件] 切到页面：download`（`PAGE_SWITCH` 钩子） |
+| 启动一次游戏 | `[插件] 实例 1.12.2 开始启动（第 1 次）`，计数写进插件自己的 properties |
 
-![命令面板里的插件命令](images/preview/17-plugin-palette.png)
+![插件钩子实机日志](images/preview/19-plugin-hooks.png)
 
 ## 3. 写自己的插件
 

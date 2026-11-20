@@ -388,7 +388,7 @@ public final class SettingsPanel extends VBox {
         bottom.setStyle("-fx-background-color: -app-nav;"
                 + " -fx-border-color: -app-border-5 transparent transparent transparent;");
 
-        ModuleHeader settingsHeader = new ModuleHeader("03 / PREFERENCES", "设置",
+        ModuleHeader settingsHeader = new ModuleHeader("03 / PREFERENCES", I18n.t("nav.settings", "设置"),
                 "启动参数 · Java · 外观", "gear", ModuleHeader.Badge.HEX, "本地配置");
         VBox.setMargin(settingsHeader, new Insets(12, 22, 2, 22));
         VBox right = new VBox(settingsHeader, content, bottom);

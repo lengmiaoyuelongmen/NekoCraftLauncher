@@ -1,5 +1,7 @@
 package com.example.demo.ui.component;
 
+import com.example.demo.core.i18n.I18n;
+
 import java.io.File;
 import java.util.List;
 import java.util.Locale;
@@ -32,7 +34,7 @@ public final class LaunchAdvisorBar extends HBox {
         this.config = config;
 
         StackPane icon = Icons.node("sparkles", 14.0, "#9ca3af");
-        Label title = new Label("启动顾问");
+        Label title = new Label(I18n.t("page.advisor.title", "启动顾问"));
         title.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 11px; -fx-font-weight: bold;");
         tip.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 10.5px;");
         tip.setWrapText(false);

@@ -1,5 +1,7 @@
 package com.example.demo.ui.page;
 
+import com.example.demo.core.i18n.I18n;
+
 import com.example.demo.ui.component.DownloadNavItem;
 import com.example.demo.ui.shell.ModuleHeader;
 import com.example.demo.ui.shell.Motion;
@@ -132,7 +134,7 @@ public final class DownloadPage {
 
         Region header = new ModuleHeader(
                 "02 / LIBRARY",
-                "下载中心",
+                I18n.t("page.download.title", "下载中心"),
                 "Minecraft · 模组 · 整合包 · 资源",
                 "download",
                 ModuleHeader.Badge.SQUARE,

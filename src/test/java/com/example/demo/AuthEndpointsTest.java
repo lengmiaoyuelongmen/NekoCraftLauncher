@@ -96,6 +96,55 @@ class AuthEndpointsTest {
                 "旧版微软账号 client id 已被 /consumers 拒绝（AADSTS700016）");
     }
 
+    @Test
+    void xboxStagesAcceptHttpsMirrorsAfterTheOfficialEndpoint() {
+        String previous = System.getProperty("mc.auth.xstsUrl");
+        try {
+            System.setProperty("mc.auth.xstsUrl",
+                    "https://mirror.example.net/xsts/authorize,"
+                            + "http://plaintext.example.net/xsts,"
+                            + AuthEndpoints.XSTS_URL);
+
+            List<AuthEndpoint> endpoints = AuthEndpoints.candidates(AuthStage.XSTS);
+
+            assertEquals(2, endpoints.size(), "官方 + 1 个 https 镜像；http 与重复官方地址被丢掉");
+            assertEquals(AuthEndpoints.XSTS_URL, endpoints.get(0).url(), "官方地址永远排第一");
+            assertTrue(endpoints.get(1).url().startsWith("https://mirror.example.net/"));
+            assertTrue(endpoints.get(1).label().contains("mirror.example.net"));
+        } finally {
+            restore("mc.auth.xstsUrl", previous);
+        }
+    }
+
+    @Test
+    void eachXboxStageHasItsOwnOverrideProperty() {
+        String[] properties = {"mc.auth.xboxLiveUrl", "mc.auth.xstsUrl",
+                "mc.auth.minecraftLoginUrl", "mc.auth.profileUrl"};
+        AuthStage[] stages = {AuthStage.XBOX_LIVE, AuthStage.XSTS,
+                AuthStage.MINECRAFT_LOGIN, AuthStage.PROFILE};
+        String[] previous = new String[properties.length];
+        try {
+            for (int i = 0; i < properties.length; i++) {
+                previous[i] = System.getProperty(properties[i]);
+                System.setProperty(properties[i], "https://mirror" + i + ".example.net/api");
+                List<AuthEndpoint> endpoints = AuthEndpoints.candidates(stages[i]);
+                assertEquals(2, endpoints.size(), properties[i] + " 应能追加一条镜像");
+            }
+        } finally {
+            for (int i = 0; i < properties.length; i++) {
+                restore(properties[i], previous[i]);
+            }
+        }
+    }
+
+    @Test
+    void withoutOverridesEachXboxStageStaysSingle() {
+        for (AuthStage stage : new AuthStage[]{AuthStage.XBOX_LIVE, AuthStage.XSTS,
+                AuthStage.MINECRAFT_LOGIN, AuthStage.PROFILE}) {
+            assertEquals(1, AuthEndpoints.candidates(stage).size(), stage.name());
+        }
+    }
+
     private static void restore(String key, String value) {
         if (value == null) {
             System.clearProperty(key);

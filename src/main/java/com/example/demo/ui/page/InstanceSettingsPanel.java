@@ -1,5 +1,7 @@
 package com.example.demo.ui.page;
 
+import com.example.demo.core.i18n.I18n;
+
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
@@ -140,7 +142,7 @@ public final class InstanceSettingsPanel extends HBox {
         content.setStyle("-fx-background-color: transparent;");
         HBox.setHgrow(content, Priority.ALWAYS);
 
-        instanceHeader = new ModuleHeader("06 / INSTANCE", "实例设置",
+        instanceHeader = new ModuleHeader("06 / INSTANCE", I18n.t("page.instanceSettings.title", "实例设置"),
                 "版本 · 加载器 · 资源", "layers", ModuleHeader.Badge.STACK,
                 instanceId == null ? "" : instanceId);
         HBox headerWrap = new HBox(instanceHeader);
