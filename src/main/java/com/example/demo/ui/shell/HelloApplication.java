@@ -358,6 +358,7 @@ public class HelloApplication extends Application {
   private Label geekTelemetry;
   private final long appStartedAt = System.currentTimeMillis();
   private AmbientBackground ambientBackground;
+  private MouseSheen mouseSheen;
   private String gameInstanceId;
   private ComboBox<String> loginTypeComboRef;
   private ComboBox<String> serverFieldRef;
@@ -640,6 +641,7 @@ public class HelloApplication extends Application {
     ambient.heightProperty().bind(this.contentStack.heightProperty());
     this.contentStack.getChildren().add(ambient);
     this.contentStack.getChildren().addAll(this.launchPanel, this.downloadPanel);
+
     this.rootPane = new VBox(topBar, this.contentStack);
     VBox root = this.rootPane;
     VBox.setVgrow(this.contentStack, Priority.ALWAYS);
@@ -697,6 +699,11 @@ public class HelloApplication extends Application {
           if (this.dropPulse != null) {
             this.dropPulse.stop();
             this.dropPulse = null;
+          }
+          // 复位呼吸动画留下的缩放，否则下次拖入会从上一帧的 1.012 开始
+          if (this.dropBox != null) {
+            this.dropBox.setScaleX(1.0);
+            this.dropBox.setScaleY(1.0);
           }
           this.dropOverlay.setVisible(false);
         }
@@ -929,7 +936,18 @@ public class HelloApplication extends Application {
     this.dialogLayer.setVisible(true);
     // 弹窗层直接叠在原根节点上：外面再包一层 StackPane 会破坏窗口圆角与描边
     rootWrap.getChildren().add(this.dialogLayer);
+    // 跟随鼠标的柔光层：放在页面之上、弹窗之下。页面背景是不透明的，把光晕放进 contentStack
+    // 会被页面整块盖住（实测鼠标移动前后像素差异为 0），所以只能叠在外层 StackPane 里。
+    this.mouseSheen = new MouseSheen();
+    this.mouseSheen.setManaged(false);
+    this.mouseSheen.setMouseTransparent(true);
+    this.mouseSheen.widthProperty().bind(rootWrap.widthProperty());
+    this.mouseSheen.heightProperty().bind(rootWrap.heightProperty());
+    rootWrap.getChildren().add(Math.max(0, rootWrap.getChildren().indexOf(this.dialogLayer)), this.mouseSheen);
     Scene scene = this.createScene(rootWrap, stage);
+    if (this.mouseSheen != null) {
+      this.mouseSheen.bindTo(scene);
+    }
     // 自动化自检：启动后自动开一个弹窗再关掉，让「弹窗描边」也进日志
     if (System.getProperty("mc.uiSelfCheck") != null) {
       Platform.runLater(

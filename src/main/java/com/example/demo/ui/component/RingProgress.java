@@ -1,6 +1,7 @@
 package com.example.demo.ui.component;
 
 import com.example.demo.ui.shell.Motion;
+import com.example.demo.ui.shell.Theme;
 
 import javafx.animation.Interpolator;
 import javafx.animation.KeyFrame;
@@ -34,8 +35,14 @@ public final class RingProgress extends StackPane {
     private static final double STROKE = 8.0;
 
     private final Canvas canvas = new Canvas(SIZE, SIZE);
-    private final Color track = Color.web("#14b8a6", 0.14);
-    private final Color accent = Color.web("#5eead4");
+    // 深浅主题两套色：浅色主题下原来的淡青几乎看不见
+    private Color track() {
+        return Theme.isLight() ? Color.web("#0d9488", 0.18) : Color.web("#5eead4", 0.16);
+    }
+
+    private Color accent() {
+        return Theme.isLight() ? Color.web("#0d9488") : Color.web("#5eead4");
+    }
     private double target = 0;
     private double shown = 0;
     private Timeline animation;
@@ -89,13 +96,13 @@ public final class RingProgress extends StackPane {
         double arcSize = SIZE - pad * 2;
         g.setLineWidth(STROKE);
         g.setLineCap(javafx.scene.shape.StrokeLineCap.ROUND);
-        g.setStroke(track);
+        g.setStroke(track());
         g.strokeArc(pad, pad, arcSize, arcSize, 90, -360, javafx.scene.shape.ArcType.OPEN);
         if (shown > 0.001) {
-            g.setStroke(accent);
+            g.setStroke(accent());
             g.strokeArc(pad, pad, arcSize, arcSize, 90, -360 * shown, javafx.scene.shape.ArcType.OPEN);
         }
-        g.setFill(Color.web("#e5fbf6"));
+        g.setFill(Theme.isLight() ? Color.web("#0f766e") : Color.web("#e5fbf6"));
         g.setFont(Font.font("Microsoft YaHei", FontWeight.BOLD, 17));
         g.setTextAlign(TextAlignment.CENTER);
         g.fillText(Math.round(shown * 100) + "%", SIZE / 2, SIZE / 2 + 6);

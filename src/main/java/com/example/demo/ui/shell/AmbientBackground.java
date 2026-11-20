@@ -16,10 +16,15 @@ import javafx.scene.paint.Stop;
  */
 public final class AmbientBackground extends Canvas {
 
-    private static final long FRAME_INTERVAL_NANOS = 500_000_000L; // 约 2fps，足够表现缓动
+    private static final long FRAME_INTERVAL_NANOS = 500_000_000L; // 静止时约 2fps，足够表现缓动
+    private static final long ACTIVE_FRAME_INTERVAL_NANOS = 50_000_000L; // 鼠标在动时 20fps，视差才跟手
 
     private final AnimationTimer timer;
     private long lastFrame;
+    /** 视差：鼠标位置换算成 -1..1，再缓动到目标，光晕跟着轻微偏移。 */
+    private double parallaxX, parallaxY, targetParallaxX, targetParallaxY;
+    private long lastMouseMove;
+    private boolean mouseBound;
     private double time;
     private boolean wasAnimating = true;
 
@@ -41,7 +46,9 @@ public final class AmbientBackground extends Canvas {
                     lastFrame = 0;
                     return;
                 }
-                if (now - lastFrame < FRAME_INTERVAL_NANOS) return;
+                long interval = (now - lastMouseMove) < 900_000_000L
+                        ? ACTIVE_FRAME_INTERVAL_NANOS : FRAME_INTERVAL_NANOS;
+                if (now - lastFrame < interval) return;
                 lastFrame = now;
                 time += 0.500;
                 draw();
@@ -59,10 +66,30 @@ public final class AmbientBackground extends Canvas {
         timer.start();
     }
 
+    /** 首次拿到 Scene 时挂鼠标监听：把指针位置换算成 -1..1 的视差目标。 */
+    private void bindMouseOnce() {
+        if (mouseBound || getScene() == null) {
+            return;
+        }
+        mouseBound = true;
+        getScene().addEventFilter(javafx.scene.input.MouseEvent.MOUSE_MOVED, event -> {
+            double w = Math.max(1, getScene().getWidth());
+            double h = Math.max(1, getScene().getHeight());
+            targetParallaxX = (event.getX() / w - 0.5) * 2;
+            targetParallaxY = (event.getY() / h - 0.5) * 2;
+            lastMouseMove = System.nanoTime();
+        });
+    }
     private void draw() {
         double w = getWidth();
         double h = getHeight();
         if (w < 4 || h < 4) return;
+        bindMouseOnce();
+        // 缓动到目标位置：0.12 的系数让视差有一点「跟手但不过头」的阻尼
+        parallaxX += (targetParallaxX - parallaxX) * 0.12;
+        parallaxY += (targetParallaxY - parallaxY) * 0.12;
+        double shiftX = parallaxX * 18;
+        double shiftY = parallaxY * 12;
         GraphicsContext g = getGraphicsContext2D();
         if (!Motion.isEnabled()) {
             if (wasAnimating) {
@@ -77,14 +104,14 @@ public final class AmbientBackground extends Canvas {
         Color accent = Color.web(Theme.current().accent());
         ensureGradients(accent, light);
 
-        blob(g, w * (0.24 + Math.sin(time * 0.09) * 0.05),
-                h * (0.22 + Math.cos(time * 0.07) * 0.06),
+        blob(g, shiftX + w * (0.24 + Math.sin(time * 0.09) * 0.05),
+                shiftY + h * (0.22 + Math.cos(time * 0.07) * 0.06),
                 Math.max(w, h) * 0.62, blobGradients[0]);
-        blob(g, w * (0.78 + Math.cos(time * 0.06) * 0.05),
-                h * (0.72 + Math.sin(time * 0.08) * 0.07),
+        blob(g, shiftX * 0.7 + w * (0.78 + Math.cos(time * 0.06) * 0.05),
+                shiftY * 0.7 + h * (0.72 + Math.sin(time * 0.08) * 0.07),
                 Math.max(w, h) * 0.55, blobGradients[1]);
-        blob(g, w * (0.55 + Math.sin(time * 0.05) * 0.07),
-                h * (0.35 + Math.cos(time * 0.11) * 0.05),
+        blob(g, shiftX * 1.3 + w * (0.55 + Math.sin(time * 0.05) * 0.07),
+                shiftY * 1.3 + h * (0.35 + Math.cos(time * 0.11) * 0.05),
                 Math.max(w, h) * 0.36, blobGradients[2]);
     }
 
