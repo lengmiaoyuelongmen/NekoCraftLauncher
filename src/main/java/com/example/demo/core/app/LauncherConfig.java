@@ -87,6 +87,9 @@ public class LauncherConfig {
     /** 启动器窗口不透明度（0.7 ~ 1.0） */
     private double uiOpacity = 1.0;
 
+    /** 是否在启动器右上角显示性能叠加层（FPS / 堆 / 线程）。 */
+    private boolean showPerfOverlay = false;
+
     /** 跟随鼠标的柔光强度：0 = 关闭，1 = 默认，最大 1.5（再高会盖住内容）。 */
     private double sheenStrength = 0.8;
 
@@ -420,6 +423,14 @@ public class LauncherConfig {
 
     public void setSpeedLimitKb(int speedLimitKb) {
         this.speedLimitKb = speedLimitKb;
+    }
+
+    public boolean isShowPerfOverlay() {
+        return showPerfOverlay;
+    }
+
+    public void setShowPerfOverlay(boolean showPerfOverlay) {
+        this.showPerfOverlay = showPerfOverlay;
     }
 
     public double getSheenStrength() {

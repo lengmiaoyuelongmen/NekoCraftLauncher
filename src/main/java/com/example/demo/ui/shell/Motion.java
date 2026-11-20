@@ -330,10 +330,13 @@ public final class Motion {
             return;
         }
         node.getProperties().put("mc.ripple", Boolean.TRUE);
-        node.addEventHandler(MouseEvent.MOUSE_PRESSED, event -> playRipple(node, event.getX(), event.getY()));
+        // 用场景坐标：事件的 x/y 是相对「事件源」的，点中文字/图标时会落在子节点坐标系里，
+        // 换算到父容器就会跑到左上角（之前水波总出现在左上角就是这个原因）
+        node.addEventHandler(MouseEvent.MOUSE_PRESSED,
+                event -> playRipple(node, event.getSceneX(), event.getSceneY()));
     }
 
-    private static void playRipple(Node node, double x, double y) {
+    private static void playRipple(Node node, double sceneX, double sceneY) {
         if (!enabled) {
             return;
         }
@@ -342,8 +345,7 @@ public final class Motion {
             return;
         }
         // 把按钮内的落点换算到窗口坐标系，水波画在窗口最上层，任何控件（Button / HBox / 卡片）都能用
-        javafx.geometry.Point2D inScene = node.localToScene(x, y);
-        javafx.geometry.Point2D inRoot = root.sceneToLocal(inScene);
+        javafx.geometry.Point2D inRoot = root.sceneToLocal(sceneX, sceneY);
         double extent = 0;
         if (node instanceof javafx.scene.layout.Region region) {
             extent = Math.max(region.getWidth(), region.getHeight());

@@ -1,6 +1,7 @@
 package com.example.demo.ui.page;
 
 import com.example.demo.core.app.LauncherConfig;
+import com.example.demo.core.i18n.I18n;
 import com.example.demo.core.download.ModrinthSearch;
 import com.example.demo.core.download.SearchFetcher;
 import com.example.demo.core.download.SearchPages;
@@ -9,6 +10,7 @@ import com.example.demo.core.model.ModpackProject;
 import com.example.demo.ui.component.DownloadFilterBar;
 import com.example.demo.ui.component.DownloadResultView;
 import com.example.demo.ui.component.ModpackCell;
+import com.example.demo.ui.shell.Toast;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import javafx.animation.PauseTransition;
@@ -72,7 +74,7 @@ public final class CommunityBrowser {
     public CommunityBrowser(Host host, DownloadFilterBar filterBar) {
         this.host = host;
         this.filterBar = filterBar;
-        this.fetcher = new SearchFetcher(host.httpClient(), java.time.Duration.ofSeconds(8L));
+        this.fetcher = new SearchFetcher(host.httpClient(), java.time.Duration.ofSeconds(12L));
     }
 
     /** 构建面板（结果列表在这里创建，因为滚动到底要回调本类）。 */
@@ -212,18 +214,27 @@ public final class CommunityBrowser {
             String url = ModrinthSearch.buildUrl(query, pType, gameVer, loader, sort, offset);
             String mirror = ModrinthSearch.mirrorUrl(url, pType);
             fetcher.alternate(url, mirror, offset)
-                    .orTimeout(10L, TimeUnit.SECONDS)
+                    .orTimeout(15L, TimeUnit.SECONDS)
                     .thenAccept(body -> Platform.runLater(() -> onBody(body, pType, pageKey, offset, first)))
-                    .exceptionally(ex -> {
+                                        .exceptionally(ex -> {
                         Platform.runLater(() -> {
                             stopWatchdog();
                             pages.endLoad();
-                            resultView.status().showText("请求失败：" + ex.getMessage() + "（点击重试）");
-                            resultView.status().setRetry(() -> {
-                                pages.endLoad();
-                                resultView.status().showLoading("正在重新加载...");
-                                loadPage(true);
-                            });
+                            String reason = friendlyError(ex);
+                            if (!first) {
+                                // 翻页失败不动整块列表：只提示一句，滚到底还会再试
+                                Toast.warn(I18n.t("download.err.loadMore", "加载更多失败：") + reason
+                                        + I18n.t("download.err.retryHint", "，滚到底可重试"));
+                                resultView.status().hide();
+                            } else {
+                                resultView.status().showText(I18n.t("download.err.request", "请求失败：") + reason
+                                        + I18n.t("download.err.clickRetry", "（点击重试）"));
+                                resultView.status().setRetry(() -> {
+                                    pages.endLoad();
+                                    resultView.status().showLoading("正在重新加载...");
+                                    loadPage(true);
+                                });
+                            }
                             updateFooter();
                         });
                         return null;
@@ -232,6 +243,27 @@ public final class CommunityBrowser {
             pages.endLoad();
             resultView.status().showText("请求参数构建失败: " + e.getMessage());
         }
+    }
+
+    /** 把底层异常翻成人话：超时和"连不上"是最常见两种，其余保留原始信息。 */
+    private static String friendlyError(Throwable error) {
+        Throwable cause = error;
+        while (cause != null && cause.getCause() != null && cause != cause.getCause()) {
+            cause = cause.getCause();
+        }
+        String type = cause == null ? "" : cause.getClass().getSimpleName();
+        if (type.contains("Timeout")) {
+            return I18n.t("download.err.timeout", "资源站响应超时（已尝试镜像）");
+        }
+        if (cause instanceof java.net.UnknownHostException) {
+            return I18n.t("download.err.dns", "域名解析失败，检查网络或代理");
+        }
+        if (cause instanceof java.net.ConnectException) {
+            return I18n.t("download.err.refused", "连接被拒绝，可能被网络策略拦截");
+        }
+        String message = cause == null ? String.valueOf(error) : cause.getMessage();
+        return message == null || message.isBlank()
+                ? (cause == null ? I18n.t("download.err.unknown", "未知错误") : type) : message;
     }
 
     private void onBody(String body, String pType, String pageKey, int offset, boolean first) {

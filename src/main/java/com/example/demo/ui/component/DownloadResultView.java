@@ -30,6 +30,7 @@ public final class DownloadResultView extends VBox {
   private final PrewarmOverlay prewarm = new PrewarmOverlay();
   private final Label loadMoreHint = new Label();
   private final PauseTransition loadMoreDebounce = new PauseTransition(Duration.millis(260.0));
+  private javafx.animation.Timeline hookRetry;
   private final StackPane listPane;
 
   public DownloadResultView(
@@ -88,8 +89,10 @@ public final class DownloadResultView extends VBox {
 
   /** 给竖直滚动条挂监听：滚到底部附近时防抖请求下一页。 */
   private void hookScroll() {
-    Node node = list.lookup(".scroll-bar:vertical");
-    if (!(node instanceof ScrollBar scrollBar)) {
+    javafx.scene.control.ScrollBar scrollBar = findVerticalBar();
+    if (scrollBar == null) {
+      // 皮肤还没建好时 lookup 会是 null，之前只试一次就再也不挂了 —— 滚到底自然没反应
+      scheduleHookRetry();
       return;
     }
     if (scrollBar.getProperties().put("mc.hooked", Boolean.TRUE) != null) {
@@ -103,6 +106,36 @@ public final class DownloadResultView extends VBox {
                 loadMoreDebounce.playFromStart();
               }
             });
+    // 兜底：某些皮肤下滑块值可能停在 1.0 不再变化，用滚动事件再判一次
+    list.addEventFilter(
+        javafx.scene.input.ScrollEvent.SCROLL,
+        event -> {
+          javafx.scene.control.ScrollBar bar = findVerticalBar();
+          if (bar != null && bar.getValue() >= 0.999 && event.getDeltaY() < 0) {
+            loadMoreDebounce.playFromStart();
+          }
+        });
+  }
+
+  private javafx.scene.control.ScrollBar findVerticalBar() {
+    for (javafx.scene.Node node : list.lookupAll(".scroll-bar")) {
+      if (node instanceof javafx.scene.control.ScrollBar bar
+          && bar.getOrientation() == javafx.geometry.Orientation.VERTICAL
+          && bar.isVisible()) {
+        return bar;
+      }
+    }
+    return null;
+  }
+
+  private void scheduleHookRetry() {
+    if (hookRetry != null && hookRetry.getStatus() == javafx.animation.Animation.Status.RUNNING) {
+      return;
+    }
+    hookRetry = new javafx.animation.Timeline(
+        new javafx.animation.KeyFrame(javafx.util.Duration.millis(400), e -> hookScroll()));
+    hookRetry.setCycleCount(25);
+    hookRetry.play();
   }
 
   public ListView<ModpackProject> listView() {

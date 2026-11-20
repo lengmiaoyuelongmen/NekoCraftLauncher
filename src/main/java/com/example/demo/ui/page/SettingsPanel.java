@@ -117,6 +117,7 @@ public final class SettingsPanel extends VBox {
     private final ComboBox<String> animationSpeedCombo;
     private final Slider opacitySlider;
     private final Slider sheenSlider;
+    private final CheckBox perfOverlayBox;
     private final VBox javaListBox = new VBox(2);
     private final Map<String, JavaScanner.JavaInfo> javaByLabel = new LinkedHashMap<>();
     private String selectedJavaLabel;
@@ -347,6 +348,8 @@ public final class SettingsPanel extends VBox {
         sheenSlider = new Slider(0.0, 1.5, config.getSheenStrength());
         sheenSlider.setPrefWidth(220);
         sheenSlider.setBlockIncrement(0.1);
+        perfOverlayBox = new CheckBox(I18n.t("settings.perfOverlay", "显示性能信息（FPS / 内存 / 线程）"));
+        perfOverlayBox.setSelected(config.isShowPerfOverlay());
 
         selectedJavaLabel = null;
 
@@ -762,6 +765,7 @@ public final class SettingsPanel extends VBox {
                 labeled("不透明度", new HBox(10, opacitySlider, hint("窗口不透明度，保存后立即生效"))),
                 labeled(I18n.t("settings.sheen.label", "鼠标柔光"), new HBox(10, sheenSlider,
                         hint(I18n.t("settings.sheen.hint", "跟随指针的氛围光强度，0 = 关闭，保存后立即生效")))),
+                perfOverlayBox,
                 section("动画"),
                 labeled("动画效果", new HBox(10, animationsBox, animationSpeedCombo, hint("低配机器建议关掉动画"))),
                 hint("动画关闭后，页面切换 / 卡片入场 / 按钮反馈都会变成瞬时完成"));
@@ -1386,6 +1390,8 @@ public final class SettingsPanel extends VBox {
         config.setAnimationSpeed(speedValue(animationSpeedCombo.getValue()));
         config.setUiOpacity(Math.round(opacitySlider.getValue() * 100.0) / 100.0);
         config.setSheenStrength(Math.round(sheenSlider.getValue() * 100.0) / 100.0);
+        config.setShowPerfOverlay(perfOverlayBox.isSelected());
+        com.example.demo.ui.shell.PerfOverlay.setGlobalActive(config.isShowPerfOverlay());
         com.example.demo.ui.shell.MouseSheen.setGlobalStrength(config.getSheenStrength());
         Motion.configure(config.isAnimations(), config.getAnimationSpeed());
 

@@ -358,6 +358,7 @@ public class HelloApplication extends Application {
   private Label geekTelemetry;
   private final long appStartedAt = System.currentTimeMillis();
   private MouseSheen mouseSheen;
+  private PerfOverlay perfOverlay;
   private String gameInstanceId;
   private ComboBox<String> loginTypeComboRef;
   private ComboBox<String> serverFieldRef;
@@ -933,6 +934,13 @@ public class HelloApplication extends Application {
     rootWrap.getChildren().add(this.dialogLayer);
     // 跟随鼠标的柔光层：放在页面之上、弹窗之下。页面背景是不透明的，把光晕放进 contentStack
     // 会被页面整块盖住（实测鼠标移动前后像素差异为 0），所以只能叠在外层 StackPane 里。
+    // 性能叠加层：打包后的版本也能看 FPS / 堆 / 线程（设置里可开关）
+    this.perfOverlay = new PerfOverlay();
+    this.perfOverlay.setMaxSize(javafx.scene.layout.Region.USE_PREF_SIZE,
+        javafx.scene.layout.Region.USE_PREF_SIZE);
+    this.perfOverlay.setActive(this.config.isShowPerfOverlay());
+    rootWrap.getChildren().add(this.perfOverlay);
+    StackPane.setAlignment(this.perfOverlay, javafx.geometry.Pos.TOP_RIGHT);
     this.mouseSheen = new MouseSheen();
     this.mouseSheen.setManaged(false);
     this.mouseSheen.setMouseTransparent(true);
