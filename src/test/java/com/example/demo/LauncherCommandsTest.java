@@ -38,6 +38,15 @@ class LauncherCommandsTest {
     }
 
     @Test
+    void authLineCommandHasAliases() {
+        assertInstanceOf(LauncherCommands.AuthLines.class, LauncherCommands.parse("线路"));
+        assertInstanceOf(LauncherCommands.AuthLines.class, LauncherCommands.parse("line"));
+        assertInstanceOf(LauncherCommands.AuthLines.class, LauncherCommands.parse("auth"));
+        assertInstanceOf(LauncherCommands.AuthLines.class, LauncherCommands.parse("AUTHLINE"));
+        assertTrue(LauncherCommands.helpText().contains("线路"), "help 里要能看到这个命令");
+    }
+
+    @Test
     void memoryParsesAndValidatesRange() {
         assertEquals(4096, assertInstanceOf(LauncherCommands.Memory.class,
                 LauncherCommands.parse("memory 4096")).mb());

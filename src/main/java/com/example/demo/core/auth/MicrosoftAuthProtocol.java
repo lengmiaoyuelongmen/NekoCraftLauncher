@@ -17,8 +17,15 @@ import java.util.UUID;
  */
 public final class MicrosoftAuthProtocol {
 
-    /** 微软公开的 Minecraft Client ID。 */
-    public static final String CLIENT_ID = "00000000402b5328";
+    /**
+     * 默认公共 client id。
+     *
+     * <p>早期用的是微软账号旧版应用 {@code 00000000402b5328}，但它已经不被
+     * {@code /consumers/oauth2/v2.0} 接受（实测 AADSTS700016: Application not found），
+     * 现在默认改用开源启动器公开的公共 client id；可用
+     * {@code -Dmc.auth.extraClientIds=...} 追加备用。
+     */
+    public static final String CLIENT_ID = AuthEndpoints.DEFAULT_CLIENT_ID;
     public static final String SCOPE = "XboxLive.signin offline_access";
 
     /** 设备码响应。 */
@@ -35,30 +42,39 @@ public final class MicrosoftAuthProtocol {
 
     private static final Gson GSON = new Gson();
 
-    private static final String DEVICE_CODE_URL =
-            "https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode";
-    private static final String TOKEN_URL =
-            "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
-
     private MicrosoftAuthProtocol() {
     }
 
+    /** 首选设备码地址（真正的选路由 {@link ResilientAuthClient} 负责）。 */
     public static String deviceCodeUrl() {
-        return DEVICE_CODE_URL;
+        return AuthEndpoints.candidates(AuthStage.DEVICE_CODE).get(0).url();
     }
 
+    /** 首选令牌地址。 */
     public static String tokenUrl() {
-        return TOKEN_URL;
+        return AuthEndpoints.candidates(AuthStage.TOKEN).get(0).url();
+    }
+
+    /** 申请设备码的 form body（默认 client id）。 */
+    public static String deviceCodeBody() {
+        return deviceCodeBody(CLIENT_ID);
     }
 
     /** 申请设备码的 form body。 */
-    public static String deviceCodeBody() {
-        return "client_id=" + CLIENT_ID + "&scope=" + SCOPE.replace(" ", "%20");
+    public static String deviceCodeBody(String clientId) {
+        String id = clientId == null || clientId.isBlank() ? CLIENT_ID : clientId;
+        return "client_id=" + id + "&scope=" + SCOPE.replace(" ", "%20");
     }
 
-    /** 轮询令牌的 form body。 */
+    /** 轮询令牌的 form body（默认 client id）。 */
     public static String tokenBody(String deviceCode) {
-        return "client_id=" + CLIENT_ID
+        return tokenBody(CLIENT_ID, deviceCode);
+    }
+
+    /** 轮询令牌的 form body；client id 必须与申请设备码时一致。 */
+    public static String tokenBody(String clientId, String deviceCode) {
+        String id = clientId == null || clientId.isBlank() ? CLIENT_ID : clientId;
+        return "client_id=" + id
                 + "&device_code=" + deviceCode
                 + "&grant_type=urn:ietf:params:oauth:grant-type:device_code";
     }

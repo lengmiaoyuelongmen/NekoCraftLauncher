@@ -61,6 +61,10 @@ public final class LauncherCommands {
     public record Clear() implements Parsed {
     }
 
+    /** 体检微软登录线路（设备码 / 令牌 / Xbox / Minecraft）。 */
+    public record AuthLines() implements Parsed {
+    }
+
     public record Unknown(String name) implements Parsed {
     }
 
@@ -89,6 +93,7 @@ public final class LauncherCommands {
             case "import" -> new Import(arg);
             case "crash" -> new Crash();
             case "clear" -> new Clear();
+            case "线路", "line", "authline", "auth" -> new AuthLines();
             default -> new Unknown(command);
         };
     }
@@ -117,6 +122,7 @@ public final class LauncherCommands {
                 + "  open [子目录]        打开游戏目录 / 指定子目录\n"
                 + "  crash               诊断最近一次崩溃\n"
                 + "  import <文件>        导入 .zip / .mrpack 整合包\n"
+                + "  线路                体检微软登录线路（探测 + 延迟）\n"
                 + "  clear               清空日志\n"
                 + "  /<命令>             发送到游戏聊天（需游戏窗口，单人需开作弊）\n";
     }

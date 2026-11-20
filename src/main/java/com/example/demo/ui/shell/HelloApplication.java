@@ -181,7 +181,11 @@ import com.example.demo.core.runtime.PerformanceTuner;
 import com.example.demo.core.ai.LocalAiAssistant;
 import com.example.demo.core.app.AppPaths;
 import com.example.demo.core.auth.AccountStore;
+import com.example.demo.core.auth.AuthEndpoint;
+import com.example.demo.core.auth.AuthEndpoints;
 import com.example.demo.core.auth.AuthManager;
+import com.example.demo.core.auth.AuthStage;
+import com.example.demo.core.auth.ResilientAuthClient;
 import com.example.demo.core.auth.SessionState;
 import com.example.demo.core.auth.SessionStore;
 import com.example.demo.core.game.PortableExporter;
@@ -2193,10 +2197,50 @@ private static void setFlexible(Node node, boolean on) {
         }
       }
       case LauncherCommands.Crash ignored -> this.showCrashReport();
+      case LauncherCommands.AuthLines ignored -> this.logAuthLines();
       case LauncherCommands.Clear ignored -> this.logArea.clear();
       case LauncherCommands.Unknown unknown ->
           this.logArea.appendText("未知命令：" + unknown.name() + "（输入 help 查看）\n");
     }
+  }
+
+  /** 线路命令：体检微软登录的公开接口，打印每条线路的探测结果与延迟。 */
+  private void logAuthLines() {
+    this.logLine("🔎 正在检测微软登录线路（设备码 / 令牌 / Xbox / Minecraft）…");
+    Thread worker = new Thread(() -> {
+      try {
+        ResilientAuthClient client = ResilientAuthClient.defaults(this::logLine);
+        AuthStage[] stages = {AuthStage.DEVICE_CODE, AuthStage.TOKEN, AuthStage.XBOX_LIVE,
+            AuthStage.XSTS, AuthStage.MINECRAFT_LOGIN, AuthStage.PROFILE};
+        int alive = 0;
+        int total = 0;
+        for (AuthStage stage : stages) {
+          for (ResilientAuthClient.Probe probe : client.probe(AuthEndpoints.candidates(stage))) {
+            total++;
+            if (probe.healthy()) {
+              alive++;
+            }
+            this.logLine(String.format("  %-11s %-30s %s %4dms", stage.label(),
+                probe.endpoint().label(), probe.healthy() ? "✓" : "✗", probe.latencyMs()));
+          }
+        }
+        for (AuthStage stage : stages) {
+          for (AuthEndpoint endpoint : client.health().order(AuthEndpoints.candidates(stage))) {
+            if (client.health().latencyOf(endpoint) >= 0) {
+              this.logLine("  ↗ " + stage.label() + " 首选线路：" + endpoint.label()
+                  + "（" + client.health().latencyOf(endpoint) + "ms）");
+              break;
+            }
+          }
+        }
+        this.logLine("✅ 线路检测完成：" + alive + "/" + total + " 条可用；登录时优先走实测最快的那条，"
+            + "失败会自动切换");
+      } catch (Exception e) {
+        this.logLine("❌ 线路检测失败：" + e.getMessage());
+      }
+    }, "auth-lines");
+    worker.setDaemon(true);
+    worker.start();
   }
 
   /** versions 命令：列出已安装版本。 */
