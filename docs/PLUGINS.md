@@ -62,6 +62,10 @@ boolean saved = config.save();            // 返回 false 表示磁盘只读/被
 
 ![插件钩子实机日志](images/preview/19-plugin-hooks.png)
 
+## 2.1 插件页显示的插件数与命令数
+
+![工具 → 插件：已加载 1 个插件，2 条命令](images/preview/21-plugin-page.png)
+
 ## 3. 写自己的插件
 
 1. 新建一个 Java 项目，依赖启动器 jar（`compileOnly`）：
