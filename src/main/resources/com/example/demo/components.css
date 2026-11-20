@@ -18,11 +18,15 @@
 
 /* 设置页卡片：底色/描边/阴影统一走主题变量 */
 .settings-card {
-    -fx-background-color: linear-gradient(to bottom, -app-card-top, -app-card-alt2);
+    /* 玻璃卡片：半透明底 + 顶部一道高光 + 双层描边（内亮外暗） */
+    -fx-background-color: linear-gradient(to bottom, rgba(255,255,255,0.07), rgba(255,255,255,0) 16%),
+        linear-gradient(to bottom, -app-glass-top, -app-glass-bottom);
     -fx-background-radius: 16;
-    -fx-border-color: -app-border-soft;
+    -fx-border-color: -app-glass-border, -app-border-soft;
+    -fx-border-insets: 0, 0.5;
+    -fx-border-width: 1, 0.6;
     -fx-border-radius: 16;
-    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.16), 18, 0.10, 0, 6);
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.18), 20, 0.12, 0, 7);
 }
 
 .neko-card:hover {
@@ -35,11 +39,15 @@
 
 /* 通用卡片：页面里那些"一块内容"的容器统一走这里 */
 .neko-card {
-    -fx-background-color: linear-gradient(to bottom, -app-card-top, -app-card-alt2);
+    /* 玻璃卡片：半透明底 + 顶部一道高光 + 双层描边（内亮外暗） */
+    -fx-background-color: linear-gradient(to bottom, rgba(255,255,255,0.07), rgba(255,255,255,0) 16%),
+        linear-gradient(to bottom, -app-glass-top, -app-glass-bottom);
     -fx-background-radius: 16;
-    -fx-border-color: -app-border-soft;
+    -fx-border-color: -app-glass-border, -app-border-soft;
+    -fx-border-insets: 0, 0.5;
+    -fx-border-width: 1, 0.6;
     -fx-border-radius: 16;
-    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.16), 18, 0.10, 0, 6);
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.18), 20, 0.12, 0, 7);
 }
 
 .neko-card:hover {

@@ -22,6 +22,10 @@
     -app-card-alt: #f8fafc;
     -app-card-alt2: #f4f9ff;
     -app-card-top: #f8fafc;
+    /* 玻璃卡片：浅色下用高不透明度白，保留一点底色透出 */
+    -app-glass-top: rgba(255, 255, 255, 0.88);
+    -app-glass-bottom: rgba(246, 238, 240, 0.82);
+    -app-glass-border: rgba(15, 23, 42, 0.10);
     -app-card-top2: #f8fafc;
     -app-card-hover: #eef2f7;
     -app-row: #f8fafc;

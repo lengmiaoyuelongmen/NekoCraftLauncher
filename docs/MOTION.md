@@ -87,3 +87,16 @@
 - **强度可调**：设置 → 个性化 → 「鼠标柔光」滑杆 0–1.5，`0` 即关闭；保存后立即生效
   （`MouseSheen.setGlobalStrength`），并写入 `config.sheenStrength`；
 - **实测**：强度 0 → 位移差异 0（关闭）；0.8 → 6.13；1.5 → 11.13、峰值 88。
+
+## 9. 2.18.0：色相渐变、玻璃卡片、环分段
+
+| 项 | 做法 | 验证 |
+|---|---|---|
+| 柔光渐变 | 内圈用强调色，外圈用 `deriveColor(+38°)`，形成内亮外暖的径向渐变 | 截图 + 位移差异仍 > 6 |
+| 玻璃卡片 | `.neko-card` / `.settings-card` 改为半透明底 + 顶部 16% 高光 + 内亮外暗双层描边，阴影加深 | 深浅两套变量 `-app-glass-*` |
+| 环形分段 | `RingProgress.setSegments(n)` / `setStage(i)`：9 段刻度，已完成实色、进行中半亮、未开始暗色 | `RingSegments` 5 项单测；`-Dmc.ringDemo=1` 截图 |
+
+![9 段环形进度](images/preview/34-ring-segments.png)
+
+分段几何抽到 `core.app.RingSegments`（槽角、弧长、起始角、进度落段），纯函数、可单测；
+`-Dmc.ringDemo=1` 会在启动 2.4 秒后居中展示一个 45% / 第 5 阶段的环，用于回归与截图。

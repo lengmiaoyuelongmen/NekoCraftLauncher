@@ -111,10 +111,13 @@ public final class MouseSheen extends Canvas {
             gradientColor = accent;
             gradientLight = light;
             double alpha = (light ? 0.14 : 0.18) * strength;
+            // 单色径向光太平：按强调色做一次色相偏移（+38°）当外圈，形成内亮外暖的渐变
+            Color inner = accent;
+            Color outerHue = accent.deriveColor(38, 1.0, 1.12, 1.0);
             gradient = new RadialGradient(0, 0, 0.5, 0.5, 0.5, true, CycleMethod.NO_CYCLE,
-                    new Stop(0, Color.color(accent.getRed(), accent.getGreen(), accent.getBlue(), alpha)),
-                    new Stop(0.55, Color.color(accent.getRed(), accent.getGreen(), accent.getBlue(), alpha * 0.45)),
-                    new Stop(1, Color.color(accent.getRed(), accent.getGreen(), accent.getBlue(), 0)));
+                    new Stop(0, Color.color(inner.getRed(), inner.getGreen(), inner.getBlue(), alpha)),
+                    new Stop(0.55, Color.color(outerHue.getRed(), outerHue.getGreen(), outerHue.getBlue(), alpha * 0.5)),
+                    new Stop(1, Color.color(outerHue.getRed(), outerHue.getGreen(), outerHue.getBlue(), 0)));
         }
         double radius = Math.max(420, Math.min(getWidth(), getHeight()) * 0.72);
         g.setFill(gradient);

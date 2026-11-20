@@ -1,5 +1,6 @@
 package com.example.demo.ui.component;
 
+import com.example.demo.core.app.RingSegments;
 import com.example.demo.ui.shell.Motion;
 import com.example.demo.ui.shell.Theme;
 
@@ -43,6 +44,8 @@ public final class RingProgress extends StackPane {
     private Color accent() {
         return Theme.isLight() ? Color.web("#0d9488") : Color.web("#5eead4");
     }
+    private int segments = 0;
+    private int stage = -1;
     private double target = 0;
     private double shown = 0;
     private Timeline animation;
@@ -52,6 +55,18 @@ public final class RingProgress extends StackPane {
         setMinSize(SIZE, SIZE);
         setMaxSize(SIZE, SIZE);
         getChildren().add(canvas);
+        redraw();
+    }
+
+    /** 分段数（安装阶段数）；0 或 1 时退回整圈连续弧。 */
+    public void setSegments(int count) {
+        this.segments = Math.max(0, count);
+        redraw();
+    }
+
+    /** 当前阶段（0 基）：这一段画得更亮，用来指示「正在做第几步」。 */
+    public void setStage(int index) {
+        this.stage = index;
         redraw();
     }
 
@@ -94,17 +109,42 @@ public final class RingProgress extends StackPane {
         g.clearRect(0, 0, SIZE, SIZE);
         double pad = STROKE / 2 + 1;
         double arcSize = SIZE - pad * 2;
-        g.setLineWidth(STROKE);
         g.setLineCap(javafx.scene.shape.StrokeLineCap.ROUND);
-        g.setStroke(track());
-        g.strokeArc(pad, pad, arcSize, arcSize, 90, -360, javafx.scene.shape.ArcType.OPEN);
-        if (shown > 0.001) {
-            g.setStroke(accent());
-            g.strokeArc(pad, pad, arcSize, arcSize, 90, -360 * shown, javafx.scene.shape.ArcType.OPEN);
-        }
-        g.setFill(Theme.isLight() ? Color.web("#0f766e") : Color.web("#e5fbf6"));
-        g.setFont(Font.font("Microsoft YaHei", FontWeight.BOLD, 17));
         g.setTextAlign(TextAlignment.CENTER);
+        g.setFont(Font.font("Microsoft YaHei", FontWeight.BOLD, 17));
+
+        if (segments <= 1) {
+            g.setLineWidth(STROKE);
+            g.setStroke(track());
+            g.strokeArc(pad, pad, arcSize, arcSize, 90, -360, javafx.scene.shape.ArcType.OPEN);
+            if (shown > 0.001) {
+                g.setStroke(accent());
+                g.strokeArc(pad, pad, arcSize, arcSize, 90, -360 * shown, javafx.scene.shape.ArcType.OPEN);
+            }
+        } else {
+            // 分段：每段先画底，再按进度覆盖；当前阶段加粗提亮
+            double slot = RingSegments.slotDegrees(segments);
+            double sweep = RingSegments.sweepDegrees(segments, 5.0);
+            double filledUpTo = shown * segments;
+            for (int i = 0; i < segments; i++) {
+                double start = RingSegments.startAngle(segments, i, 5.0);
+                boolean done = i + 1 <= filledUpTo + 0.001;
+                boolean current = i == stage;
+                g.setLineWidth(current ? STROKE + 2.0 : STROKE);
+                g.setStroke(done ? accent() : track());
+                if (current && !done) {
+                    // 正在做的那段用半亮，和「已完成」「未开始」区分开
+                    g.setStroke(accent().deriveColor(0, 1.0, 1.0, 0.55));
+                }
+                g.strokeArc(pad, pad, arcSize, arcSize, start, -sweep, javafx.scene.shape.ArcType.OPEN);
+            }
+            // 段间空隙留白：靠 sweep 与 slot 的差额实现，不需要额外擦除
+            if (slot <= 0) {
+                g.setStroke(track());
+            }
+        }
+
+        g.setFill(Theme.isLight() ? Color.web("#0f766e") : Color.web("#e5fbf6"));
         g.fillText(Math.round(shown * 100) + "%", SIZE / 2, SIZE / 2 + 6);
     }
 }

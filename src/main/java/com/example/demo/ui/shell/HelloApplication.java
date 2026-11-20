@@ -959,6 +959,29 @@ public class HelloApplication extends Application {
             delay.play();
           });
     }
+    // 环形进度自检：-Dmc.ringDemo=1 时居中展示一个 9 段 / 45% / 第 5 阶段的环，方便截图目检
+    if (System.getProperty("mc.ringDemo") != null) {
+      Platform.runLater(
+          () -> {
+            PauseTransition show = new PauseTransition(Duration.millis(2400));
+            show.setOnFinished(
+                ev -> {
+                  com.example.demo.ui.component.RingProgress ring =
+                      new com.example.demo.ui.component.RingProgress();
+                  ring.setSegments(9);
+                  ring.setStage(4);
+                  ring.setProgress(0.45);
+                  javafx.scene.layout.StackPane card = new javafx.scene.layout.StackPane(ring);
+                  card.setStyle("-fx-background-color: rgba(16,12,13,0.96); -fx-background-radius: 20;"
+                      + " -fx-padding: 40; -fx-border-color: rgba(94,234,212,0.35); -fx-border-radius: 20;");
+                  javafx.scene.layout.StackPane veil = new javafx.scene.layout.StackPane(card);
+                  veil.setStyle("-fx-background-color: rgba(0,0,0,0.45);");
+                  this.dialogLayer.getChildren().add(veil);
+                });
+            show.play();
+          });
+    }
+
     // 动效自检：-Dmc.dropDemo=1 时自动展示拖拽提示层，方便截图与冒烟检查（正常启动不触发）
     if (System.getProperty("mc.dropDemo") != null) {
       Platform.runLater(

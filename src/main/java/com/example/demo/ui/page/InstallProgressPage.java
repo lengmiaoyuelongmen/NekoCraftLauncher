@@ -82,6 +82,8 @@ public final class InstallProgressPage {
             stepNames.add(step);
         }
 
+        // 环按阶段数分段：9 个步骤就是 9 段刻度
+        ring.setSegments(Math.max(1, stepNames.size()));
         statusLabel.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 11.5px;");
         statusLabel.setWrapText(true);
 
@@ -202,6 +204,7 @@ public final class InstallProgressPage {
         if (index < 0 || index >= stepIcons.size()) {
             return;
         }
+        ring.setStage(index);
         Label icon = stepIcons.get(index);
         Label text = stepTexts.get(index);
         String name = stepNames.get(index);
