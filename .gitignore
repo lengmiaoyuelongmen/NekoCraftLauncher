@@ -57,3 +57,7 @@ local-github/
 /engine/
 /icon-cache/
 *.tmp
+
+### 插件构建产物（示例插件源码在 plugins-samples/）
+/plugins/*.jar
+/plugins-samples/*/build/

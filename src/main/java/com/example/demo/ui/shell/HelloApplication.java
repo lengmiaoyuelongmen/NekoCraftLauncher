@@ -169,6 +169,7 @@ import com.example.demo.core.app.LauncherCommands;
 import com.example.demo.core.app.LauncherConfig;
 import com.example.demo.core.app.SingleInstance;
 import com.example.demo.core.auth.AuthlibInjectorManager;
+import com.example.demo.core.i18n.I18n;
 import com.example.demo.core.download.DownloadManager;
 import com.example.demo.core.download.IconProxy;
 import com.example.demo.core.download.Integrity;
@@ -826,6 +827,8 @@ public class HelloApplication extends Application {
     List<MinecraftVersion> cachedVersions;
     this.stageRef = stage;
     this.primaryStage = stage;
+    // 界面语言要在任何控件创建之前定下来：文案是构造时取好的快照
+    I18n.setLocale(this.config.getUiLanguage());
     File bootstrapGameDir = this.resolveGameDir();
     Bootstrap.ensureGameDir(bootstrapGameDir, null);
     if (!SingleInstance.acquire(bootstrapGameDir)) {

@@ -4,6 +4,7 @@ import javafx.animation.FadeTransition;
 import javafx.animation.Interpolator;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
+import javafx.animation.PauseTransition;
 import javafx.animation.Timeline;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -15,6 +16,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 
+import com.example.demo.core.app.SkeletonTiming;
 import com.example.demo.ui.shell.Icons;
 import com.example.demo.ui.shell.Theme;
 
@@ -32,6 +34,8 @@ public final class DownloadStatusPane extends StackPane {
   private final VBox skeletonBox = new VBox(10.0);
   private final Timeline breathe;
   private Runnable retry;
+  /** 骨架屏开始显示的时刻（毫秒），用于最短可见时间。 */
+  private long skeletonShownAt = System.currentTimeMillis();
 
   public DownloadStatusPane() {
     spinner.setMaxSize(60.0, 60.0);
@@ -89,6 +93,9 @@ public final class DownloadStatusPane extends StackPane {
   public void showLoading(String text) {
     box.getChildren().setAll(spinner, label);
     label.setText(text);
+    if (!skeletonBox.isVisible()) {
+      skeletonShownAt = System.currentTimeMillis();
+    }
     skeletonBox.setVisible(true);
     skeletonBox.setManaged(true);
     setVisible(true);
@@ -139,9 +146,33 @@ public final class DownloadStatusPane extends StackPane {
     retry = null;
   }
 
+  /**
+   * 收起骨架屏。
+   *
+   * <p>加载很快时（本地命中缓存常常 30–80ms）不立刻收，而是补足到
+   * {@link SkeletonTiming#MIN_VISIBLE_MS}，否则它就是一闪而过的白块，
+   * 既看不见也没法被截图验证。收起时把真实可见时长打进标准输出，冒烟脚本可断言。
+   */
   private void stopSkeleton() {
+    if (!skeletonBox.isVisible()) {
+      return;
+    }
+    final long shownAt = skeletonShownAt;
+    long delay = SkeletonTiming.hideDelayMs(shownAt, System.currentTimeMillis());
+    if (delay <= 0) {
+      hideSkeletonNow(shownAt);
+      return;
+    }
+    PauseTransition pause = new PauseTransition(Duration.millis(delay));
+    pause.setOnFinished(event -> hideSkeletonNow(shownAt));
+    pause.play();
+  }
+
+  private void hideSkeletonNow(long shownAt) {
     breathe.stop();
     skeletonBox.setVisible(false);
     skeletonBox.setManaged(false);
+    long visible = SkeletonTiming.visibleMs(shownAt, System.currentTimeMillis());
+    System.out.println(SkeletonTiming.report(visible));
   }
 }

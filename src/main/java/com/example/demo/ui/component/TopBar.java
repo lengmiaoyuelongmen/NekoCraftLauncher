@@ -1,5 +1,6 @@
 package com.example.demo.ui.component;
 
+import com.example.demo.core.i18n.I18n;
 import com.example.demo.ui.shell.Icons;
 import com.example.demo.ui.shell.Motion;
 
@@ -67,9 +68,9 @@ public final class TopBar {
     private final Map<String, Button> navButtons = new LinkedHashMap<>();
     private final Rectangle navIndicator = new Rectangle(0.0, 2.0);
     private final Circle statusDot = new Circle(4.0, Color.web("#6b7280"));
-    private final Label statusLabel = new Label("就绪");
-    private final Button stopGame = new Button("结束游戏");
-    private final Button cancelLaunch = new Button("取消启动");
+    private final Label statusLabel = new Label(I18n.t("status.ready", "就绪"));
+    private final Button stopGame = new Button(I18n.t("action.stopGame", "结束游戏"));
+    private final Button cancelLaunch = new Button(I18n.t("action.cancelLaunch", "取消启动"));
     private FadeTransition pulse;
 
     public TopBar(Host host) {
@@ -91,6 +92,8 @@ public final class TopBar {
         Label appTitle = new Label("Neko Craft Launcher");
         appTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
         appTitle.setTextFill(Color.web("#e8eaee"));
+        // 英文文案比中文长得多：允许按钮/标题按内容撑开，缺空间时由下面的紧凑模式让位
+        appTitle.setMinWidth(Region.USE_PREF_SIZE);
         Label badge = new Label("NEKO");
         badge.setStyle("-fx-font-size: 10.5px; -fx-font-weight: bold;");
         badge.setTextFill(Color.web("#5eead4"));
@@ -111,6 +114,7 @@ public final class TopBar {
         clockTimer.play();
 
         statusLabel.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 10px;");
+        statusLabel.setMinWidth(Region.USE_PREF_SIZE);
         HBox statusChip = new HBox(6.0, statusDot, statusLabel);
         statusChip.setAlignment(Pos.CENTER_LEFT);
         statusChip.setPadding(Insets.EMPTY);
@@ -125,6 +129,7 @@ public final class TopBar {
         dock.setStyle("-fx-background-color: rgba(255,255,255,0.05);"
                 + " -fx-background-radius: 12; -fx-border-color: rgba(255,255,255,0.08);"
                 + " -fx-border-radius: 12;");
+        dock.setMinWidth(Region.USE_PREF_SIZE);
         Motion.hoverScale(dock, 1.02);
 
         stopGame.setStyle("-fx-background-color: rgba(248,113,113,0.16); -fx-text-fill: #fecaca;"
@@ -170,13 +175,13 @@ public final class TopBar {
                 {"tools", "工具", "tools"}
         };
         for (String[] entry : entries) {
-            Button button = topButton(entry[1], entry[2]);
+            Button button = topButton(I18n.t("nav." + entry[0], entry[1]), entry[2]);
             button.setUserData(entry[2]);
             button.setOnAction(e -> host.switchPage(entry[0]));
             navButtons.put(entry[0], button);
             Motion.press(button);
             Motion.hoverScale(button, 1.05);
-            button.setTooltip(new javafx.scene.control.Tooltip(entry[1]));
+            button.setTooltip(new javafx.scene.control.Tooltip(I18n.t("nav." + entry[0], entry[1])));
             navBox.getChildren().add(button);
         }
 
@@ -292,7 +297,7 @@ public final class TopBar {
         stopGame.setManaged(running);
         statusDot.setFill(Color.web(running ? "#4CAF50" : "#6b7280"));
         statusDot.setOpacity(1.0);
-        statusLabel.setText(running ? "游戏运行中" : "就绪");
+        statusLabel.setText(running ? I18n.t("status.running", "游戏运行中") : I18n.t("status.ready", "就绪"));
         if (pulse != null) {
             pulse.stop();
             pulse = null;
@@ -315,10 +320,16 @@ public final class TopBar {
 
     private Button topButton(String text, String icon) {
         Button button = new Button(text);
-        button.setGraphic(Icons.node(icon, 14.0, "#c7ccd4"));
-        button.setContentDisplay(ContentDisplay.LEFT);
-        button.setGraphicTextGap(6.0);
-        button.getStyleClass().add("nav-btn");
+        // 英文标签更长：省掉图标、收紧内边距，否则在 1060px 窗口里会变成 "Downloa…"
+        if (I18n.isEnglish()) {
+            button.getStyleClass().add("nav-btn-compact");
+        } else {
+            button.setGraphic(Icons.node(icon, 14.0, "#c7ccd4"));
+            button.setContentDisplay(ContentDisplay.LEFT);
+            button.setGraphicTextGap(6.0);
+            button.getStyleClass().add("nav-btn");
+        }
+        button.setMinWidth(Region.USE_PREF_SIZE);
         return button;
     }
 

@@ -1,6 +1,7 @@
-param(
+﻿param(
     [string]$JavaHome = "C:\Program Files\Java\jdk-21.0.11",
-    [string]$AppVersion = "1.0.0"
+    [string]$AppVersion = "1.0.0",
+    [switch]$SkipBuild
 )
 
 $ErrorActionPreference = "Stop"
@@ -8,7 +9,7 @@ $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $root
 $env:JAVA_HOME = $JavaHome
 
-& .\mvnw.cmd -q clean package
+if (-not $SkipBuild) { & .\mvnw.cmd -q clean package }
 
 $stage = Join-Path $root "target\jpackage-input"
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }

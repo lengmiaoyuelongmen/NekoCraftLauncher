@@ -1,5 +1,7 @@
 package com.example.demo.ui.page;
 
+import com.example.demo.core.i18n.I18n;
+
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
@@ -267,9 +269,9 @@ public final class SettingsPanel extends VBox {
         updateMemoryBars();
 
         languageCombo = new ComboBox<>();
-        languageCombo.getItems().addAll("简体中文", "English（预览，未完成）");
+        languageCombo.getItems().addAll("简体中文", "English");
         languageCombo.setValue("en_US".equals(config.getUiLanguage())
-                ? "English（预览，未完成）" : "简体中文");
+                ? "English" : "简体中文");
         languageCombo.setMaxWidth(320);
         languageCombo.setStyle("-fx-padding: 4;");
 
@@ -856,9 +858,10 @@ public final class SettingsPanel extends VBox {
 
     private ScrollPane buildLanguageTab() {
         VBox card = card(
-                section("界面语言"),
-                labeled("语言", languageCombo),
-                hint("English 界面仍在开发中，切换后只有部分文本会变化，保存后重启生效。"));
+                section(I18n.t("settings.language.title", "界面语言")),
+                labeled(I18n.t("settings.language.label", "语言"), languageCombo),
+                hint(I18n.t("settings.language.hint",
+                        "切换后顶栏与通用按钮会跟随语言变化，页面正文仍在逐页翻译中；保存后重启生效。")));
         return scroll(card);
     }
 
@@ -1439,7 +1442,7 @@ public final class SettingsPanel extends VBox {
             autoMemoryRadio.setSelected(loaded.isAutoMemory());
             customMemoryRadio.setSelected(!loaded.isAutoMemory());
             languageCombo.setValue("en_US".equals(loaded.getUiLanguage())
-                    ? "English（预览，未完成）" : "简体中文");
+                    ? "English" : "简体中文");
             config.setWindowWidth(loaded.getWindowWidth());
             config.setWindowHeight(loaded.getWindowHeight());
             config.setJavaPath(loaded.getJavaPath());
