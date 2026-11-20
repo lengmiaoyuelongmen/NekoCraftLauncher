@@ -366,15 +366,15 @@ public final class SettingsPanel extends VBox {
 
         // ---------- 底部保存栏 ----------
         savedHint.setStyle("-fx-text-fill: #4CAF50; -fx-font-size: 12px;");
-        Button importConfig = smallButton("导入设置");
+        Button importConfig = smallButton(I18n.t("action.importSettings", "导入设置"));
         importConfig.setOnAction(e -> importConfig());
-        Button exportConfig = smallButton("导出设置");
+        Button exportConfig = smallButton(I18n.t("action.exportSettings", "导出设置"));
         exportConfig.setOnAction(e -> exportConfig());
-        Button history = smallButton("配置历史");
+        Button history = smallButton(I18n.t("action.configHistory", "配置历史"));
         history.setOnAction(e -> showConfigHistory());
-        Button reset = smallButton("恢复默认");
+        Button reset = smallButton(I18n.t("action.resetDefaults", "恢复默认"));
         reset.setOnAction(e -> resetDefaults());
-        Button save = new Button("保存");
+        Button save = new Button(I18n.t("action.save", "保存"));
         save.getStyleClass().add("btn-primary");
         save.setStyle("-fx-padding: 9 28;");
         Motion.press(save);

@@ -1,5 +1,7 @@
 package com.example.demo.ui.component;
 
+import com.example.demo.core.i18n.I18n;
+
 import com.example.demo.core.download.DownloadManager;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
@@ -37,7 +39,7 @@ public final class DownloadTasksDialog {
         current.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 12px;");
 
         Label last = new Label(lastDownloaded == null
-                ? "还没有已完成的下载。"
+                ? I18n.t("empty.downloadTasks", "还没有已完成的下载。")
                 : "最近完成：\n" + lastDownloaded.getAbsolutePath());
         last.setWrapText(true);
         last.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");

@@ -1245,7 +1245,7 @@ public final class InstanceSettingsPanel extends HBox {
         File servers = new File(instanceRoot, "servers.dat");
         Label info = new Label(servers.isFile()
                 ? "servers.dat 存在（" + (servers.length() / 1024) + " KB）：" + servers.getAbsolutePath()
-                : "还没有 servers.dat。进游戏 → 多人游戏 → 添加服务器后会生成。");
+                : I18n.t("empty.servers", "还没有 servers.dat。进游戏 → 多人游戏 → 添加服务器后会生成。"));
         info.setStyle("-fx-text-fill: -app-text-dim; -fx-font-size: 12px;");
         info.setWrapText(true);
 

@@ -320,7 +320,7 @@ public final class InstancesPanel extends HBox {
         groupBox.getChildren().clear();
         if (groups.isEmpty()) {
             emptyHint.setText(all.isEmpty()
-                    ? "还没有实例。去「下载」页装一个版本，或用 Forge/Fabric 安装一个加载器。"
+                    ? I18n.t("empty.instances", "还没有实例。去「下载」页装一个版本，或用 Forge/Fabric 安装一个加载器。")
                     : "没有匹配的实例。");
             return;
         }

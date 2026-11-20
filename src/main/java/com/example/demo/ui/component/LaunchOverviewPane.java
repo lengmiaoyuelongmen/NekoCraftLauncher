@@ -1,5 +1,7 @@
 package com.example.demo.ui.component;
 
+import com.example.demo.core.i18n.I18n;
+
 import java.io.File;
 import java.util.List;
 import java.util.function.Supplier;
@@ -243,7 +245,7 @@ public final class LaunchOverviewPane extends VBox {
 
         historyBox.getChildren().clear();
         if (entries.isEmpty()) {
-            Label empty = new Label("还没有启动记录，启动一次后会显示在这里");
+            Label empty = new Label(I18n.t("empty.launchHistory", "还没有启动记录，启动一次后会显示在这里"));
             empty.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
             historyBox.getChildren().add(empty);
         } else {

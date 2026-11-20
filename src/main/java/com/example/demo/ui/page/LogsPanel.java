@@ -1,5 +1,7 @@
 package com.example.demo.ui.page;
 
+import com.example.demo.core.i18n.I18n;
+
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
@@ -116,7 +118,7 @@ public final class LogsPanel extends VBox {
 
         if (shown.isEmpty()) {
             Label empty = new Label(files.isEmpty()
-                    ? "还没有日志。启动一次游戏后这里会出现 latest.log 等记录。"
+                    ? I18n.t("empty.logs", "还没有日志。启动一次游戏后这里会出现 latest.log 等记录。")
                     : "没有匹配「" + filterField.getText() + "」的日志。");
             empty.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 12px;");
             empty.setWrapText(true);

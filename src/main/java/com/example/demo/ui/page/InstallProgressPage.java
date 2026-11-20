@@ -1,5 +1,7 @@
 package com.example.demo.ui.page;
 
+import com.example.demo.core.i18n.I18n;
+
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
@@ -26,7 +28,7 @@ public final class InstallProgressPage {
     private final Label statusLabel = new Label("准备中…");
 
     private final ProgressBar downloadBar = new ProgressBar(0);
-    private final Label downloadInfo = new Label("暂无下载任务");
+    private final Label downloadInfo = new Label(I18n.t("empty.downloadInfo", "暂无下载任务"));
     private final ProgressBar installBar = new ProgressBar(0);
     private final Label installInfo = new Label("准备中…");
 
@@ -167,7 +169,7 @@ public final class InstallProgressPage {
 
     public void clearDownload() {
         downloadBar.setProgress(0);
-        downloadInfo.setText("暂无下载任务");
+        downloadInfo.setText(I18n.t("empty.downloadInfo", "暂无下载任务"));
     }
 
     // ==================== 安装进度 ====================

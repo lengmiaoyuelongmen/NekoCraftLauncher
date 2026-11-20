@@ -1,5 +1,7 @@
 package com.example.demo.ui.component;
 
+import com.example.demo.core.i18n.I18n;
+
 import com.example.demo.core.mod.ProjectFormat;
 import com.example.demo.core.model.Favorites;
 import com.example.demo.ui.shell.Icons;
@@ -74,7 +76,7 @@ public final class FavoritesRenderer {
 
         if (favs.isEmpty()) {
             Label empty = new Label(Favorites.list().isEmpty()
-                    ? "还没有收藏的资源。在下载页的卡片上点 ☆ 即可收藏。"
+                    ? I18n.t("empty.favorites", "还没有收藏的资源。在下载页的卡片上点 ☆ 即可收藏。")
                     : "没有匹配的收藏资源。");
             empty.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 12px;");
             empty.setWrapText(true);

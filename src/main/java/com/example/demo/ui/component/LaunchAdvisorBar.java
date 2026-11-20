@@ -64,7 +64,7 @@ public final class LaunchAdvisorBar extends HBox {
         File dir = new File(config.getGameDir());
         List<LaunchHistory.Entry> entries = LaunchHistory.recent(dir);
         if (entries.isEmpty()) {
-            tip.setText("还没有启动记录，启动一次后会生成稳定性画像");
+            tip.setText(I18n.t("empty.advisor", "还没有启动记录，启动一次后会生成稳定性画像"));
             metrics.setText("");
             return;
         }

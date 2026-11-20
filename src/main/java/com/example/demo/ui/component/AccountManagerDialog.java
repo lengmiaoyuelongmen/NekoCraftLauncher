@@ -1,5 +1,7 @@
 package com.example.demo.ui.component;
 
+import com.example.demo.core.i18n.I18n;
+
 import com.example.demo.core.auth.AccountStore;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -58,7 +60,7 @@ public final class AccountManagerDialog {
         list.getChildren().clear();
         List<AccountStore.Account> accounts = AccountStore.list();
         if (accounts.isEmpty()) {
-            Label empty = new Label("还没有保存的账户，登录后会自动保存。");
+            Label empty = new Label(I18n.t("empty.accounts", "还没有保存的账户，登录后会自动保存。"));
             empty.setStyle("-fx-text-fill: -app-text-muted;");
             list.getChildren().add(empty);
         }
