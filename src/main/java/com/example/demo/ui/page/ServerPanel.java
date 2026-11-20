@@ -3,6 +3,7 @@ package com.example.demo.ui.page;
 import com.example.demo.core.app.LauncherConfig;
 import com.example.demo.core.i18n.I18n;
 import com.example.demo.core.server.PortableServerManager;
+import com.example.demo.core.server.UpnpPortMapper;
 import com.example.demo.ui.shell.Motion;
 import com.example.demo.ui.shell.Toast;
 
@@ -42,6 +43,8 @@ public final class ServerPanel {
     private final Label publicLabel = new Label("检测中…");
     private final Label localLabel = new Label("—");
     private final Label natHint = new Label("");
+    private final Label upnpHint = new Label("");
+    private boolean mapped;
     private final Label statusLabel = new Label(I18n.t("server.status.idle", "当前没有运行中的服务端"));
     private final VBox listBox = new VBox(8);
     private final ProgressBar progress = new ProgressBar(0);
@@ -102,11 +105,18 @@ public final class ServerPanel {
         Button copyLocal = small(I18n.t("server.ip.copyLocal", "复制局域网地址"),
                 e -> copy(localLabel.getText()));
         Button firewall = small(I18n.t("server.firewall", "放行防火墙端口"), e -> allowFirewall());
+        Button upnp = small(I18n.t("server.upnp.map", "自动映射端口（UPnP）"), null);
+        upnp.setOnAction(e -> autoMap(upnp));
+        Button unmap = small(I18n.t("server.upnp.unmap", "取消映射"), e -> unmap());
+        upnpHint.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
+        upnpHint.setWrapText(true);
 
         VBox box = card(
                 section(I18n.t("server.addr.title", "连接地址")),
                 row(I18n.t("server.addr.public", "公网地址"), publicLabel, copyPublic, refreshIp),
                 row(I18n.t("server.addr.local", "局域网地址"), localLabel, copyLocal, firewall),
+                new HBox(10, upnp, unmap),
+                upnpHint,
                 natHint);
         return box;
     }
@@ -291,6 +301,42 @@ public final class ServerPanel {
         }
     }
 
+    /** UPnP 自动映射：成功后把公网地址换成网关读到的真实 IP。 */
+    private void autoMap(Button trigger) {
+        int port = currentPort;
+        trigger.setDisable(true);
+        upnpHint.setText(I18n.t("server.upnp.working", "正在通过 UPnP 向路由器申请端口映射…"));
+        CompletableFuture.supplyAsync(() -> UpnpPortMapper.map(port, "Neko Craft Launcher"))
+                .thenAccept(result -> Platform.runLater(() -> {
+                    trigger.setDisable(false);
+                    if (result.ok()) {
+                        mapped = true;
+                        upnpHint.setText(I18n.t("server.upnp.ok", "已自动映射 TCP ") + port
+                                + (result.externalIp().isEmpty() ? "" : " → " + result.externalIp() + ":" + port));
+                        if (!result.externalIp().isEmpty()) {
+                            publicLabel.setText(result.externalIp() + ":" + port);
+                        }
+                        Toast.ok(result.message());
+                    } else {
+                        upnpHint.setText(I18n.t("server.upnp.failed", "自动映射没成功：") + result.message());
+                        Toast.warn(result.message());
+                    }
+                }));
+    }
+
+    private void unmap() {
+        int port = currentPort;
+        CompletableFuture.supplyAsync(() -> UpnpPortMapper.unmap(port))
+                .thenAccept(result -> Platform.runLater(() -> {
+                    if (result.ok()) {
+                        mapped = false;
+                        upnpHint.setText(I18n.t("server.upnp.removed", "已删除端口映射"));
+                    } else {
+                        upnpHint.setText(result.message());
+                    }
+                    Toast.info(result.message());
+                }));
+    }
     private void allowFirewall() {
         int port = currentPort;
         CompletableFuture.runAsync(() -> {
