@@ -47,6 +47,13 @@ if ($hwnd -eq [IntPtr]::Zero) {
 }
 # 截图前把窗口提到前台，否则 CopyFromScreen 拍到的是压在上面的别的窗口。
 # Windows 会拦住后台进程抢前台，所以先用 ALT 解锁再 SetForegroundWindow（和 smoke 一致）
+# 先把其它窗口最小化：背景里有窗口时，「桌面参考色」会取到那个窗口的颜色，圆角会被误判成方角
+try {
+    (New-Object -ComObject Shell.Application).MinimizeAll()
+    Start-Sleep -Milliseconds 700
+} catch {
+    Write-Host "WARN: 无法最小化其它窗口，圆角判定可能受背景影响" -ForegroundColor DarkYellow
+}
 $focused = $false
 for ($try = 0; $try -lt 5; $try++) {
     [CornerWin]::ShowWindow($hwnd, 9) | Out-Null

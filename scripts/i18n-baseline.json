@@ -1,7 +1,7 @@
 ﻿{
     "generated":  "2026-11-20",
     "note":  "只降不升：新文案请写成 I18n.t(\"key\", \"中文\")，这个数字才会往下走",
-    "total":  2190,
+    "total":  2185,
     "files":  {
                   "HealthCheckView.java":  10,
                   "InAppDialog.java":  14,
@@ -47,7 +47,7 @@
                   "FirstRunPanel.java":  25,
                   "ConsoleToolbar.java":  8,
                   "FavoritesRenderer.java":  13,
-                  "ToolsPanel.java":  242,
+                  "ToolsPanel.java":  237,
                   "AvatarPane.java":  9,
                   "BootScreen.java":  10,
                   "CrashReportDialog.java":  9,

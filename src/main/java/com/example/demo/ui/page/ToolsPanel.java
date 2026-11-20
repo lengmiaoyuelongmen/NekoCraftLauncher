@@ -545,27 +545,44 @@ public final class ToolsPanel extends VBox {
         Label path = new Label(pluginDir.getAbsolutePath());
         path.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
         path.setWrapText(true);
-        Label status = new Label("插件通过 ServiceLoader 加载，命令会出现在 Ctrl+K 面板。");
+        Label status = new Label(pluginSummary());
         status.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
         status.setWrapText(true);
-        Button reload = smallButton("启用 / 重新加载插件", e -> {
+        Button reload = smallButton(I18n.t("tools.plugins.reload", "启用 / 重新加载插件"), e -> {
             ((Button) e.getSource()).setDisable(true);
-            status.setText("正在扫描插件…");
+            status.setText(I18n.t("tools.plugins.scanning", "正在扫描插件…"));
             CompletableFuture.supplyAsync(() -> PluginManager.load(log))
                     .thenAccept(commands -> Platform.runLater(() -> {
                         ((Button) e.getSource()).setDisable(false);
-                        status.setText("已加载 " + commands.size() + " 个插件命令。");
-                        Toast.ok("插件加载完成，共 " + commands.size() + " 个命令");
+                        status.setText(pluginSummary());
+                        Toast.ok(I18n.t("tools.plugins.loaded", "插件加载完成")
+                                + "：" + PluginManager.loadedPlugins() + " 个插件 / "
+                                + commands.size() + " 条命令");
                     }));
         });
-        Button open = smallButton("打开插件目录", e -> openDir(pluginDir));
+        Button open = smallButton(I18n.t("tools.plugins.openDir", "打开插件目录"), e -> openDir(pluginDir));
         VBox card = card(
-                section("第三方插件"),
+                section(I18n.t("tools.plugins.title", "第三方插件")),
                 path,
                 new HBox(10, reload, open),
                 status,
-                hint("把插件 jar 放入该目录，实现 com.example.demo.NekoPlugin 并注册 META-INF/services。"));
+                hint(I18n.t("tools.plugins.hint",
+                        "把插件 jar 放入该目录，实现 com.example.demo.core.plugin.NekoPlugin 并在 "
+                                + "META-INF/services 里注册。")));
         return scroll(card);
+    }
+
+    /** 插件页的概览行：插件数来自 PluginManager，命令数来自命令面板注册表。 */
+    private static String pluginSummary() {
+        int plugins = PluginManager.loadedPlugins();
+        int commands = PluginManager.commands().size();
+        if (plugins == 0) {
+            return I18n.t("tools.plugins.none",
+                    "还没有加载任何插件：把 jar 放进下面的目录后点「重新加载」。");
+        }
+        return I18n.t("tools.plugins.summary", "已加载")
+                + " " + plugins + I18n.t("tools.plugins.countSuffix", " 个插件")
+                + "，" + commands + I18n.t("tools.plugins.commandSuffix", " 条命令已进入 Ctrl+K 面板。");
     }
 
     private ScrollPane buildLaunchHistory() {
