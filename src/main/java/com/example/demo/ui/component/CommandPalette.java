@@ -166,6 +166,9 @@ public final class CommandPalette {
         });
 
         refresh.run();
+
+
+        Motion.staggerRows(rows, 22, 8);
         overlay.setOpacity(0.0);
         card.setScaleX(0.97);
         card.setScaleY(0.97);

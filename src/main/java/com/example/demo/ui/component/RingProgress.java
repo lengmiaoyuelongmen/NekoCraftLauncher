@@ -1,0 +1,103 @@
+package com.example.demo.ui.component;
+
+import com.example.demo.ui.shell.Motion;
+
+import javafx.animation.Interpolator;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.Timeline;
+import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.layout.StackPane;
+import javafx.scene.paint.Color;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
+import javafx.scene.text.TextAlignment;
+import javafx.util.Duration;
+
+/**
+ * 环形进度：安装页用它替掉一根只会变长的进度条。
+ *
+ * <p>两点设计取舍：
+ * <ul>
+ *   <li><b>平滑过渡</b>：外部频繁调用 {@link #setProgress(double)} 时不会一格一格跳，
+ *       内部用一个 160ms 的 Timeline 把弧线补到目标值；</li>
+ *   <li><b>阶段感</b>：环中间显示百分比，阶段文案换行时由调用方做交叉淡入，
+ *       让「正在装库 → 正在解包」这种切换看得出来。</li>
+ * </ul>
+ *
+ * <p>用 Canvas 直接画弧，避免 Arc + 多层 StackPane 带来的布局开销。
+ */
+public final class RingProgress extends StackPane {
+
+    private static final double SIZE = 92.0;
+    private static final double STROKE = 8.0;
+
+    private final Canvas canvas = new Canvas(SIZE, SIZE);
+    private final Color track = Color.web("#14b8a6", 0.14);
+    private final Color accent = Color.web("#5eead4");
+    private double target = 0;
+    private double shown = 0;
+    private Timeline animation;
+
+    public RingProgress() {
+        setPrefSize(SIZE, SIZE);
+        setMinSize(SIZE, SIZE);
+        setMaxSize(SIZE, SIZE);
+        getChildren().add(canvas);
+        redraw();
+    }
+
+    /** 设置进度（0..1），内部补间到目标值。 */
+    public void setProgress(double value) {
+        target = Math.max(0, Math.min(1, value));
+        if (!Motion.isEnabled()) {
+            shown = target;
+            redraw();
+            return;
+        }
+        if (animation != null) {
+            animation.stop();
+        }
+        animation = new Timeline(new KeyFrame(Duration.millis(180),
+                new KeyValue(progressProxy(), target, Interpolator.SPLINE(0.16, 1, 0.3, 1))));
+        animation.play();
+    }
+
+    /** 当前显示值（测试/断言用）。 */
+    public double progress() {
+        return shown;
+    }
+
+    private javafx.beans.property.DoubleProperty proxy;
+
+    private javafx.beans.property.DoubleProperty progressProxy() {
+        if (proxy == null) {
+            proxy = new javafx.beans.property.SimpleDoubleProperty(shown);
+            proxy.addListener((o, old, value) -> {
+                shown = value.doubleValue();
+                redraw();
+            });
+        }
+        return proxy;
+    }
+
+    private void redraw() {
+        GraphicsContext g = canvas.getGraphicsContext2D();
+        g.clearRect(0, 0, SIZE, SIZE);
+        double pad = STROKE / 2 + 1;
+        double arcSize = SIZE - pad * 2;
+        g.setLineWidth(STROKE);
+        g.setLineCap(javafx.scene.shape.StrokeLineCap.ROUND);
+        g.setStroke(track);
+        g.strokeArc(pad, pad, arcSize, arcSize, 90, -360, javafx.scene.shape.ArcType.OPEN);
+        if (shown > 0.001) {
+            g.setStroke(accent);
+            g.strokeArc(pad, pad, arcSize, arcSize, 90, -360 * shown, javafx.scene.shape.ArcType.OPEN);
+        }
+        g.setFill(Color.web("#e5fbf6"));
+        g.setFont(Font.font("Microsoft YaHei", FontWeight.BOLD, 17));
+        g.setTextAlign(TextAlignment.CENTER);
+        g.fillText(Math.round(shown * 100) + "%", SIZE / 2, SIZE / 2 + 6);
+    }
+}

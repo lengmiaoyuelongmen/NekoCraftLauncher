@@ -1241,9 +1241,12 @@ public class HelloApplication extends Application {
       child.setOpacity(0.0);
     }
     long transitionStart = System.nanoTime();
+    // 前进/后退方向感：新页面在导航顺序里更靠后就从右侧进，反之从左侧回
+    double slideFrom = this.currentPage != null
+        && pageOrder(pageName) < pageOrder(this.currentPage) ? -18 : 18;
     Motion.pageIn(
         target,
-        18,
+        slideFrom,
         () ->
             System.out.println(
                 "页面过渡完成: "
@@ -1261,6 +1264,22 @@ public class HelloApplication extends Application {
     }
   }
 
+
+  /** 页面在导航里的顺序，用来决定过渡方向（数值越小越靠左/前）。 */
+  private static int pageOrder(String page) {
+    if (page == null) return 0;
+    return switch (page) {
+      case "launch" -> 0;
+      case "download" -> 1;
+      case "instances" -> 2;
+      case "advisor" -> 3;
+      case "settings" -> 4;
+      case "tools" -> 5;
+      case "health" -> 6;
+      case "worlds" -> 7;
+      default -> 0;
+    };
+  }
   private void applyLaunchBackground() {
     String path = this.config.getBackgroundImage();
     File file = path == null || path.isBlank() ? null : new File(path);

@@ -1,6 +1,8 @@
 package com.example.demo.ui.page;
 
 import com.example.demo.core.i18n.I18n;
+import com.example.demo.ui.component.RingProgress;
+import com.example.demo.ui.shell.Motion;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -30,6 +32,7 @@ public final class InstallProgressPage {
     private final ProgressBar downloadBar = new ProgressBar(0);
     private final Label downloadInfo = new Label(I18n.t("empty.downloadInfo", "暂无下载任务"));
     private final ProgressBar installBar = new ProgressBar(0);
+    private final RingProgress ring = new RingProgress();
     private final Label installInfo = new Label("准备中…");
 
     private final List<Label> stepIcons = new ArrayList<>();
@@ -90,7 +93,10 @@ public final class InstallProgressPage {
         installInfo.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 11px;");
 
         VBox downloadBox = section("下载进度", downloadBar, downloadInfo);
-        VBox installBox = section("安装进度", installBar, installInfo);
+        VBox installText = section("安装进度", installBar, installInfo);
+        HBox installBox = new HBox(14, ring, installText);
+        installBox.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(installText, Priority.ALWAYS);
 
         root.setPadding(new Insets(6, 8, 6, 8));
         root.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
@@ -178,10 +184,13 @@ public final class InstallProgressPage {
         if (value < 0) {
             installBar.setProgress(ProgressBar.INDETERMINATE_PROGRESS);
         } else {
-            installBar.setProgress(Math.max(0, Math.min(1, value)));
+            double clamped = Math.max(0, Math.min(1, value));
+            installBar.setProgress(clamped);
+            ring.setProgress(clamped);
         }
-        if (text != null && !text.isBlank()) {
-            installInfo.setText(text);
+        if (text != null && !text.isBlank() && !text.equals(installInfo.getText())) {
+            // 阶段文案变化时做一次交叉淡入，让「正在装库 → 正在解包」这种切换看得出来
+            Motion.crossFade(installInfo, () -> installInfo.setText(text));
         }
     }
 

@@ -59,3 +59,13 @@
 
 设置 → 个性 → 动效开关（`config.animations=false`）。关闭后所有 `Motion.*` 直接返回，
 不注册监听器、不起 Timeline；切换页面立即完成并回调，不影响功能。
+
+## 6. 2.15.0 追加
+
+| 场景 | 实现 |
+|---|---|
+| 列表逐行入场 | `Motion.staggerRows(rows, 24, 12)`：只让第一屏 12 行参与，后面的立即出现（200 个模组不会排队 5 秒） |
+| 安装进度环 | `ui/component/RingProgress`：Canvas 画弧 + 中心百分比，180ms 补间；阶段文案切换走 `Motion.crossFade` |
+| 页面方向感 | `switchPage` 按 `pageOrder()` 判断前进/后退，前进从右进（+18px），后退从左回（-18px） |
+| 命令面板逐项浮现 | 打开时前 8 行按 22ms 错开进场 |
+| 头像/皮肤换图 | `Motion.crossFade(imageView, swap)`：先淡到 0.25 再换图淡回，不再「啪」一下换脸 |

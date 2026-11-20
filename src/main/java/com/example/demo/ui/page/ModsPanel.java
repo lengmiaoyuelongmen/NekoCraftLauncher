@@ -505,7 +505,8 @@ public final class ModsPanel extends VBox {
             }
         }
         if (!rows.isEmpty()) {
-            com.example.demo.ui.shell.Motion.stagger(rows);
+            // 只给第一屏的行做入场，避免 200 个模组排队等动画
+            com.example.demo.ui.shell.Motion.staggerRows(rows, 24, 12);
         }
     }
 

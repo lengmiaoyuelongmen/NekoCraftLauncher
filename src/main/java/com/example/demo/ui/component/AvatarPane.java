@@ -77,7 +77,7 @@ public final class AvatarPane extends StackPane {
                   config.setAvatarImage("");
                   config.setAvatarUseSkin(false);
                   config.save();
-                  imageView.setImage(null);
+                  com.example.demo.ui.shell.Motion.crossFade(imageView, () -> imageView.setImage(null));
                   Toast.ok("已恢复默认头像");
                 });
             menu.getItems().addAll(choose, toggle, reset);
@@ -121,8 +121,9 @@ public final class AvatarPane extends StackPane {
             } else if (board.hasUrl()) {
               skin = new Image(board.getUrl(), true);
             }
-            if (skin != null && !skin.isError()) {
-              imageView.setImage(skin);
+            final Image chosenSkin = skin;
+            if (chosenSkin != null && !chosenSkin.isError()) {
+              com.example.demo.ui.shell.Motion.crossFade(imageView, () -> imageView.setImage(chosenSkin));
               Toast.ok("皮肤已加载预览");
               if (log != null) {
                 log.accept("🧵 已载入皮肤预览");
@@ -143,7 +144,8 @@ public final class AvatarPane extends StackPane {
 
   /** 皮肤头像加载完成后设置图片。 */
   public void setImage(Image image) {
-    imageView.setImage(image);
+        // 换头像/皮肤时交叉淡入，避免「啪」一下换脸
+        com.example.demo.ui.shell.Motion.crossFade(imageView, () -> imageView.setImage(image));
   }
 
   private static void run(Runnable action) {

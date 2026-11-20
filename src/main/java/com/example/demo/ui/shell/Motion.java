@@ -423,6 +423,52 @@ public final class Motion {
         new ParallelTransition(fade, slide).play();
     }
 
+    /**
+     * 列表逐行入场：前 visibleLimit 行按 stepMs 错开淡入上浮，后面的直接显示。
+     *
+     * <p>为什么要限流：一次渲染 200 行模组时，逐行延迟会让最后一行等 5 秒才出现，
+     * 看上去像卡住。只让「第一屏看得见的行」参与动画，剩下的立即出现。
+     */
+    public static void staggerRows(List<? extends Node> rows, long stepMs, int visibleLimit) {
+        if (!enabled || rows == null) {
+            return;
+        }
+        int limit = Math.min(Math.max(0, visibleLimit), rows.size());
+        for (int i = 0; i < rows.size(); i++) {
+            Node row = rows.get(i);
+            if (Boolean.TRUE.equals(row.getProperties().get("mc.rowStaggered"))) {
+                continue;
+            }
+            row.getProperties().put("mc.rowStaggered", Boolean.TRUE);
+            if (i >= limit) {
+                continue;
+            }
+            if (row.getOpacity() == 1.0 && row.getTranslateY() == 0.0) {
+                reveal(row, i * stepMs);
+            } else {
+                reveal(row, 0);
+            }
+        }
+    }
+
+    /** 换图时做一次交叉淡入：先淡到 0，换图，再淡回 1。 */
+    public static void crossFade(Node node, Runnable swap) {
+        if (!enabled) {
+            if (swap != null) swap.run();
+            return;
+        }
+        FadeTransition out = new FadeTransition(scaled(Duration.millis(90)), node);
+        out.setToValue(0.25);
+        out.setInterpolator(IN_OUT);
+        out.setOnFinished(e -> {
+            if (swap != null) swap.run();
+            FadeTransition in = new FadeTransition(scaled(Duration.millis(180)), node);
+            in.setToValue(1);
+            in.setInterpolator(OUT);
+            in.play();
+        });
+        out.play();
+    }
     /** 拖拽提示层：呼吸式缩放 + 边框亮度，提示「这里可以松手」。 */
     public static javafx.animation.Timeline dropPulse(Node node) {
         if (!enabled) return null;
