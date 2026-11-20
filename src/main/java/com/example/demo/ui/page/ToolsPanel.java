@@ -76,23 +76,23 @@ public final class ToolsPanel extends VBox {
         side.setStyle("-fx-background-color: -app-nav;"
                 + " -fx-border-color: transparent -app-border-5 transparent transparent;");
         side.getChildren().addAll(
-                sectionLabel("启动器"),
-                tabItem("环境"),
-                tabItem("性能优化"),
-                tabItem("启动记录"),
-                tabItem("缓存"),
-                sectionLabel("其他"),
-                tabItem("快捷入口"),
-                tabItem("百宝箱"),
-                tabItem("插件"));
+                sectionLabel(I18n.t("tools.group.launcher", "启动器")),
+                tabItem("env"),
+                tabItem("perf"),
+                tabItem("history"),
+                tabItem("cache"),
+                sectionLabel(I18n.t("tools.group.other", "其他")),
+                tabItem("shortcuts"),
+                tabItem("toolbox"),
+                tabItem("plugins"));
 
-        pages.put("环境", buildEnvironment());
-        pages.put("性能优化", buildPerformance());
-        pages.put("启动记录", buildLaunchHistory());
-        pages.put("缓存", buildCache());
-        pages.put("快捷入口", buildShortcuts());
-        pages.put("百宝箱", buildToolbox());
-        pages.put("插件", buildPlugins());
+        pages.put("env", buildEnvironment());
+        pages.put("perf", buildPerformance());
+        pages.put("history", buildLaunchHistory());
+        pages.put("cache", buildCache());
+        pages.put("shortcuts", buildShortcuts());
+        pages.put("toolbox", buildToolbox());
+        pages.put("plugins", buildPlugins());
 
         content.setStyle("-fx-background-color: transparent;");
         HBox.setHgrow(content, Priority.ALWAYS);
@@ -111,12 +111,12 @@ public final class ToolsPanel extends VBox {
 
         checkResult.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
         checkResult.setWrapText(true);
-        select("环境");
+        select("env");
     }
 
     /** 外部入口（启动失败提示用）：切到百宝箱并开始校验。 */
     public void startLibraryCheck() {
-        select("百宝箱");
+        select("toolbox");
         verifyLibrariesWithRepair();
     }
 
@@ -129,7 +129,7 @@ public final class ToolsPanel extends VBox {
         return label;
     }
 
-    private HBox tabItem(String name) {
+    private HBox tabItem(String key) {
         HBox item = new HBox(9);
         item.setAlignment(Pos.CENTER_LEFT);
         item.setPadding(new Insets(8, 10, 8, 10));
@@ -142,23 +142,49 @@ public final class ToolsPanel extends VBox {
         bar.setArcWidth(2);
         bar.setArcHeight(2);
         bar.setStyle("-fx-fill: transparent;");
-        Label text = new Label(name);
+        Label text = new Label(tabLabel(key));
         text.setStyle("-fx-text-fill: -app-text-dim; -fx-font-size: 13px;");
         item.getChildren().addAll(bar, text);
-        item.setOnMouseClicked(e -> select(name));
-        tabs.put(name, item);
+        item.setOnMouseClicked(e -> select(key));
+        tabs.put(key, item);
         return item;
     }
 
+    /** 页签 key → 中文标签；英文走语言包，中文作为兜底。 */
+    private static final String[][] TAB_LABELS = {
+        {"env", "环境"}, {"perf", "性能优化"}, {"history", "启动记录"}, {"cache", "缓存"},
+        {"shortcuts", "快捷入口"}, {"toolbox", "百宝箱"}, {"plugins", "插件"}
+    };
+
+    private static String tabLabel(String key) {
+        for (String[] pair : TAB_LABELS) {
+            if (pair[0].equals(key)) {
+                return I18n.t("tools.tab." + key, pair[1]);
+            }
+        }
+        return key;
+    }
+
+    /** 兼容老调用：中文标签也能定位到 key。 */
+    private static String tabKey(String nameOrKey) {
+        for (String[] pair : TAB_LABELS) {
+            if (pair[0].equals(nameOrKey) || pair[1].equals(nameOrKey)) {
+                return pair[0];
+            }
+        }
+        return nameOrKey;
+    }
+
     public void openPerformanceTab() {
-        select("性能优化");
+        select("perf");
     }
 
     public void openHistoryTab() {
-        select("启动记录");
+        select("history");
     }
 
-    private void select(String name) {
+    private void select(String nameOrKey) {
+        String name = tabKey(nameOrKey);
         for (Map.Entry<String, HBox> entry : tabs.entrySet()) {
             boolean active = entry.getKey().equals(name);
             HBox box = entry.getValue();
@@ -593,11 +619,11 @@ public final class ToolsPanel extends VBox {
             }
         }
 
-        Button refresh = smallButton("刷新", e -> select("启动记录"));
+        Button refresh = smallButton("刷新", e -> select("history"));
         Button clear = smallButton("清空记录", e -> {
             LaunchHistory.clear(dir);
             Toast.ok("启动记录已清空");
-            select("启动记录");
+            select("history");
         });
         VBox card = card(
                 section("启动记录"),

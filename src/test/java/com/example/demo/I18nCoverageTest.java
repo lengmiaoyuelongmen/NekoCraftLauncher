@@ -97,7 +97,16 @@ class I18nCoverageTest {
             String[] keys = {"nav.launch", "nav.download", "nav.advisor", "nav.settings", "nav.tools",
                     "page.download.title", "page.instances.title", "page.instanceSettings.title",
                     "page.advisor.title", "page.health.title", "page.worlds.title",
-                    "status.ready", "status.running", "action.stopGame", "action.cancelLaunch"};
+                    "status.ready", "status.running", "action.stopGame", "action.cancelLaunch",
+                    // 页签：设置 / 工具 / 实例设置三个侧栏
+                    "settings.tab.launch", "settings.tab.java", "settings.tab.manage",
+                    "settings.tab.lan", "settings.tab.ai", "settings.tab.ui", "settings.tab.language",
+                    "settings.tab.misc", "settings.tab.about", "settings.tab.update",
+                    "settings.tab.feedback", "settings.tab.logs",
+                    "tools.tab.env", "tools.tab.perf", "tools.tab.history", "tools.tab.cache",
+                    "tools.tab.shortcuts", "tools.tab.toolbox", "tools.tab.plugins",
+                    "instance.tab.overview", "instance.tab.settings", "instance.tab.mods",
+                    "instance.tab.saves", "instance.tab.servers"};
             for (String key : keys) {
                 String value = I18n.t(key);
                 assertEquals(value, I18n.t(key, value));

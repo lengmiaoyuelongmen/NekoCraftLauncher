@@ -169,22 +169,22 @@ public final class SettingsPanel extends VBox {
 
         side.getChildren().addAll(
                 tabSearch,
-                sectionLabel("游戏"),
-                tabItem("启动"),
-                tabItem("Java"),
-                tabItem("管理"),
-                sectionLabel("工具"),
-                tabItem("联机"),
-                tabItem("AI"),
-                sectionLabel("启动器"),
-                tabItem("个性化"),
-                tabItem("语言"),
-                tabItem("杂项"),
-                sectionLabel("关于"),
-                tabItem("软件信息"),
-                tabItem("软件更新"),
-                tabItem("反馈"),
-                tabItem("查看日志"));
+                sectionLabel(I18n.t("settings.group.game", "游戏")),
+                tabItem("launch"),
+                tabItem("java"),
+                tabItem("manage"),
+                sectionLabel(I18n.t("settings.group.tools", "工具")),
+                tabItem("lan"),
+                tabItem("ai"),
+                sectionLabel(I18n.t("settings.group.launcher", "启动器")),
+                tabItem("ui"),
+                tabItem("language"),
+                tabItem("misc"),
+                sectionLabel(I18n.t("settings.group.about", "关于")),
+                tabItem("about"),
+                tabItem("update"),
+                tabItem("feedback"),
+                tabItem("logs"));
 
         // ---------- 控件先建好，页签复用 ----------
         memorySpinner = spinner(512, 16384, config.getMemoryMb(), 512, 130);
@@ -347,18 +347,18 @@ public final class SettingsPanel extends VBox {
         selectedJavaLabel = null;
 
         // ---------- 页签内容 ----------
-        tabPages.put("启动", buildLaunchTab());
-        tabPages.put("Java", buildJavaTab());
-        tabPages.put("管理", buildManageTab());
-        tabPages.put("个性化", buildUiTab());
-        tabPages.put("杂项", buildMiscTab());
-        tabPages.put("软件信息", buildAboutTab());
-        tabPages.put("联机", buildLanTab());
-        tabPages.put("语言", buildLanguageTab());
-        tabPages.put("AI", buildAiTab());
-        tabPages.put("软件更新", buildUpdateTab());
-        tabPages.put("反馈", buildFeedbackTab());
-        tabPages.put("查看日志", buildLogTab());
+        tabPages.put("launch", buildLaunchTab());
+        tabPages.put("java", buildJavaTab());
+        tabPages.put("manage", buildManageTab());
+        tabPages.put("ui", buildUiTab());
+        tabPages.put("misc", buildMiscTab());
+        tabPages.put("about", buildAboutTab());
+        tabPages.put("lan", buildLanTab());
+        tabPages.put("language", buildLanguageTab());
+        tabPages.put("ai", buildAiTab());
+        tabPages.put("update", buildUpdateTab());
+        tabPages.put("feedback", buildFeedbackTab());
+        tabPages.put("logs", buildLogTab());
 
         content.setStyle("-fx-background-color: transparent;");
         HBox.setHgrow(content, Priority.ALWAYS);
@@ -401,7 +401,7 @@ public final class SettingsPanel extends VBox {
         getChildren().add(body);
 
         reloadJavaList();
-        selectTab("启动");
+        selectTab("launch");
     }
 
     // ================== 页签 ==================
@@ -414,25 +414,52 @@ public final class SettingsPanel extends VBox {
     }
 
     /** 每个分栏的符号，和下载页侧栏保持同一套图标语言。 */
-    private static String tabIcon(String name) {
-        return switch (name) {
-            case "启动" -> "play";
-            case "Java" -> "package";
-            case "管理" -> "tools";
-            case "联机" -> "server";
-            case "AI" -> "sparkles";
-            case "个性化" -> "image";
-            case "语言" -> "globe";
-            case "杂项" -> "layers";
-            case "软件信息" -> "folder";
-            case "软件更新" -> "refresh";
-            case "反馈" -> "edit";
-            case "查看日志" -> "terminal";
+    private static String tabIcon(String key) {
+        return switch (key) {
+            case "launch" -> "play";
+            case "java" -> "package";
+            case "manage" -> "tools";
+            case "lan" -> "server";
+            case "ai" -> "sparkles";
+            case "ui" -> "image";
+            case "language" -> "globe";
+            case "misc" -> "layers";
+            case "about" -> "folder";
+            case "update" -> "refresh";
+            case "feedback" -> "edit";
+            case "logs" -> "terminal";
             default -> "dot";
         };
     }
 
-    private HBox tabItem(String name) {
+    /** 页签 key → 中文标签；英文走语言包，中文作为兜底。 */
+    private static final String[][] TAB_LABELS = {
+        {"launch", "启动"}, {"java", "Java"}, {"manage", "管理"}, {"lan", "联机"},
+        {"ai", "AI"}, {"ui", "个性化"}, {"language", "语言"}, {"misc", "杂项"},
+        {"about", "软件信息"}, {"update", "软件更新"}, {"feedback", "反馈"},
+        {"logs", "查看日志"}
+    };
+
+    private static String tabLabel(String key) {
+        for (String[] pair : TAB_LABELS) {
+            if (pair[0].equals(key)) {
+                return I18n.t("settings.tab." + key, pair[1]);
+            }
+        }
+        return key;
+    }
+
+    /** 兼容老调用：允许传中文标签（F8 / 启动失败提示里用的就是中文）。 */
+    private static String tabKey(String nameOrKey) {
+        for (String[] pair : TAB_LABELS) {
+            if (pair[0].equals(nameOrKey) || pair[1].equals(nameOrKey)) {
+                return pair[0];
+            }
+        }
+        return nameOrKey;
+    }
+
+    private HBox tabItem(String key) {
         HBox item = new HBox(8);
         item.setAlignment(Pos.CENTER_LEFT);
         item.setPadding(new Insets(8, 10, 8, 10));
@@ -446,21 +473,21 @@ public final class SettingsPanel extends VBox {
         bar.setArcHeight(2);
         bar.setStyle("-fx-fill: transparent;");
 
-        javafx.scene.Node icon = com.example.demo.ui.shell.Icons.node(tabIcon(name), 13.0, "#9aa3ad");
+        javafx.scene.Node icon = com.example.demo.ui.shell.Icons.node(tabIcon(key), 13.0, "#9aa3ad");
         icon.setOpacity(0.72);
         icon.setMouseTransparent(true);
 
-        Label text = new Label(name);
+        Label text = new Label(tabLabel(key));
         text.setStyle("-fx-text-fill: -app-text-dim; -fx-font-size: 13px;");
         // 点击必须落在整行上：文字与色条不吞事件，否则只点中文字时选不中分栏
         text.setMouseTransparent(true);
         bar.setMouseTransparent(true);
         item.getChildren().addAll(bar, icon, text);
-        item.setOnMouseClicked(e -> selectTab(name));
+        item.setOnMouseClicked(e -> selectTab(key));
         item.setOnMouseEntered(
                 e -> {
                     scaleIcon(icon, 1.18);
-                    if (!name.equals(currentTab)) {
+                    if (!key.equals(currentTab)) {
                         // 反馈：未选中的分栏悬停时给一点底色，暗示可点
                         item.setStyle("-fx-background-color: -app-hover-2;"
                                 + " -fx-background-radius: 8;");
@@ -469,12 +496,12 @@ public final class SettingsPanel extends VBox {
         item.setOnMouseExited(
                 e -> {
                     scaleIcon(icon, 1.0);
-                    if (!name.equals(currentTab)) {
+                    if (!key.equals(currentTab)) {
                         item.setStyle("");
                     }
                 });
         // 记下图标，切换分栏时由 selectTab 提亮
-        tabItems.put(name, item);
+        tabItems.put(key, item);
         return item;
     }
 
@@ -495,22 +522,22 @@ public final class SettingsPanel extends VBox {
     private void filterSettings(String query) {
         String q = query == null ? "" : query.trim().toLowerCase(java.util.Locale.ROOT);
         java.util.Map<String, String> keywords = java.util.Map.ofEntries(
-                java.util.Map.entry("启动", "内存 java 窗口 下载 网络 参数 游戏"),
-                java.util.Map.entry("Java", "java 路径 运行时 jdk"),
-                java.util.Map.entry("管理", "实例 目录 隔离 版本"),
-                java.util.Map.entry("联机", "服务器 联机 端口"),
-                java.util.Map.entry("AI", "ai deepseek key 模型 助手"),
-                java.util.Map.entry("个性化", "主题 颜色 字体 背景 透明度 动画"),
-                java.util.Map.entry("语言", "中文 英文 语言"),
-                java.util.Map.entry("杂项", "缓存 日志 关闭 托盘"),
-                java.util.Map.entry("软件信息", "版本 关于"),
-                java.util.Map.entry("软件更新", "更新 镜像 gitee github"),
-                java.util.Map.entry("反馈", "反馈 问题"),
-                java.util.Map.entry("查看日志", "日志 log"));
+                java.util.Map.entry("launch", "内存 java 窗口 下载 网络 参数 游戏"),
+                java.util.Map.entry("java", "java 路径 运行时 jdk"),
+                java.util.Map.entry("manage", "实例 目录 隔离 版本"),
+                java.util.Map.entry("lan", "服务器 联机 端口"),
+                java.util.Map.entry("ai", "ai deepseek key 模型 助手"),
+                java.util.Map.entry("ui", "主题 颜色 字体 背景 透明度 动画"),
+                java.util.Map.entry("language", "中文 英文 语言"),
+                java.util.Map.entry("misc", "缓存 日志 关闭 托盘"),
+                java.util.Map.entry("about", "版本 关于"),
+                java.util.Map.entry("update", "更新 镜像 gitee github"),
+                java.util.Map.entry("feedback", "反馈 问题"),
+                java.util.Map.entry("logs", "日志 log"));
         String first = null;
         for (java.util.Map.Entry<String, HBox> entry : tabItems.entrySet()) {
             String name = entry.getKey();
-            String haystack = (name + " " + keywords.getOrDefault(name, "")).toLowerCase(java.util.Locale.ROOT);
+            String haystack = (tabLabel(name) + " " + keywords.getOrDefault(name, "")).toLowerCase(java.util.Locale.ROOT);
             boolean match = q.isBlank() || haystack.contains(q);
             entry.getValue().setVisible(match);
             entry.getValue().setManaged(match);
@@ -703,7 +730,7 @@ public final class SettingsPanel extends VBox {
                 config.save();
                 if (getScene() != null) Theme.apply(getScene().getRoot());
                 Toast.ok("主题色已切换：" + palette.name());
-                selectTab("个性化");
+                selectTab("ui");
             });
             themeRow.getChildren().add(swatch);
         }
@@ -714,7 +741,7 @@ public final class SettingsPanel extends VBox {
             config.save();
             applyBackground();
             Toast.ok("已清除启动页背景");
-            selectTab("个性化");
+            selectTab("ui");
         });
         String bg = config.getBackgroundImage();
         Label bgLabel = hint(bg == null || bg.isBlank() ? "未设置" : new File(bg).getName());
@@ -746,7 +773,7 @@ public final class SettingsPanel extends VBox {
         config.save();
         applyBackground();
         Toast.ok("背景已设置：" + file.getName());
-        selectTab("个性化");
+        selectTab("ui");
     }
 
     /** 把背景图直接贴到启动页（通过 id 查找），并重新套一遍主题色。 */
@@ -816,8 +843,9 @@ public final class SettingsPanel extends VBox {
     }
 
     /** 外部入口：按名字打开某个页签（F8 / 启动失败提示用）。 */
-    public void openTab(String name) {
-        if (tabPages.containsKey(name)) selectTab(name);
+    public void openTab(String nameOrKey) {
+        String key = tabKey(nameOrKey);
+        if (tabPages.containsKey(key)) selectTab(key);
     }
 
     private VBox buildLogTab() {

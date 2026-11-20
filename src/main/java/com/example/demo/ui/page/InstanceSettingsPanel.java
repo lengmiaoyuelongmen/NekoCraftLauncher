@@ -121,18 +121,18 @@ public final class InstanceSettingsPanel extends HBox {
 
         side.getChildren().addAll(back, breadcrumb);
         side.getChildren().add(sectionLabel("游戏本体"));
-        side.getChildren().add(navItem("overview", "概览"));
-        side.getChildren().add(navItem("settings", "设置"));
-        side.getChildren().add(navItem("modify", "修改"));
-        side.getChildren().add(navItem("export", "导出"));
+        side.getChildren().add(navItem("overview", I18n.t("instance.tab.overview", "概览")));
+        side.getChildren().add(navItem("settings", I18n.t("instance.tab.settings", "设置")));
+        side.getChildren().add(navItem("modify", I18n.t("instance.tab.modify", "修改")));
+        side.getChildren().add(navItem("export", I18n.t("instance.tab.export", "导出")));
         side.getChildren().add(sectionLabel("游戏资源"));
-        side.getChildren().add(navItem("saves", "存档"));
-        side.getChildren().add(navItem("screenshots", "截图"));
-        side.getChildren().add(navItem("mods", "模组"));
-        side.getChildren().add(navItem("resourcepacks", "资源包"));
-        side.getChildren().add(navItem("shaderpacks", "光影包"));
-        side.getChildren().add(navItem("schematics", "投影原型图"));
-        side.getChildren().add(navItem("servers", "服务器"));
+        side.getChildren().add(navItem("saves", I18n.t("instance.tab.saves", "存档")));
+        side.getChildren().add(navItem("screenshots", I18n.t("instance.tab.screenshots", "截图")));
+        side.getChildren().add(navItem("mods", I18n.t("instance.tab.mods", "模组")));
+        side.getChildren().add(navItem("resourcepacks", I18n.t("instance.tab.resourcepacks", "资源包")));
+        side.getChildren().add(navItem("shaderpacks", I18n.t("instance.tab.shaderpacks", "光影包")));
+        side.getChildren().add(navItem("schematics", I18n.t("instance.tab.schematics", "投影原型图")));
+        side.getChildren().add(navItem("servers", I18n.t("instance.tab.servers", "服务器")));
 
         // ---------- 右侧预构建 ----------
         settingsTab = new SettingsPanel(config, log);
