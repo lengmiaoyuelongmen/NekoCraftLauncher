@@ -116,6 +116,7 @@ public final class SettingsPanel extends VBox {
     private final CheckBox animationsBox;
     private final ComboBox<String> animationSpeedCombo;
     private final Slider opacitySlider;
+    private final Slider sheenSlider;
     private final VBox javaListBox = new VBox(2);
     private final Map<String, JavaScanner.JavaInfo> javaByLabel = new LinkedHashMap<>();
     private String selectedJavaLabel;
@@ -343,6 +344,9 @@ public final class SettingsPanel extends VBox {
 
         opacitySlider = new Slider(0.7, 1.0, config.getUiOpacity());
         opacitySlider.setPrefWidth(220);
+        sheenSlider = new Slider(0.0, 1.5, config.getSheenStrength());
+        sheenSlider.setPrefWidth(220);
+        sheenSlider.setBlockIncrement(0.1);
 
         selectedJavaLabel = null;
 
@@ -756,6 +760,8 @@ public final class SettingsPanel extends VBox {
                 labeled("字体大小", new HBox(10, fontScaleCombo, hint("重启启动器后生效"))),
                 labeled("浅色模式", lightModeBox),
                 labeled("不透明度", new HBox(10, opacitySlider, hint("窗口不透明度，保存后立即生效"))),
+                labeled(I18n.t("settings.sheen.label", "鼠标柔光"), new HBox(10, sheenSlider,
+                        hint(I18n.t("settings.sheen.hint", "跟随指针的氛围光强度，0 = 关闭，保存后立即生效")))),
                 section("动画"),
                 labeled("动画效果", new HBox(10, animationsBox, animationSpeedCombo, hint("低配机器建议关掉动画"))),
                 hint("动画关闭后，页面切换 / 卡片入场 / 按钮反馈都会变成瞬时完成"));
@@ -1379,6 +1385,8 @@ public final class SettingsPanel extends VBox {
         config.setAnimations(animationsBox.isSelected());
         config.setAnimationSpeed(speedValue(animationSpeedCombo.getValue()));
         config.setUiOpacity(Math.round(opacitySlider.getValue() * 100.0) / 100.0);
+        config.setSheenStrength(Math.round(sheenSlider.getValue() * 100.0) / 100.0);
+        com.example.demo.ui.shell.MouseSheen.setGlobalStrength(config.getSheenStrength());
         Motion.configure(config.isAnimations(), config.getAnimationSpeed());
 
         if (getScene() != null && getScene().getWindow() != null) {
@@ -1416,6 +1424,7 @@ public final class SettingsPanel extends VBox {
         animationsBox.setSelected(true);
         animationSpeedCombo.setValue("标准");
         opacitySlider.setValue(1.0);
+        sheenSlider.setValue(0.8);
         autoMemoryRadio.setSelected(false);
         customMemoryRadio.setSelected(true);
         languageCombo.setValue("简体中文");

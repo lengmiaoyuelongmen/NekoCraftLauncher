@@ -12,7 +12,7 @@ import javafx.scene.paint.Stop;
 /**
  * 跟随鼠标的柔光高光层。
  *
- * <p>为什么要单独一层：页面自己的背景是不透明的，{@link AmbientBackground} 那些光晕被盖住了，
+ * <p>为什么要单独一层：页面自己的背景是不透明的，画在页面下面的光晕会被整块盖住，
  * 只调它的参数等于对空气上色。这一层画在页面之上、鼠标穿透，所以不管当前是哪个页面都看得到。
  *
  * <p>性能：只有指针在动的时候才按 20fps 追，静止 900ms 后降到 2fps；
@@ -20,10 +20,15 @@ import javafx.scene.paint.Stop;
  */
 public final class MouseSheen extends Canvas {
 
+    /** 最近的实例：设置页改强度时用它立即生效。 */
+    private static MouseSheen latestInstance;
+
     private static final long ACTIVE_INTERVAL = 50_000_000L;
     private static final long IDLE_INTERVAL = 500_000_000L;
 
     private final AnimationTimer timer;
+    /** 0 = 关闭；1 = 默认强度。 */
+    private double strength = 0.8;
     private double x = -1000;
     private double y = -1000;
     private double targetX = -1000;
@@ -35,6 +40,7 @@ public final class MouseSheen extends Canvas {
     private boolean gradientLight;
 
     public MouseSheen() {
+        latestInstance = this;
         setMouseTransparent(true);
         setOpacity(1.0);
         timer = new AnimationTimer() {
@@ -52,6 +58,26 @@ public final class MouseSheen extends Canvas {
             }
         };
         timer.start();
+    }
+
+    /** 供设置页调用：立即把强度应用到当前实例（没有实例时只记下，等创建时读取配置）。 */
+    public static void setGlobalStrength(double value) {
+        MouseSheen instance = latestInstance;
+        if (instance != null) {
+            instance.setStrength(value);
+        }
+    }
+
+    /** 设置柔光强度（0 关闭，1 默认）。 */
+    public void setStrength(double value) {
+        strength = Math.max(0, Math.min(1.5, value));
+        if (strength <= 0) {
+            getGraphicsContext2D().clearRect(0, 0, getWidth(), getHeight());
+        }
+    }
+
+    public double strength() {
+        return strength;
     }
 
     /** 挂到场景后开始接收鼠标位置。 */
@@ -84,7 +110,7 @@ public final class MouseSheen extends Canvas {
         if (gradient == null || !accent.equals(gradientColor) || light != gradientLight) {
             gradientColor = accent;
             gradientLight = light;
-            double alpha = light ? 0.14 : 0.18;
+            double alpha = (light ? 0.14 : 0.18) * strength;
             gradient = new RadialGradient(0, 0, 0.5, 0.5, 0.5, true, CycleMethod.NO_CYCLE,
                     new Stop(0, Color.color(accent.getRed(), accent.getGreen(), accent.getBlue(), alpha)),
                     new Stop(0.55, Color.color(accent.getRed(), accent.getGreen(), accent.getBlue(), alpha * 0.45)),

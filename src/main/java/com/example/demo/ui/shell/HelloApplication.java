@@ -357,7 +357,6 @@ public class HelloApplication extends Application {
   private boolean quitting;
   private Label geekTelemetry;
   private final long appStartedAt = System.currentTimeMillis();
-  private AmbientBackground ambientBackground;
   private MouseSheen mouseSheen;
   private String gameInstanceId;
   private ComboBox<String> loginTypeComboRef;
@@ -634,12 +633,8 @@ public class HelloApplication extends Application {
     this.downloadPanel.setMaxHeight(Double.MAX_VALUE);
     this.downloadPanel.setVisible(false);
     this.downloadPanel.setOpacity(0.0);
-    AmbientBackground ambient = new AmbientBackground();
-    this.ambientBackground = ambient;
-    ambient.setManaged(false);
-    ambient.widthProperty().bind(this.contentStack.widthProperty());
-    ambient.heightProperty().bind(this.contentStack.heightProperty());
-    this.contentStack.getChildren().add(ambient);
+    // 环境光晕层已移除：它画在页面下面，被不透明的页面背景盖住（实测位移差异 0.01），
+    // 现在由 MouseSheen 在页面之上承担「氛围光」的角色。
     this.contentStack.getChildren().addAll(this.launchPanel, this.downloadPanel);
 
     this.rootPane = new VBox(topBar, this.contentStack);
@@ -941,6 +936,7 @@ public class HelloApplication extends Application {
     this.mouseSheen = new MouseSheen();
     this.mouseSheen.setManaged(false);
     this.mouseSheen.setMouseTransparent(true);
+    this.mouseSheen.setStrength(this.config.getSheenStrength());
     this.mouseSheen.widthProperty().bind(rootWrap.widthProperty());
     this.mouseSheen.heightProperty().bind(rootWrap.heightProperty());
     rootWrap.getChildren().add(Math.max(0, rootWrap.getChildren().indexOf(this.dialogLayer)), this.mouseSheen);
@@ -986,7 +982,7 @@ public class HelloApplication extends Application {
         .iconifiedProperty()
         .addListener(
             (obs, was, iconified) -> {
-              AmbientBackground background = this.ambientBackground;
+              MouseSheen background = this.mouseSheen;
               if (background == null) {
                 return;
               }
@@ -6125,9 +6121,9 @@ private static void setFlexible(Node node, boolean on) {
                     this.stageRef.setIconified(false);
                   }
                   if (this.config.isPauseVisualsInGame()
-                      && this.ambientBackground != null
+                      && this.mouseSheen != null
                       && (this.stageRef == null || !this.stageRef.isIconified())) {
-                    this.ambientBackground.start();
+                    this.mouseSheen.start();
                   }
                   String recent = "";
                   try {
@@ -6235,8 +6231,8 @@ private static void setFlexible(Node node, boolean on) {
       this.minimizedForGame = true;
       this.stageRef.setIconified(true);
     }
-    if (this.config.isPauseVisualsInGame() && this.ambientBackground != null) {
-      this.ambientBackground.stop();
+    if (this.config.isPauseVisualsInGame() && this.mouseSheen != null) {
+      this.mouseSheen.stop();
     }
     if (this.testMode) {
       this.testMode = false;
