@@ -374,6 +374,9 @@ public class HelloApplication extends Application {
   private Button cancelLaunchButton;
   private File lastDownloadedFile;
   private StackPane dropOverlay;
+  private VBox dropBox;
+  private javafx.scene.Node dropIcon;
+  private javafx.animation.Timeline dropPulse;
   private Label dropTitle;
   private Label dropHint;
   private AccountInfoCard accountInfo;
@@ -593,7 +596,7 @@ public class HelloApplication extends Application {
   private void installDropOverlay(StackPane rootWrap) {
       this.dropOverlay = new StackPane();
       this.dropOverlay.setVisible(false);
-      this.dropOverlay.setManaged(false);
+      this.dropOverlay.setManaged(true);   // 交给 StackPane 铺满窗口，否则子节点会挤到左上角
       this.dropOverlay.setMouseTransparent(true);
       this.dropOverlay.setStyle(
           "-fx-background-color: rgba(5,20,18,0.72); -fx-background-radius: 16;");
@@ -601,8 +604,10 @@ public class HelloApplication extends Application {
       this.dropTitle.setStyle("-fx-text-fill: #ccfbf1; -fx-font-size: 24px; -fx-font-weight: bold;");
       this.dropHint = new Label("支持 .zip / .mrpack，直接拖入窗口即可安装");
       this.dropHint.setStyle("-fx-text-fill: rgba(204,251,241,0.78); -fx-font-size: 12px;");
-      VBox dropBox =
-          new VBox(10.0, Icons.node("download", 42.0, "#5eead4"), this.dropTitle, this.dropHint);
+      javafx.scene.Node dropIcon = Icons.node("download", 42.0, "#5eead4");
+      VBox dropBox = new VBox(10.0, dropIcon, this.dropTitle, this.dropHint);
+      this.dropBox = dropBox;
+      this.dropIcon = dropIcon;
       dropBox.setAlignment(Pos.CENTER);
       dropBox.setStyle(
           "-fx-background-color: rgba(14,47,38,0.92); -fx-background-radius: 20; -fx-border-color:"
@@ -671,7 +676,17 @@ public class HelloApplication extends Application {
           this.dropTitle.setText(jar != null ? "松开安装模组" : "松开鼠标导入整合包");
           this.dropHint.setText(
               jar != null ? "支持 .jar，可一次拖入多个文件" : "支持 .zip / .mrpack，直接拖入窗口即可安装");
-          this.dropOverlay.setVisible(true);
+          if (!this.dropOverlay.isVisible()) {
+            this.dropOverlay.setVisible(true);
+            this.dropOverlay.setOpacity(1);
+            if (this.dropPulse != null) {
+              this.dropPulse.stop();
+            }
+            this.dropPulse = Motion.dropPulse(dropBox);
+            Motion.iconBounce(dropIcon);
+            Motion.reveal(this.dropTitle, 60);
+            Motion.reveal(this.dropHint, 140);
+          }
         }
         event.consume();
       });
@@ -679,14 +694,22 @@ public class HelloApplication extends Application {
       DragEvent.DRAG_EXITED,
       event -> {
         if (this.dropOverlay != null) {
+          if (this.dropPulse != null) {
+            this.dropPulse.stop();
+            this.dropPulse = null;
+          }
           this.dropOverlay.setVisible(false);
         }
       });
   scene.addEventFilter(
       DragEvent.DRAG_DROPPED,
       event -> {
-        if (this.dropOverlay != null) {
-          this.dropOverlay.setVisible(false);
+        if (this.dropPulse != null) {
+          this.dropPulse.stop();
+          this.dropPulse = null;
+        }
+        if (this.dropOverlay != null && this.dropOverlay.isVisible()) {
+          Motion.dropConfirm(this.dropOverlay, () -> this.dropOverlay.setVisible(false));
         }
         File archive = this.firstImportArchive(event.getDragboard());
         List<File> jars = this.modJars(event.getDragboard());
@@ -922,7 +945,23 @@ public class HelloApplication extends Application {
             delay.play();
           });
     }
-    Platform.setImplicitExit(false);
+    // 动效自检：-Dmc.dropDemo=1 时自动展示拖拽提示层，方便截图与冒烟检查（正常启动不触发）
+    if (System.getProperty("mc.dropDemo") != null) {
+      Platform.runLater(
+          () -> {
+            PauseTransition show = new PauseTransition(Duration.millis(2600));
+            show.setOnFinished(
+                ev -> {
+                  if (this.dropOverlay != null) {
+                    this.dropOverlay.setVisible(true);
+                    this.dropOverlay.setOpacity(1);
+                    this.dropPulse = Motion.dropPulse(this.dropBox);
+                    Motion.iconBounce(this.dropIcon);
+                  }
+                });
+            show.play();
+          });
+    }    Platform.setImplicitExit(false);
     stage.setOpacity(Math.max(0.7, Math.min(1.0, this.config.getUiOpacity())));
     stage.setTitle("Neko Craft Launcher");
     stage

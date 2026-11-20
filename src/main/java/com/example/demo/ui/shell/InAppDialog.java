@@ -277,18 +277,13 @@ public final class InAppDialog {
         int missing = com.example.demo.ui.component.StyleRepair.countMissing(backdrop);
         System.out.println(
                 "弹窗描边修复: " + fixedCount + " 个，剩余缺失: " + missing + " 个");
-        // 入场动画：淡入 + 卡片轻微放大，和应用的 Motion 风格一致
+        // 入场动画统一走 Motion：遮罩淡入 + 卡片带回弹放大，和页面过渡同一套缓动
         backdrop.setOpacity(0);
-        card.setScaleX(0.97);
-        card.setScaleY(0.97);
-        ParallelTransition in =
-                new ParallelTransition(
-                        new FadeTransition(Duration.millis(140), backdrop),
-                        new ScaleTransition(Duration.millis(160), card));
-        ((FadeTransition) in.getChildren().get(0)).setToValue(1);
-        ((ScaleTransition) in.getChildren().get(1)).setToX(1);
-        ((ScaleTransition) in.getChildren().get(1)).setToY(1);
-        in.play();
+        FadeTransition veil = new FadeTransition(Duration.millis(140), backdrop);
+        veil.setToValue(1);
+        veil.setInterpolator(Motion.OUT);
+        veil.play();
+        Motion.dialogIn(card);
         // 键盘可达：焦点落到第一个动作按钮，Tab 在按钮间移动，Esc 关闭，Enter 触发默认按钮
         javafx.application.Platform.runLater(
                 () -> {
@@ -303,9 +298,10 @@ public final class InAppDialog {
         }
     }
 
-    private static void close(StackPane host, StackPane backdrop) {
-        FadeTransition out = new FadeTransition(Duration.millis(110), backdrop);
+        private static void close(StackPane host, StackPane backdrop) {
+        FadeTransition out = new FadeTransition(Duration.millis(140), backdrop);
         out.setToValue(0);
+        out.setInterpolator(Motion.IN_OUT);
         out.setOnFinished(e -> host.getChildren().remove(backdrop));
         out.play();
     }

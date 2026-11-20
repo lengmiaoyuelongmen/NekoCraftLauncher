@@ -112,12 +112,12 @@ public final class Toast {
         pill.setTranslateY(-8);
         stack.getChildren().add(pill);
         com.example.demo.ui.component.StyleRepair.fixRoundedBorders(stack);
-
         FadeTransition in = new FadeTransition(Duration.millis(160), pill);
         in.setToValue(1);
-        TranslateTransition drop = new TranslateTransition(Duration.millis(200), pill);
+        in.setInterpolator(Motion.OUT);
+        TranslateTransition drop = new TranslateTransition(Duration.millis(240), pill);
         drop.setToY(0);
-        drop.setInterpolator(Motion.OUT);
+        drop.setInterpolator(Motion.SPRING);
         in.play();
         drop.play();
 
@@ -125,8 +125,10 @@ public final class Toast {
         wait.setOnFinished(e -> {
             FadeTransition out = new FadeTransition(Duration.millis(180), pill);
             out.setToValue(0);
+            out.setInterpolator(Motion.IN_OUT);
             TranslateTransition lift = new TranslateTransition(Duration.millis(180), pill);
             lift.setToY(-6);
+            lift.setInterpolator(Motion.IN_OUT);
             out.setOnFinished(done -> stack.getChildren().remove(pill));
             out.play();
             lift.play();
