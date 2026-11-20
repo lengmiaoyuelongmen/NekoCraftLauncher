@@ -311,6 +311,7 @@ public class HelloApplication extends Application {
   private InstancesPanel instancesPanel;
   private InstanceSettingsPanel instanceSettingsPanel;
   private ToolsPanel toolsPanel;
+  private com.example.demo.ui.page.ServerPanel serverPanel;
   private SettingsPanel settingsPanel;
   private String navHighlight;
   private boolean testMode;
@@ -949,6 +950,7 @@ public class HelloApplication extends Application {
     this.mouseSheen.heightProperty().bind(rootWrap.heightProperty());
     rootWrap.getChildren().add(Math.max(0, rootWrap.getChildren().indexOf(this.dialogLayer)), this.mouseSheen);
     Scene scene = this.createScene(rootWrap, stage);
+    Navigation.bind(this::switchPage);
     if (this.mouseSheen != null) {
       this.mouseSheen.bindTo(scene);
     }
@@ -1191,11 +1193,25 @@ public class HelloApplication extends Application {
         }
         yield this.toolsPanel;
       }
+      case "server" -> this.serverPanel().node();
       case "logs" -> new LogsPanel(new File(this.config.getGameDir()), this::logMessage);
       default -> this.launchPanel;
     };
   }
 
+
+  /** 便携服务器页：懒加载，第一次进入时构造。 */
+  private com.example.demo.ui.page.ServerPanel serverPanel() {
+    if (this.serverPanel == null) {
+      this.serverPanel = new com.example.demo.ui.page.ServerPanel(this.config, new File(this.config.getGameDir()));
+    }
+    return this.serverPanel;
+  }
+
+  /** 供设置页/顶栏调用：跳到便携服务器页。 */
+  public void openServerPage() {
+    this.switchPage("server");
+  }
   private void switchPage(String pageName) {
     this.primaryStage
         .getProperties()
@@ -1325,6 +1341,7 @@ public class HelloApplication extends Application {
       case "tools" -> 5;
       case "health" -> 6;
       case "worlds" -> 7;
+      case "server" -> 8;
       default -> 0;
     };
   }

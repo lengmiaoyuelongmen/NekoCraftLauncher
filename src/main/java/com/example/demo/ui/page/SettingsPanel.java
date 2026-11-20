@@ -872,20 +872,14 @@ public final class SettingsPanel extends VBox {
             copyToClipboard(ip + ":25565");
             Toast.ok("已复制局域网地址");
         });
-        Button portable = smallButton("创建便携服务器", e -> {
-            String instanceId = config.getLastInstance();
-            if (instanceId == null || instanceId.isBlank()) {
-                Toast.warn("请先选择一个实例");
-                return;
-            }
-            PortableServerDialog.show(owner(), new File(config.getGameDir()),
-                    instanceId, InstanceSettings.effectiveIsolation(
-                            new File(config.getGameDir()), instanceId, config.isIsolation()));
+        Button portable = smallButton("打开便携服务器页", e -> {
+            // 旧版在这里弹窗，建完就没下文（没有日志、没有记录）；现在统一进独立页面
+            com.example.demo.ui.shell.Navigation.go("server");
         });
         VBox card = card(
                 section("局域网联机"),
                 labeled("本机地址", new HBox(12, address, copy)),
-                new HBox(10, portable, hint("基于当前实例生成独立服务端目录")),
+                new HBox(10, portable, hint("生成真正能启动的服务端：进度、日志、历史记录都在那一页")),
                 hint("进入游戏后按 Esc → 对局域网开放，其他玩家用上面的地址直连（同一局域网）。"),
                 hint("PCL CE 的 Natayark 大厅联机需要账号与官方服务，本启动器暂未接入；这里只提供局域网直连信息。"),
                 section("快速步骤"),
