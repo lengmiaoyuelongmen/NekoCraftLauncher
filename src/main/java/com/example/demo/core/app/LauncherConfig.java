@@ -87,11 +87,14 @@ public class LauncherConfig {
     /** 启动器窗口不透明度（0.7 ~ 1.0） */
     private double uiOpacity = 1.0;
 
+    /** 网络代理：host:port 或 socks5://host:port，留空直连。 */
+    private String networkProxy = "";
+
     /** 是否在启动器右上角显示性能叠加层（FPS / 堆 / 线程）。 */
     private boolean showPerfOverlay = false;
 
     /** 跟随鼠标的柔光强度：0 = 关闭，1 = 默认，最大 1.5（再高会盖住内容）。 */
-    private double sheenStrength = 0.8;
+    private double sheenStrength = 0.0;
 
     /** 界面动画（关掉相当于性能模式，低配机器更顺） */
     private boolean animations = true;
@@ -291,7 +294,7 @@ public class LauncherConfig {
         if (maxConcurrent < 1) maxConcurrent = 16;
         if (maxConcurrent > 128) maxConcurrent = 128;
         if (speedLimitKb < 0) speedLimitKb = 0;
-        if (sheenStrength < 0) sheenStrength = 0.8;
+        if (sheenStrength < 0) sheenStrength = 0.0;
         if (sheenStrength > 1.5) sheenStrength = 1.5;
         if (uiOpacity < 0.7) uiOpacity = 1.0;
         if (uiOpacity > 1.0) uiOpacity = 1.0;
@@ -423,6 +426,14 @@ public class LauncherConfig {
 
     public void setSpeedLimitKb(int speedLimitKb) {
         this.speedLimitKb = speedLimitKb;
+    }
+
+    public String getNetworkProxy() {
+        return networkProxy == null ? "" : networkProxy;
+    }
+
+    public void setNetworkProxy(String networkProxy) {
+        this.networkProxy = networkProxy == null ? "" : networkProxy.trim();
     }
 
     public boolean isShowPerfOverlay() {

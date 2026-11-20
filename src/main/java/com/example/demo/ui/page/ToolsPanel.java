@@ -1,5 +1,6 @@
 package com.example.demo.ui.page;
 
+import com.example.demo.core.app.ProxySettings;
 import com.example.demo.core.i18n.I18n;
 
 import javafx.application.Platform;
@@ -11,6 +12,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -512,6 +514,27 @@ public final class ToolsPanel extends VBox {
             config.save();
         });
 
+        // 代理：搜索 / 图标 / 下载都走同一个 ProxySelector，填完点应用即可生效
+        TextField proxyField = new TextField(config.getNetworkProxy());
+        proxyField.setPromptText(I18n.t("tools.proxy.prompt",
+                "127.0.0.1:7890 或 socks5://127.0.0.1:7891（留空直连）"));
+        proxyField.setPrefColumnCount(26);
+        Button applyProxy = new Button(I18n.t("tools.proxy.apply", "应用代理"));
+        applyProxy.getStyleClass().addAll("btn-secondary", "btn-sm");
+        applyProxy.setOnAction(e -> {
+            String value = proxyField.getText() == null ? "" : proxyField.getText().trim();
+            if (!ProxySettings.isValid(value)) {
+                Toast.error(I18n.t("tools.proxy.invalid",
+                        "代理格式不对，应为 host:port 或 socks5://host:port"));
+                return;
+            }
+            config.setNetworkProxy(value);
+            config.save();
+            ProxySettings.apply(value);
+            Toast.ok(value.isEmpty()
+                    ? I18n.t("tools.proxy.off", "已切回直连")
+                    : I18n.t("tools.proxy.on", "代理已应用：") + value);
+        });
         VBox networkCard = card(
                 section("网络加速"),
                 dnsStatus,
@@ -519,9 +542,11 @@ public final class ToolsPanel extends VBox {
                 new HBox(10, dnsReset, dnsFlush),
                 boostOnStart,
                 aria2Box,
+                new HBox(10, proxyField, applyProxy),
                 engineStatus,
                 dnsProbe,
-                hint("只改本机 DNS，不动 hosts、不装驱动、不改代理。需要管理员权限，失败时仅提示。"));
+                hint(I18n.t("tools.proxy.hint",
+                        "只改本机 DNS，不动 hosts、不装驱动；代理只影响启动器自己的请求，留空即直连。")));
 
         VBox cleanCard = card(section("内存清理"), extremeClean, cleanStatus);
 

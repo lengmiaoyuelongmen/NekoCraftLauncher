@@ -8,10 +8,10 @@
     -app-launch-border-hover: rgba(153,246,228,0.95);
     -app-launch-text: #ffffff;
     -app-launch-text-dim: #ccfbf1;
-    -app-bg: #eaf4ff;
-    -app-root-1: #f5faff;
-    -app-root-2: #eef7ff;
-    -app-root-3: #e6f1fc;
+    -app-bg: #ffffff;
+    -app-root-1: #ffffff;
+    -app-root-2: #ffffff;
+    -app-root-3: #ffffff;
     -app-bg-2: #e9eef5;
     -app-bg-3: #dfe5ec;
     -app-surface: #ffffff;
@@ -20,11 +20,11 @@
     -app-nav-2: #e7edf4;
     -app-card: #ffffff;
     -app-card-alt: #f8fafc;
-    -app-card-alt2: #f4f9ff;
-    -app-card-top: #f8fafc;
+    -app-card-alt2: #ffffff;
+    -app-card-top: #ffffff;
     /* 玻璃卡片：浅色下用高不透明度白，保留一点底色透出 */
-    -app-glass-top: rgba(255, 255, 255, 0.88);
-    -app-glass-bottom: rgba(246, 238, 240, 0.82);
+    -app-glass-top: #ffffff;
+    -app-glass-bottom: #ffffff;
     -app-glass-border: rgba(15, 23, 42, 0.10);
     -app-card-top2: #f8fafc;
     -app-card-hover: #eef2f7;
@@ -287,3 +287,11 @@
 }
 
 /* 体检面板告警行（浅色主题） */
+
+.neko-card:hover, .settings-card:hover {
+    -fx-background-color: #ffffff;
+}
+.nav-btn:hover, .app-tab:hover, .mod-row:hover, .instance-row:hover, .log-row:hover,
+.list-view .list-cell:filled:hover {
+    -fx-background-color: transparent;
+}

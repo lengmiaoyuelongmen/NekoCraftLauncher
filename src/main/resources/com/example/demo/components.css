@@ -26,7 +26,7 @@
     -fx-border-insets: 0, 0.5;
     -fx-border-width: 1, 0.6;
     -fx-border-radius: 16;
-    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.18), 20, 0.12, 0, 7);
+
 }
 
 .neko-card:hover {
@@ -47,7 +47,7 @@
     -fx-border-insets: 0, 0.5;
     -fx-border-width: 1, 0.6;
     -fx-border-radius: 16;
-    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.18), 20, 0.12, 0, 7);
+
 }
 
 .neko-card:hover {
@@ -204,4 +204,20 @@
 .btn-cyan:hover {
     -fx-background-color: rgba(20, 184, 166, 0.30);
     -fx-border-color: rgba(125, 233, 217, 0.7);
+}
+
+/* ===== 2026-11-21 用户要求：鼠标经过不再改色、卡片不再投影 ===== */
+.neko-card, .settings-card {
+    -fx-effect: null;
+}
+.neko-card:hover, .settings-card:hover {
+    -fx-background-color: linear-gradient(to bottom, -app-glass-top, -app-glass-bottom);
+    -fx-border-color: -app-glass-border, -app-border-soft;
+}
+.nav-btn:hover, .nav-btn-compact:hover, .app-tab:hover, .app-tab-active:hover,
+.mod-row:hover, .instance-row:hover, .history-row:hover, .log-row:hover, .version-row:hover,
+.list-view .list-cell:filled:hover, .mod-card:hover, .combo-box:hover, .menu-button:hover,
+.icon-ghost:hover, .log-toggle:hover, .health-row-warn:hover,
+.scroll-bar:vertical .thumb:hover {
+    -fx-background-color: transparent;
 }

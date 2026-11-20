@@ -967,6 +967,9 @@ public class HelloApplication extends Application {
             delay.play();
           });
     }
+    // 全局代理要尽早生效：HttpClient 默认走 ProxySelector.getDefault()
+    com.example.demo.core.app.ProxySettings.apply(this.config.getNetworkProxy());
+
     // 环形进度自检：-Dmc.ringDemo=1 时居中展示一个 9 段 / 45% / 第 5 阶段的环，方便截图目检
     if (System.getProperty("mc.ringDemo") != null) {
       Platform.runLater(

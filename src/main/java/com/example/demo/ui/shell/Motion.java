@@ -355,6 +355,9 @@ public final class Motion {
         circle.setCenterX(inRoot.getX());
         circle.setCenterY(inRoot.getY());
         circle.setMouseTransparent(true);
+        // 关键：让容器跳过布局。之前这个圆是 managed 的，StackPane 会把它重新摆到左上角，
+        // 于是「点哪都在左上角冒一下水波」
+        circle.setManaged(false);
         circle.setFill(javafx.scene.paint.Color.web("#5eead4", 0.26));
         root.getChildren().add(circle);
         ScaleTransition grow = new ScaleTransition(scaled(Duration.millis(320)), circle);
