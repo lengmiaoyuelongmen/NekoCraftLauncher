@@ -26,7 +26,7 @@ foreach ($file in Get-ChildItem $uiDir -Recurse -Filter *.java) {
     $lines = [System.IO.File]::ReadAllLines($file.FullName)
     for ($i = 0; $i -lt $lines.Length; $i++) {
         # 已经包进 I18n.t("key", "中文") 的不算欠账：中文只是英文缺失时的兜底
-        $scanned = [regex]::Replace($lines[$i], 'I18n\.t\(\s*"[^"]*"\s*,\s*"[^"]*"\s*\)', 'I18n.t("")')
+        $scanned = [regex]::Replace($lines[$i], 'I18n\.t\(\s*"[^"]*"(?:\s*,\s*"[^"]*")?\s*\)', 'I18n.t("")')
         foreach ($match in [regex]::Matches($scanned, $pattern)) {
             $text = $match.Groups[1].Value
             $rows.Add([pscustomobject]@{

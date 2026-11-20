@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class I18nCoverageTest {
 
     /** 与 scripts/i18n-report.ps1 保持同一口径。 */
-    private static final Pattern WRAPPED = Pattern.compile("I18n\\.t\\(\\s*\"[^\"]*\"\\s*,\\s*\"[^\"]*\"\\s*\\)");
+    private static final Pattern WRAPPED = Pattern.compile("I18n\\.t\\(\\s*\"[^\"]*\"(?:\\s*,\\s*\"[^\"]*\")?\\s*\\)");
     private static final Pattern CHINESE_LITERAL =
             Pattern.compile("\"([^\"\\\\\\r\\n]*[\\u4e00-\\u9fff][^\"\\\\\\r\\n]*)\"");
 

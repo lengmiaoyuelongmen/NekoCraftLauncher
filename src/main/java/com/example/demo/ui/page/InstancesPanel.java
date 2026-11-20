@@ -107,7 +107,7 @@ public final class InstancesPanel extends HBox {
         header.setAlignment(Pos.CENTER_LEFT);
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        Button favorites = new Button("★ 只看收藏");
+        Button favorites = new Button(I18n.t("★ 只看收藏"));
         favorites.setStyle("-fx-background-color: -app-row3; -fx-text-fill: -app-text-2; -fx-background-radius: 8;"
                 + " -fx-padding: 6 14; -fx-cursor: hand; -fx-font-size: 12px;");
         favorites.setOnAction(e -> {
@@ -122,7 +122,7 @@ public final class InstancesPanel extends HBox {
                 + " -fx-padding: 6 14; -fx-cursor: hand; -fx-font-size: 12px;");
         refresh.setOnAction(e -> reload());
 
-        Button fileManager = new Button("文件管理");
+        Button fileManager = new Button(I18n.t("文件管理"));
         fileManager.setStyle("-fx-background-color: -app-row3; -fx-text-fill: -app-text-2; -fx-background-radius: 8;"
                 + " -fx-padding: 6 14; -fx-cursor: hand; -fx-font-size: 12px;");
         fileManager.setOnAction(e -> InstanceFileManager.show(
@@ -130,7 +130,7 @@ public final class InstancesPanel extends HBox {
                 InstanceDirs.root(gameDir, selectedId,
                         InstanceSettings.effectiveIsolation(gameDir, selectedId, config.isIsolation())), gameDir));
 
-        searchField.setPromptText("搜索游戏实例");
+        searchField.setPromptText(I18n.t("搜索游戏实例"));
         searchField.setStyle("-fx-background-color: -app-input; -fx-text-fill: -app-text;"
                 + " -fx-prompt-text-fill: -app-text-muted; -fx-background-radius: 9;");
         searchField.setPrefHeight(38);
@@ -148,7 +148,7 @@ public final class InstancesPanel extends HBox {
         groupBox.setFillWidth(true);
 
         ModuleHeader instancesHeader = new ModuleHeader("05 / INSTANCES", I18n.t("page.instances.title", "实例选择"),
-                "每个实例独立的 mods / config / saves", "layers", ModuleHeader.Badge.STACK, "版本隔离");
+                I18n.t("每个实例独立的 mods / config / saves"), "layers", ModuleHeader.Badge.STACK, I18n.t("版本隔离"));
         main.getChildren().addAll(instancesHeader, header, emptyHint, scroll);
         getChildren().addAll(side, main);
 
@@ -173,7 +173,7 @@ public final class InstancesPanel extends HBox {
             if (onBack != null) onBack.run();
         });
         side.getChildren().add(back);
-        side.getChildren().add(sectionLabel("文件夹列表"));
+        side.getChildren().add(sectionLabel(I18n.t("文件夹列表")));
         File active = gameDir.getAbsoluteFile();
         List<File> all = new ArrayList<>();
         java.util.Set<String> seen = new java.util.LinkedHashSet<>();
@@ -195,12 +195,12 @@ public final class InstancesPanel extends HBox {
                 side.getChildren().add(pathLabel);
             }
         }
-        side.getChildren().add(sectionLabel("添加或导入"));
-        side.getChildren().add(sideItem("添加已有文件夹", "＋", false, this::browseFolder));
-        side.getChildren().add(sideItem("导入整合包", "⇩", false, () -> {
+        side.getChildren().add(sectionLabel(I18n.t("添加或导入")));
+        side.getChildren().add(sideItem(I18n.t("添加已有文件夹"), "＋", false, this::browseFolder));
+        side.getChildren().add(sideItem(I18n.t("导入整合包"), "⇩", false, () -> {
             if (onImport != null) onImport.run();
         }));
-        side.getChildren().add(sideItem("导出整合包", "⇧", false, this::exportSelected));
+        side.getChildren().add(sideItem(I18n.t("导出整合包"), "⇧", false, this::exportSelected));
     }
 
     private void exportSelected() {
