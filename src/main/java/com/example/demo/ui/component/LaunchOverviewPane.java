@@ -55,6 +55,9 @@ public final class LaunchOverviewPane extends VBox {
     private Label instanceMem = new Label();
     private Label instanceDir = new Label();
     private Label instanceMods = new Label();
+    private final javafx.scene.control.CheckBox onlyFailed = new javafx.scene.control.CheckBox(I18n.t("overview.onlyFailed", "只看失败"));
+    private final Label lastReason = new Label();
+    private final Button fixEnvButton = new Button(I18n.t("overview.env.fix", "一键修复"));
 
     public LaunchOverviewPane(
             LauncherConfig config,
@@ -90,8 +93,15 @@ public final class LaunchOverviewPane extends VBox {
         envMemory.setStyle(envLineStyle());
         envDisk.setStyle(envLineStyle());
         envHead.setStyle("-fx-text-fill: -app-text; -fx-font-size: 13px; -fx-font-weight: bold;");
-        VBox statCard = card("运行环境", envHead, envJava, envMemory, envDisk);
-        VBox lastCard = card("最近一次启动", lastValue, lastSub);
+        fixEnvButton.getStyleClass().addAll("btn-secondary", "btn-sm");
+        fixEnvButton.setVisible(false);
+        fixEnvButton.setManaged(false);
+        fixEnvButton.setOnAction(e -> fixEnvironment());
+        VBox statCard = card("运行环境", envHead, envJava, envMemory, envDisk, fixEnvButton);
+        lastReason.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11px;");
+        lastReason.setWrapText(true);
+        lastReason.setMaxWidth(210);
+        VBox lastCard = card("最近一次启动", lastValue, lastSub, lastReason);
         totalValue.setStyle(
                 "-fx-text-fill: -app-text; -fx-font-size: 16px; -fx-font-weight: bold;");
         VBox totalCard = card("累计游玩", totalValue, totalSub);
@@ -107,9 +117,9 @@ public final class LaunchOverviewPane extends VBox {
         HBox.setHgrow(totalCard, Priority.ALWAYS);
         HBox statRow = new HBox(12.0, statCard, lastCard, totalCard);
         statRow.setFillHeight(true);
-        statRow.setMinHeight(132.0);
-        statRow.setPrefHeight(132.0);
-        statRow.setMaxHeight(132.0);
+        statRow.setMinHeight(140.0);
+        statRow.setPrefHeight(140.0);
+        statRow.setMaxHeight(140.0);
 
         HBox historyHead =
                 new HBox(
@@ -125,7 +135,11 @@ public final class LaunchOverviewPane extends VBox {
                 + " -fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 5 12;"
                 + " -fx-font-size: 11px; -fx-cursor: hand;");
         seeAll.setOnAction(e -> openAdvisor.run());
-        HBox historyFoot = new HBox(seeAll);
+        onlyFailed.setStyle("-fx-text-fill: -app-text-dim-2; -fx-font-size: 10.5px;");
+        onlyFailed.selectedProperty().addListener((o, a, b) -> refresh());
+        Region footGap = new Region();
+        HBox.setHgrow(footGap, Priority.ALWAYS);
+        HBox historyFoot = new HBox(8.0, onlyFailed, footGap, seeAll);
         historyFoot.setAlignment(Pos.CENTER_RIGHT);
         VBox historyCard = card("最近启动记录", historyHead, historyBox, historyFoot);
         HBox.setHgrow(historyCard, Priority.ALWAYS);
@@ -133,10 +147,10 @@ public final class LaunchOverviewPane extends VBox {
         VBox instanceCard = card("当前实例", instanceValue, instanceSub);
         instanceMem = new Label();
         instanceMem.setStyle("-fx-text-fill: -app-text-dim-2; -fx-font-size: 11px;");
-        instanceMem.setText("分配内存 " + config.getMemoryMb() + " MB");
+        instanceMem.setText(I18n.t("overview.instance.memory", "分配内存 ") + config.getMemoryMb() + " MB");
         instanceDir = new Label();
         instanceDir.setStyle("-fx-text-fill: -app-text-dim-2; -fx-font-size: 11px;");
-        instanceDir.setText("目录 " + config.getGameDir());
+        instanceDir.setText(I18n.t("overview.instance.dir", "目录 ") + config.getGameDir());
         instanceDir.setTextOverrun(OverrunStyle.ELLIPSIS);
         instanceDir.setMaxWidth(Double.MAX_VALUE);
         instanceMods = new Label();
@@ -210,7 +224,11 @@ public final class LaunchOverviewPane extends VBox {
     public void refresh() {
         File dir = new File(config.getGameDir());
         LaunchHistory.Summary summary = LaunchHistory.summary(dir);
-        List<LaunchHistory.Entry> entries = LaunchHistory.recent(dir);
+        List<LaunchHistory.Entry> allEntries = LaunchHistory.recent(dir);
+        List<LaunchHistory.Entry> entries = allEntries;
+        if (onlyFailed.isSelected()) {
+            entries = entries.stream().filter(e -> e.crash()).toList();
+        }
         if (summary.total() == 0) {
             statValue.setText("还没有记录");
             statSub.setText("启动一次后会生成稳定性画像");
@@ -226,6 +244,7 @@ public final class LaunchOverviewPane extends VBox {
                 lastSub.setText("—");
             } else {
                 lastValue.setText(time(last.time()));
+                lastReason.setText(last.crash() ? crashReason(dir) : "");
                 lastSub.setText(
                         LaunchHistory.outcomeLabel(last)
                                 + " · 准备 "
@@ -237,6 +256,10 @@ public final class LaunchOverviewPane extends VBox {
         }
 
         refreshEnvironment();
+
+        // 内存/目录每次刷新都重读，避免「一键修复」后卡片还显示旧值
+        instanceMem.setText(I18n.t("overview.instance.memory", "分配内存 ") + config.getMemoryMb() + " MB");
+        instanceDir.setText(I18n.t("overview.instance.dir", "目录 ") + config.getGameDir());
 
         String instance = currentInstance == null ? null : currentInstance.get();
         if (instance == null || instance.isBlank()) {
@@ -252,9 +275,10 @@ public final class LaunchOverviewPane extends VBox {
             instanceMods.setText(I18n.t("overview.mods", "模组 ") + countMods(instance) + I18n.t("overview.modsUnit", " 个"));
         }
 
+        // 累计游玩永远按全部记录算，不跟着「只看失败」的筛选变
         long totalSession = 0L;
         int played = 0;
-        for (LaunchHistory.Entry entry : entries) {
+        for (LaunchHistory.Entry entry : allEntries) {
             if (entry.sessionSeconds() > 0L) {
                 totalSession += entry.sessionSeconds();
                 played++;
@@ -374,6 +398,9 @@ public final class LaunchOverviewPane extends VBox {
         } else {
             head = I18n.t("overview.env.headOk", "环境就绪 · 点这里调整");
         }
+        // 只有「能自动修」的问题才给按钮：内存过低；磁盘满、Java 缺失只能人工处理
+        fixEnvButton.setVisible(tooLow);
+        fixEnvButton.setManaged(tooLow);
         envHead.setText(head);
         envHead.setStyle("-fx-text-fill: "
                 + (lowDisk ? "#ef4444" : (tooLow ? "#f59e0b" : "-app-text"))
@@ -389,6 +416,41 @@ public final class LaunchOverviewPane extends VBox {
             return files == null ? 0 : files.length;
         } catch (Exception e) {
             return 0;
+        }
+    }
+    /** 一键修复能修的部分：内存低于下限时按推荐值调好并保存。 */
+    private void fixEnvironment() {
+        int recommended = 4096;
+        try {
+            recommended = com.example.demo.core.runtime.MemoryAdvisor.suggest(
+                    com.example.demo.core.model.InstanceDirs.mods(
+                            new File(config.getGameDir()),
+                            config.getLastInstance(),
+                            config.isIsolation())).memoryMb();
+        } catch (Exception ignored) {
+            // 拿不到推荐值就用 4096
+        }
+        int target = Math.max(config.getMemoryMb(), recommended);
+        config.setMemoryMb(target);
+        config.save();
+        refresh();
+        com.example.demo.ui.shell.Toast.ok(I18n.t("overview.env.fixed", "已把内存调到 ") + target + " MB");
+    }
+
+    /** 从崩溃报告里提一句最关键的错误；读不到就返回空。 */
+    private String crashReason(File gameDir) {
+        try {
+            var report = com.example.demo.core.game.CrashAnalyzer.analyze(gameDir);
+            if (report == null || report.findings() == null || report.findings().isEmpty()) {
+                return "";
+            }
+            String title = report.findings().get(0).title();
+            if (title == null) {
+                return "";
+            }
+            return title.length() > 90 ? title.substring(0, 90) + "…" : title;
+        } catch (Exception e) {
+            return "";
         }
     }
     private static Label caption(String text) {
