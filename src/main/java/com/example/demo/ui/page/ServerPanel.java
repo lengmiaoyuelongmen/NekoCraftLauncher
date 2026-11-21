@@ -27,6 +27,7 @@ import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.canvas.Canvas;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
@@ -57,6 +58,16 @@ public final class ServerPanel {
     private final Map<String, PortableServerManager.RunningServer> running = new LinkedHashMap<>();
     private final Map<String, StringBuilder> logs = new LinkedHashMap<>();
 
+    // 资源曲线：CPU / 内存各保留最近 60 个采样点
+    private final Canvas chart = new Canvas(280, 58);
+    private final java.util.Deque<Double> cpuHistory = new java.util.ArrayDeque<>();
+    private final java.util.Deque<Double> memHistory = new java.util.ArrayDeque<>();
+    private final Map<String, com.example.demo.core.server.ServerMetrics.CpuSampler> samplers =
+            new LinkedHashMap<>();
+    private final Map<String, Long> lastBackupAt = new LinkedHashMap<>();
+    private final Map<String, Long> lastRestartAt = new LinkedHashMap<>();
+    private javafx.animation.Timeline samplerTimer;
+    private javafx.animation.Timeline scheduleTimer;
     private String selectedId;
     private boolean creating;
 
@@ -257,6 +268,7 @@ public final class ServerPanel {
                 tab(I18n.t("server.panel.tab.console", "控制台"), consolePane(profile)),
                 tab(I18n.t("server.panel.tab.config", "配置"), configPane(profile)),
                 tab(I18n.t("server.panel.tab.players", "玩家"), playersPane(profile)),
+                tab(I18n.t("server.panel.tab.files", "文件"), filesPane(profile)),
                 tab(I18n.t("server.panel.tab.info", "信息"), infoPane(profile)));
         tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
         VBox.setVgrow(tabs, Priority.ALWAYS);
@@ -312,7 +324,11 @@ public final class ServerPanel {
         hintLine.setText(I18n.t("server.panel.consoleHint",
                 "日志写入 server-console.log；命令直接发给服务端，回显会带上 > 前缀"));
 
-        VBox box = new VBox(8, console, quick, input, hintLine);
+        drawChart();
+        if (running.containsKey(profile.id())) {
+            startSampling(profile);
+        }
+        VBox box = new VBox(8, chart, console, quick, input, hintLine);
         box.setPadding(new Insets(10));
         VBox.setVgrow(box, Priority.ALWAYS);
         return box;
@@ -543,9 +559,10 @@ public final class ServerPanel {
 
         VBox box = new VBox(12,
                 info,
-                new Label(I18n.t("server.panel.network", "外网访问")),
+                sectionLabel(I18n.t("server.panel.network", "外网访问")),
                 new HBox(8, upnp, unmap, reach, firewall),
-                upnpHint, reachHint);
+                upnpHint, reachHint,
+                scheduleSection(profile));
         box.setPadding(new Insets(12));
         return scroll(box);
     }
@@ -659,9 +676,14 @@ public final class ServerPanel {
             PortableServerManager.RunningServer handle = PortableServerManager.start(profile,
                     line -> Platform.runLater(() -> appendLog(profile.id(), line)));
             running.put(profile.id(), handle);
+            startSampling(profile);
+            ensureScheduler();
             updatePillAfterSelect(profile);
             handle.process().onExit().thenAccept(p -> Platform.runLater(() -> {
                 running.remove(profile.id());
+                if (running.isEmpty()) {
+                    stopSampling();
+                }
                 appendLog(profile.id(), I18n.t("server.status.exited", "[服务端已退出] code=") + p.exitValue());
                 updatePillAfterSelect(profile);
             }));
@@ -746,6 +768,298 @@ public final class ServerPanel {
         }
     }
 
+    // ==================== 文件 ====================
+
+    private VBox filesPane(PortableServerManager.Profile profile) {
+        File root = new File(profile.dir());
+        Label pathLabel = new Label(root.getAbsolutePath());
+        pathLabel.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
+        VBox entries = new VBox(4);
+        TextArea editor = new TextArea();
+        editor.setVisible(false);
+        editor.setManaged(false);
+        editor.setPrefRowCount(10);
+        editor.setStyle("-fx-font-family: 'Consolas','Microsoft YaHei',monospace; -fx-font-size: 11.5px;");
+        Label editorPath = new Label();
+        editorPath.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 10.5px;");
+        editorPath.setVisible(false);
+        editorPath.setManaged(false);
+
+        final File[] current = {root};
+        Runnable[] reload = new Runnable[1];
+        reload[0] = () -> {
+            entries.getChildren().clear();
+            pathLabel.setText(current[0].getAbsolutePath());
+            File[] files = current[0].listFiles();
+            if (files == null) {
+                return;
+            }
+            java.util.Arrays.sort(files, (a, b) -> {
+                if (a.isDirectory() != b.isDirectory()) {
+                    return a.isDirectory() ? -1 : 1;
+                }
+                return a.getName().compareToIgnoreCase(b.getName());
+            });
+            for (File file : files) {
+                Label name = new Label((file.isDirectory() ? "▸ " : "· ") + file.getName());
+                name.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 11.5px;");
+                Label size = new Label(file.isDirectory() ? ""
+                        : humanSize(file.length()));
+                size.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 10.5px;");
+                Region gap = new Region();
+                HBox.setHgrow(gap, Priority.ALWAYS);
+                HBox row = new HBox(8, name, gap, size);
+                row.setPadding(new Insets(3, 6, 3, 6));
+                row.setOnMouseClicked(e -> {
+                    if (file.isDirectory()) {
+                        current[0] = file;
+                        reload[0].run();
+                    } else if (file.length() <= 512 * 1024) {
+                        try {
+                            editor.setText(java.nio.file.Files.readString(file.toPath(),
+                                    java.nio.charset.StandardCharsets.UTF_8));
+                            editorPath.setText(file.getAbsolutePath());
+                            editor.setVisible(true);
+                            editor.setManaged(true);
+                            editorPath.setVisible(true);
+                            editorPath.setManaged(true);
+                        } catch (Exception ex) {
+                            Toast.error(I18n.t("server.panel.fileReadFailed", "读取失败：") + ex.getMessage());
+                        }
+                    } else {
+                        openDir(file.getParentFile());
+                    }
+                });
+                entries.getChildren().add(row);
+            }
+        };
+        reload[0].run();
+
+        Button up = new Button(I18n.t("server.panel.up", "上级目录"));
+        up.getStyleClass().addAll("btn-secondary", "btn-sm");
+        up.setOnAction(e -> {
+            File parent = current[0].getParentFile();
+            if (parent != null && parent.getAbsolutePath().startsWith(root.getAbsolutePath())) {
+                current[0] = parent;
+                reload[0].run();
+            }
+        });
+        Button refresh = new Button(I18n.t("server.panel.refresh", "刷新"));
+        refresh.getStyleClass().addAll("btn-ghost", "btn-sm");
+        refresh.setOnAction(e -> reload[0].run());
+        Button open = new Button(I18n.t("server.row.open", "打开目录"));
+        open.getStyleClass().addAll("btn-ghost", "btn-sm");
+        open.setOnAction(e -> openDir(current[0]));
+        Button save = new Button(I18n.t("server.panel.fileSave", "保存文件"));
+        save.getStyleClass().addAll("btn-primary", "btn-sm");
+        save.setVisible(false);
+        save.setManaged(false);
+        save.setOnAction(e -> {
+            if (editorPath.getText() == null || editorPath.getText().isBlank()) {
+                return;
+            }
+            try {
+                java.nio.file.Files.writeString(java.nio.file.Path.of(editorPath.getText()),
+                        editor.getText(), java.nio.charset.StandardCharsets.UTF_8);
+                Toast.ok(I18n.t("server.panel.fileSaved", "文件已保存"));
+            } catch (Exception ex) {
+                Toast.error(I18n.t("server.panel.saveFailed", "保存失败：") + ex.getMessage());
+            }
+        });
+
+        ScrollPane scroll = new ScrollPane(entries);
+        scroll.setFitToWidth(true);
+        scroll.setPrefHeight(200);
+        VBox box = new VBox(8, new HBox(8, up, refresh, open), pathLabel, scroll,
+                editorPath, editor, save);
+        box.setPadding(new Insets(12));
+        VBox.setVgrow(editor, Priority.ALWAYS);
+        return box;
+    }
+
+    private static String humanSize(long bytes) {
+        if (bytes < 1024) {
+            return bytes + " B";
+        }
+        if (bytes < 1024 * 1024) {
+            return String.format(java.util.Locale.ROOT, "%.1f KB", bytes / 1024.0);
+        }
+        return String.format(java.util.Locale.ROOT, "%.1f MB", bytes / 1024.0 / 1024.0);
+    }
+
+    // ==================== 资源曲线 ====================
+
+    private void startSampling(PortableServerManager.Profile profile) {
+        stopSampling();
+        samplerTimer = new javafx.animation.Timeline(
+                new javafx.animation.KeyFrame(javafx.util.Duration.seconds(2), e -> sampleOnce(profile)));
+        samplerTimer.setCycleCount(javafx.animation.Animation.INDEFINITE);
+        samplerTimer.play();
+        sampleOnce(profile);
+    }
+
+    private void stopSampling() {
+        if (samplerTimer != null) {
+            samplerTimer.stop();
+            samplerTimer = null;
+        }
+    }
+
+    private void sampleOnce(PortableServerManager.Profile profile) {
+        PortableServerManager.RunningServer handle = running.get(profile.id());
+        if (handle == null || !handle.isAlive()) {
+            return;
+        }
+        var cpuSampler = samplers.computeIfAbsent(profile.id(),
+                key -> new com.example.demo.core.server.ServerMetrics.CpuSampler());
+        double cpu = cpuSampler.sample(handle.process());
+        long mem = profile.id().equals(selectedId) ? com.example.demo.core.server.ServerMetrics.memoryMb(handle.pid()) : -1;
+        if (profile.id().equals(selectedId)) {
+            push(cpuHistory, cpu);
+            if (mem > 0) {
+                push(memHistory, (double) mem);
+            }
+            drawChart();
+        }
+    }
+
+    private void push(java.util.Deque<Double> deque, double value) {
+        deque.addLast(value);
+        while (deque.size() > 60) {
+            deque.removeFirst();
+        }
+    }
+
+    private void drawChart() {
+        var g = chart.getGraphicsContext2D();
+        double w = chart.getWidth();
+        double h = chart.getHeight();
+        g.clearRect(0, 0, w, h);
+        g.setFill(javafx.scene.paint.Color.web("#0b1416"));
+        g.fillRoundRect(0, 0, w, h, 8, 8);
+        drawLine(g, cpuHistory, 100, javafx.scene.paint.Color.web("#5eead4"), w, h);
+        drawLine(g, memHistory, Math.max(512, maxOf(memHistory)), javafx.scene.paint.Color.web("#f59e0b"), w, h);
+        g.setFill(javafx.scene.paint.Color.web("#94a3b8"));
+        g.setFont(javafx.scene.text.Font.font("Consolas", 9.5));
+        g.fillText("CPU " + Math.round(lastOf(cpuHistory)) + "%   MEM " + Math.round(lastOf(memHistory)) + " MB", 8, 12);
+    }
+
+    private static double maxOf(java.util.Deque<Double> deque) {
+        double max = 1;
+        for (double value : deque) {
+            max = Math.max(max, value);
+        }
+        return max;
+    }
+
+    private static double lastOf(java.util.Deque<Double> deque) {
+        return deque.isEmpty() ? 0 : deque.peekLast();
+    }
+
+    private static void drawLine(javafx.scene.canvas.GraphicsContext g, java.util.Deque<Double> values,
+                                 double scale, javafx.scene.paint.Color color, double w, double h) {
+        if (values.size() < 2) {
+            return;
+        }
+        g.setStroke(color);
+        g.setLineWidth(1.4);
+        double step = w / 59.0;
+        int index = 0;
+        g.beginPath();
+        for (double value : values) {
+            double x = w - (values.size() - 1 - index) * step;
+            double y = h - 4 - Math.min(1, value / scale) * (h - 18);
+            if (index == 0) {
+                g.moveTo(x, y);
+            } else {
+                g.lineTo(x, y);
+            }
+            index++;
+        }
+        g.stroke();
+    }
+
+    // ==================== 定时任务 ====================
+
+    private VBox scheduleSection(PortableServerManager.Profile profile) {
+        var schedule = com.example.demo.core.server.ServerMetrics.readSchedule(new File(profile.dir()));
+        TextField restart = new TextField(String.valueOf(schedule.restartMinutes()));
+        TextField backup = new TextField(String.valueOf(schedule.backupMinutes()));
+        restart.setPrefColumnCount(5);
+        backup.setPrefColumnCount(5);
+        Label hint = new Label();
+        hint.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 10.5px;");
+        hint.setText(I18n.t("server.panel.scheduleHint", "单位分钟，0 = 关闭；备份写到 backups/，保留最近 10 份"));
+
+        Button save = new Button(I18n.t("server.panel.saveSchedule", "保存计划"));
+        save.getStyleClass().addAll("btn-secondary", "btn-sm");
+        save.setOnAction(e -> {
+            try {
+                int r = Integer.parseInt(restart.getText().trim());
+                int b = Integer.parseInt(backup.getText().trim());
+                com.example.demo.core.server.ServerMetrics.writeSchedule(new File(profile.dir()),
+                        new com.example.demo.core.server.ServerMetrics.Schedule(r, b));
+                ensureScheduler();
+                Toast.ok(I18n.t("server.panel.scheduleSaved", "定时任务已保存"));
+            } catch (NumberFormatException ex) {
+                Toast.error(I18n.t("server.error.number", "端口或内存不是数字"));
+            }
+        });
+
+        return new VBox(8,
+                sectionLabel(I18n.t("server.panel.schedule", "定时任务")),
+                row(I18n.t("server.panel.everyRestart", "每 N 分钟重启"), restart),
+                row(I18n.t("server.panel.everyBackup", "每 N 分钟备份"), backup),
+                new HBox(8, save),
+                hint);
+    }
+
+    private void ensureScheduler() {
+        if (scheduleTimer != null) {
+            return;
+        }
+        scheduleTimer = new javafx.animation.Timeline(
+                new javafx.animation.KeyFrame(javafx.util.Duration.seconds(30), e -> runSchedules()));
+        scheduleTimer.setCycleCount(javafx.animation.Animation.INDEFINITE);
+        scheduleTimer.play();
+    }
+
+    private void runSchedules() {
+        for (var entry : java.util.List.copyOf(running.entrySet())) {
+            String id = entry.getKey();
+            PortableServerManager.Profile profile = PortableServerManager.load(gameDir).stream()
+                    .filter(p -> p.id().equals(id)).findFirst().orElse(null);
+            if (profile == null) {
+                continue;
+            }
+            var schedule = com.example.demo.core.server.ServerMetrics.readSchedule(new File(profile.dir()));
+            long now = System.currentTimeMillis();
+            if (schedule.backupMinutes() > 0) {
+                long last = lastBackupAt.getOrDefault(id, now);
+                if (now - last >= schedule.backupMinutes() * 60_000L) {
+                    lastBackupAt.put(id, now);
+                    java.util.concurrent.CompletableFuture.runAsync(() -> {
+                        try {
+                            File zip = com.example.demo.core.server.ServerMetrics.backupWorld(new File(profile.dir()));
+                            Platform.runLater(() -> appendLog(id,
+                                    I18n.t("server.panel.backupDone", "[自动备份] ") + zip.getName()));
+                        } catch (Exception ex) {
+                            Platform.runLater(() -> appendLog(id,
+                                    I18n.t("server.panel.backupFailed", "[备份失败] ") + ex.getMessage()));
+                        }
+                    });
+                }
+            }
+            if (schedule.restartMinutes() > 0) {
+                long last = lastRestartAt.getOrDefault(id, now);
+                if (now - last >= schedule.restartMinutes() * 60_000L) {
+                    lastRestartAt.put(id, now);
+                    appendLog(id, I18n.t("server.panel.autoRestart", "[按计划重启]"));
+                    restartServer(profile);
+                }
+            }
+        }
+    }
     // ==================== 地址与小工具 ====================
 
     private String localAddress(PortableServerManager.Profile profile) {
@@ -783,6 +1097,11 @@ public final class ServerPanel {
         }
     }
 
+    private Label sectionLabel(String text) {
+        Label label = new Label(text);
+        label.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 11.5px; -fx-font-weight: bold;");
+        return label;
+    }
     private HBox row(String label, javafx.scene.Node control) {
         Label name = new Label(label);
         name.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11.5px;");
