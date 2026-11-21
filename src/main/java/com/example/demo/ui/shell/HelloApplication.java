@@ -311,6 +311,8 @@ public class HelloApplication extends Application {
   private InstancesPanel instancesPanel;
   private InstanceSettingsPanel instanceSettingsPanel;
   private ToolsPanel toolsPanel;
+  /** 上一次「游戏正在运行中」提示的时间，用于节流。 */
+  private long lastLaunchBlockNoticeAt;
   private com.example.demo.ui.page.ServerPanel serverPanel;
   private SettingsPanel settingsPanel;
   private String navHighlight;
@@ -5365,7 +5367,12 @@ private static void setFlexible(Node node, boolean on) {
     if (block == LaunchGuards.Block.NONE) {
       return false;
     }
-    this.logLine(LaunchGuards.logMessage(block));
+    // 防刷屏：卡在准备阶段时用户会连点，同一条提示 5 秒内只写一次
+    long now = System.currentTimeMillis();
+    if (now - this.lastLaunchBlockNoticeAt > 5000L) {
+      this.lastLaunchBlockNoticeAt = now;
+      this.logLine(LaunchGuards.logMessage(block));
+    }
     String toast = LaunchGuards.toastMessage(block);
     if (!toast.isEmpty()) {
       Toast.info(toast);
