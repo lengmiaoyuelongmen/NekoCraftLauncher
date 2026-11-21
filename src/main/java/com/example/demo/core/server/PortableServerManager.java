@@ -244,8 +244,55 @@ public final class PortableServerManager {
 
     // ==================== 运行 ====================
 
+    /** 一个正在运行的服务端：进程 + 标准输入，用来发 stop / op 这类命令。 */
+    public static final class RunningServer {
+        private final String id;
+        private final Process process;
+        private final java.io.BufferedWriter stdin;
+
+        RunningServer(String id, Process process, java.io.BufferedWriter stdin) {
+            this.id = id;
+            this.process = process;
+            this.stdin = stdin;
+        }
+
+        public String id() {
+            return id;
+        }
+
+        public long pid() {
+            return process.pid();
+        }
+
+        public boolean isAlive() {
+            return process.isAlive();
+        }
+
+        /** 往服务端控制台发一条命令（自动补换行）。 */
+        public void send(String command) throws IOException {
+            if (command == null || command.isBlank()) {
+                return;
+            }
+            stdin.write(command.trim());
+            stdin.newLine();
+            stdin.flush();
+        }
+
+        public void stop() {
+            try {
+                send("stop");
+            } catch (IOException ignored) {
+                process.destroy();
+            }
+        }
+
+        public Process process() {
+            return process;
+        }
+    }
+
     /** 启动服务端进程；输出逐行回调（后台线程）。 */
-    public static Process start(Profile profile, Consumer<String> log) throws IOException {
+    public static RunningServer start(Profile profile, Consumer<String> log) throws IOException {
         File dir = new File(profile.dir());
         File jar = new File(dir, "server.jar");
         if (!jar.isFile()) {
@@ -258,37 +305,69 @@ public final class PortableServerManager {
         ProcessBuilder builder = new ProcessBuilder(command);
         builder.directory(dir);
         builder.redirectErrorStream(true);
+        File logFile = new File(dir, "server-console.log");
+        builder.redirectOutput(ProcessBuilder.Redirect.appendTo(logFile));
         Process process = builder.start();
-        Thread reader = new Thread(() -> {
-            try (InputStream in = process.getInputStream()) {
-                byte[] buffer = new byte[4096];
-                StringBuilder line = new StringBuilder();
-                int read;
-                while ((read = in.read(buffer)) >= 0) {
-                    String chunk = new String(buffer, 0, read, StandardCharsets.UTF_8);
-                    for (char c : chunk.toCharArray()) {
-                        if (c == '\n') {
-                            if (log != null) {
-                                log.accept(line.toString());
-                            }
-                            line.setLength(0);
-                        } else if (c != '\r') {
-                            line.append(c);
-                        }
-                    }
-                }
-                if (line.length() > 0 && log != null) {
-                    log.accept(line.toString());
-                }
-            } catch (IOException ignored) {
-                // 进程结束
-            }
-        }, "portable-server-log");
-        reader.setDaemon(true);
-        reader.start();
-        return process;
+        // 输出重定向到文件后，用 tail 线程把新增内容读出来推给 UI（避免 pipe 缓冲爆掉）
+        Thread tailer = new Thread(() -> tail(logFile.getAbsoluteFile(), log, process),
+                "portable-server-tail-" + profile.id());
+        tailer.setDaemon(true);
+        tailer.start();
+
+        java.io.BufferedWriter stdin = new java.io.BufferedWriter(
+                new java.io.OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8));
+        return new RunningServer(profile.id(), process, stdin);
     }
 
+    /** 追读日志文件；进程退出后再多读一轮，确保 "Done"/"Stopping" 不丢。 */
+    private static void tail(File file, Consumer<String> log, Process process) {
+        long position = 0;
+        StringBuilder pending = new StringBuilder();
+        while (process.isAlive()) {
+            position = readFrom(file, position, pending, log);
+            try {
+                Thread.sleep(120);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        readFrom(file, position, pending, log);
+        if (pending.length() > 0 && log != null) {
+            log.accept(pending.toString());
+        }
+    }
+
+    private static long readFrom(File file, long position, StringBuilder pending, Consumer<String> log) {
+        if (!file.isFile()) {
+            return position;
+        }
+        try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(file, "r")) {
+            if (raf.length() < position) {
+                position = 0;
+            }
+            raf.seek(position);
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = raf.read(buffer)) > 0) {
+                position += read;
+                String chunk = new String(buffer, 0, read, StandardCharsets.UTF_8);
+                for (char ch : chunk.toCharArray()) {
+                    if (ch == '\n') {
+                        if (log != null) {
+                            log.accept(pending.toString());
+                        }
+                        pending.setLength(0);
+                    } else if (ch != '\r') {
+                        pending.append(ch);
+                    }
+                }
+            }
+        } catch (IOException ignored) {
+            // 文件被占用/还没建好，下一轮再读
+        }
+        return position;
+    }
     // ==================== 网络信息 ====================
 
     /** 公网 IPv4：依次尝试几个公共回显服务。 */

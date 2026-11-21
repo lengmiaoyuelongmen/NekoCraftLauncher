@@ -2,6 +2,7 @@ package com.example.demo.ui.page;
 
 import com.example.demo.core.app.LauncherConfig;
 import com.example.demo.core.i18n.I18n;
+import com.example.demo.core.server.PortReachability;
 import com.example.demo.core.server.PortableServerManager;
 import com.example.demo.core.server.UpnpPortMapper;
 import com.example.demo.ui.shell.Motion;
@@ -14,7 +15,8 @@ import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
-import javafx.scene.control.ScrollPane;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.input.Clipboard;
@@ -25,14 +27,16 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
 import java.io.File;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * 便携服务器页：地址 / 历史记录 / 创建进度 / 独立日志。
+ * 便携服务器页：地址 / 历史 / 创建进度 / 每服一个日志标签页 / 控制台命令。
  *
- * <p>为什么单独一页：服务端日志是持续刷屏的流，挤在启动器的运行日志里既看不清也互相覆盖。
- * 这里给它一块独立区域，主日志只保留启动器的信息。
+ * <p>支持同时开多个服：每个运行中的服务端有自己的标签页和日志，标签页底部可以直接发命令
+ * （stop / op 玩家 / list…），不用去开那个黑窗口。
  */
 public final class ServerPanel {
 
@@ -44,20 +48,23 @@ public final class ServerPanel {
     private final Label localLabel = new Label("—");
     private final Label natHint = new Label("");
     private final Label upnpHint = new Label("");
-    private boolean mapped;
+    private final Label reachHint = new Label("");
     private final Label statusLabel = new Label(I18n.t("server.status.idle", "当前没有运行中的服务端"));
+
     private final VBox listBox = new VBox(8);
     private final ProgressBar progress = new ProgressBar(0);
     private final Label progressLabel = new Label("");
-    private final TextArea logArea = new TextArea();
+
+    private final TabPane logTabs = new TabPane();
+    private final Map<String, TextArea> logAreas = new LinkedHashMap<>();
+    private final Map<String, PortableServerManager.RunningServer> running = new LinkedHashMap<>();
+    private final TextField commandField = new TextField();
 
     private final TextField portField = new TextField("25565");
     private final TextField memoryField = new TextField("4096");
     private final TextField motdField = new TextField("Neko Craft Server");
     private final CheckBox onlineBox = new CheckBox(I18n.t("server.form.online", "正版验证 (online-mode)"));
 
-    private Process running;
-    private String runningId;
     private int currentPort = 25565;
 
     public ServerPanel(LauncherConfig config, File gameDir) {
@@ -76,8 +83,9 @@ public final class ServerPanel {
 
     private void build() {
         root.setPadding(new Insets(4, 2, 4, 2));
-        root.getChildren().addAll(headerCard(), addressCard(), listCard(), createCard(), logCard());
-        VBox.setVgrow(root.getChildren().get(4), Priority.ALWAYS);
+        VBox log = logCard();
+        root.getChildren().addAll(headerCard(), addressCard(), listCard(), createCard(), log);
+        VBox.setVgrow(log, Priority.ALWAYS);
     }
 
     private VBox headerCard() {
@@ -98,6 +106,10 @@ public final class ServerPanel {
         localLabel.setStyle("-fx-text-fill: -app-text; -fx-font-size: 14px; -fx-font-weight: bold;");
         natHint.setStyle("-fx-text-fill: #f59e0b; -fx-font-size: 11px;");
         natHint.setWrapText(true);
+        upnpHint.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
+        upnpHint.setWrapText(true);
+        reachHint.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
+        reachHint.setWrapText(true);
 
         Button refreshIp = small(I18n.t("server.ip.refresh", "重新检测公网 IP"), e -> refreshPublicIp());
         Button copyPublic = small(I18n.t("server.ip.copyPublic", "复制公网地址"),
@@ -108,22 +120,21 @@ public final class ServerPanel {
         Button upnp = small(I18n.t("server.upnp.map", "自动映射端口（UPnP）"), null);
         upnp.setOnAction(e -> autoMap(upnp));
         Button unmap = small(I18n.t("server.upnp.unmap", "取消映射"), e -> unmap());
-        upnpHint.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
-        upnpHint.setWrapText(true);
+        Button reach = small(I18n.t("server.reach.check", "检测外网是否可连"), null);
+        reach.setOnAction(e -> checkReachability(reach));
 
-        VBox box = card(
+        return card(
                 section(I18n.t("server.addr.title", "连接地址")),
                 row(I18n.t("server.addr.public", "公网地址"), publicLabel, copyPublic, refreshIp),
                 row(I18n.t("server.addr.local", "局域网地址"), localLabel, copyLocal, firewall),
-                new HBox(10, upnp, unmap),
+                new HBox(10, upnp, unmap, reach),
                 upnpHint,
+                reachHint,
                 natHint);
-        return box;
     }
 
     private VBox listCard() {
-        VBox box = card(section(I18n.t("server.list.title", "开过的服务端")), listBox);
-        return box;
+        return card(section(I18n.t("server.list.title", "开过的服务端")), listBox);
     }
 
     private VBox createCard() {
@@ -136,35 +147,82 @@ public final class ServerPanel {
         create.getStyleClass().addAll("btn-primary", "btn-sm");
         create.setOnAction(e -> createServer(create));
 
-        VBox box = card(
+        return card(
                 section(I18n.t("server.create.title", "从当前实例创建")),
                 new HBox(10, new Label(I18n.t("server.form.port", "端口")), portField,
                         new Label(I18n.t("server.form.memory", "最大内存 (MB)")), memoryField),
                 new HBox(10, new Label("MOTD"), motdField, onlineBox),
                 new HBox(10, create, progress, progressLabel));
-        return box;
     }
 
     private VBox logCard() {
-        logArea.setEditable(false);
-        logArea.setWrapText(false);
-        logArea.setStyle("-fx-font-family: 'Consolas','Microsoft YaHei',monospace; -fx-font-size: 11px;"
-                + " -fx-control-inner-background: #0b1416; -fx-text-fill: #c7f9ee;");
-        logArea.setPrefRowCount(12);
-        VBox.setVgrow(logArea, Priority.ALWAYS);
+        logTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.SELECTED_TAB);
+        logTabs.setPrefHeight(280);
+        VBox.setVgrow(logTabs, Priority.ALWAYS);
 
-        Button clear = small(I18n.t("server.log.clear", "清空日志"), e -> logArea.clear());
-        Button copyLog = small(I18n.t("server.log.copy", "复制日志"),
-                e -> copy(logArea.getText()));
-        HBox actions = new HBox(8, clear, copyLog);
-        actions.setAlignment(Pos.CENTER_RIGHT);
+        commandField.setPromptText(I18n.t("server.console.prompt", "输入服务端命令，例如 list / op 玩家名 / stop"));
+        HBox.setHgrow(commandField, Priority.ALWAYS);
+        Button send = small(I18n.t("server.console.send", "发送"), e -> sendCommand());
+        Button clear = small(I18n.t("server.log.clear", "清空日志"), e -> currentLog().clear());
+        Button copyLog = small(I18n.t("server.log.copy", "复制日志"), e -> copy(currentLog().getText()));
+        commandField.setOnAction(e -> sendCommand());
 
         VBox box = card(
-                section(I18n.t("server.log.title", "服务端日志（独立）")),
-                logArea,
-                actions);
+                section(I18n.t("server.log.title", "服务端日志与控制台（每服一个标签页）")),
+                logTabs,
+                new HBox(8, commandField, send, clear, copyLog));
         VBox.setVgrow(box, Priority.ALWAYS);
         return box;
+    }
+
+    // ==================== 日志与标签页 ====================
+
+    private TextArea tabFor(String id, int port) {
+        TextArea area = logAreas.get(id);
+        if (area != null) {
+            return area;
+        }
+        area = new TextArea();
+        area.setEditable(false);
+        area.setWrapText(false);
+        area.setStyle("-fx-font-family: 'Consolas','Microsoft YaHei',monospace; -fx-font-size: 11px;"
+                + " -fx-control-inner-background: #0b1416; -fx-text-fill: #c7f9ee;");
+        logAreas.put(id, area);
+        Tab tab = new Tab(id + " :" + port, area);
+        tab.setUserData(id);
+        logTabs.getTabs().add(tab);
+        logTabs.getSelectionModel().select(tab);
+        return area;
+    }
+
+    private TextArea currentLog() {
+        Tab tab = logTabs.getSelectionModel().getSelectedItem();
+        if (tab == null) {
+            return new TextArea();
+        }
+        Object id = tab.getUserData();
+        return id == null ? new TextArea() : tabFor(String.valueOf(id), currentPort);
+    }
+
+    private void appendLog(String id, int port, String line) {
+        if (line == null) {
+            return;
+        }
+        TextArea area = tabFor(id, port);
+        area.appendText(line + System.lineSeparator());
+        String text = area.getText();
+        if (text.length() > 400_000) {
+            area.setText(text.substring(text.length() - 300_000));
+        }
+        area.positionCaret(area.getLength());
+    }
+
+    private void markTab(String id, String suffix) {
+        for (Tab tab : logTabs.getTabs()) {
+            if (id.equals(String.valueOf(tab.getUserData()))) {
+                tab.setText(tab.getText().replace(" · 已退出", "") + suffix);
+            }
+        }
     }
 
     // ==================== 数据 ====================
@@ -182,6 +240,11 @@ public final class ServerPanel {
             listBox.getChildren().add(profileRow(profile));
         }
         Motion.staggerRows(listBox.getChildren(), 24, 8);
+        statusLabel.setText(running.isEmpty()
+                ? I18n.t("server.status.idle", "当前没有运行中的服务端")
+                : I18n.t("server.status.count", "运行中：") + running.size()
+                + I18n.t("server.status.countUnit", " 个 · ")
+                + String.join(" / ", running.keySet()));
     }
 
     private HBox profileRow(PortableServerManager.Profile profile) {
@@ -194,11 +257,13 @@ public final class ServerPanel {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        boolean isRunning = running != null && running.isAlive() && profile.id().equals(runningId);
-        Button start = small(isRunning ? I18n.t("server.row.stop", "停止") : I18n.t("server.row.start", "启动"),
+        boolean isRunning = running.containsKey(profile.id());
+        Button start = small(isRunning
+                        ? I18n.t("server.row.stop", "停止")
+                        : I18n.t("server.row.start", "启动"),
                 e -> {
-                    if (running != null && running.isAlive() && profile.id().equals(runningId)) {
-                        stopServer();
+                    if (running.containsKey(profile.id())) {
+                        stopServer(profile.id());
                     } else {
                         startServer(profile);
                     }
@@ -260,7 +325,7 @@ public final class ServerPanel {
                 Platform.runLater(() -> {
                     trigger.setDisable(false);
                     progressLabel.setText(I18n.t("server.create.failed", "创建失败"));
-                    appendLog(I18n.t("server.create.failedLog", "[创建失败] ") + ex.getMessage());
+                    appendLog("create", port, I18n.t("server.create.failedLog", "[创建失败] ") + ex.getMessage());
                     Toast.error(I18n.t("server.create.failedToast", "创建失败：") + ex.getMessage());
                 });
             }
@@ -268,40 +333,102 @@ public final class ServerPanel {
     }
 
     private void startServer(PortableServerManager.Profile profile) {
-        if (running != null && running.isAlive()) {
-            Toast.warn(I18n.t("server.error.busy", "已有服务端在运行，先停止它"));
-            return;
-        }
         currentPort = profile.port();
         try {
-            runningId = profile.id();
-            appendLog("=== " + profile.id() + " · " + profile.loader() + " " + profile.mcVersion()
-                    + " · port " + profile.port() + " ===");
-            running = PortableServerManager.start(profile, line -> Platform.runLater(() -> appendLog(line)));
-            statusLabel.setText(I18n.t("server.status.running", "运行中：") + profile.id()
-                    + " · " + I18n.t("server.status.pid", "pid ") + running.pid());
+            appendLog(profile.id(), profile.port(), "=== " + profile.id() + " · " + profile.loader()
+                    + " " + profile.mcVersion() + " · port " + profile.port() + " ===");
+            PortableServerManager.RunningServer handle =
+                    PortableServerManager.start(profile, line ->
+                            Platform.runLater(() -> appendLog(profile.id(), profile.port(), line)));
+            running.put(profile.id(), handle);
             refreshList();
-            running.onExit().thenAccept(p -> Platform.runLater(() -> {
-                statusLabel.setText(I18n.t("server.status.stopped", "服务端已停止（exit ") + p.exitValue() + ")");
-                appendLog(I18n.t("server.status.exited", "[服务端已退出] code=") + p.exitValue());
-                running = null;
-                runningId = null;
+            handle.process().onExit().thenAccept(p -> Platform.runLater(() -> {
+                running.remove(profile.id());
+                appendLog(profile.id(), profile.port(),
+                        I18n.t("server.status.exited", "[服务端已退出] code=") + p.exitValue());
+                markTab(profile.id(), " · 已退出");
                 refreshList();
             }));
         } catch (Exception e) {
-            appendLog(I18n.t("server.error.startFailed", "[启动失败] ") + e.getMessage());
+            appendLog(profile.id(), profile.port(), I18n.t("server.error.startFailed", "[启动失败] ") + e.getMessage());
             Toast.error(I18n.t("server.error.startFailedToast", "启动失败：") + e.getMessage());
         }
     }
 
-    private void stopServer() {
-        if (running != null && running.isAlive()) {
-            running.destroy();
-            appendLog(I18n.t("server.log.stopping", "[正在停止服务端…]"));
+    private void stopServer(String id) {
+        PortableServerManager.RunningServer handle = running.get(id);
+        if (handle == null) {
+            return;
+        }
+        appendLog(id, currentPort, I18n.t("server.log.stopping", "[正在停止服务端…]"));
+        handle.stop();
+        // 10 秒还没退就强杀，避免卡在保存世界
+        CompletableFuture.delayedExecutor(10, java.util.concurrent.TimeUnit.SECONDS).execute(() -> {
+            if (handle.isAlive()) {
+                handle.process().destroyForcibly();
+            }
+        });
+    }
+
+    private void sendCommand() {
+        Tab tab = logTabs.getSelectionModel().getSelectedItem();
+        if (tab == null) {
+            Toast.warn(I18n.t("server.console.noTab", "先启动一个服务端"));
+            return;
+        }
+        String id = String.valueOf(tab.getUserData());
+        PortableServerManager.RunningServer handle = running.get(id);
+        if (handle == null || !handle.isAlive()) {
+            Toast.warn(I18n.t("server.console.notRunning", "这个服务端没有在运行"));
+            return;
+        }
+        String command = commandField.getText();
+        if (command == null || command.isBlank()) {
+            return;
+        }
+        try {
+            handle.send(command);
+            appendLog(id, currentPort, "> " + command.trim());
+            commandField.clear();
+        } catch (Exception e) {
+            Toast.error(I18n.t("server.console.failed", "发送失败：") + e.getMessage());
         }
     }
 
-    /** UPnP 自动映射：成功后把公网地址换成网关读到的真实 IP。 */
+    private void checkReachability(Button trigger) {
+        String publicText = publicLabel.getText();
+        String host = publicText == null ? "" : publicText.split(":")[0];
+        if (host.isEmpty() || !host.matches("\\d{1,3}(\\.\\d{1,3}){3}")) {
+            Toast.warn(I18n.t("server.reach.noIp", "先拿到公网 IP 再检测"));
+            return;
+        }
+        int port = currentPort;
+        trigger.setDisable(true);
+        reachHint.setText(I18n.t("server.reach.checking", "正在请外部节点连一次 ") + host + ":" + port + " …");
+        CompletableFuture.supplyAsync(() -> PortReachability.check(host, port))
+                .thenAccept(result -> Platform.runLater(() -> {
+                    trigger.setDisable(false);
+                    reachHint.setText(result.reason());
+                    reachHint.setStyle("-fx-font-size: 11px; -fx-text-fill: "
+                            + (result.reachable() ? "#22c55e" : (result.conclusive() ? "#ef4444" : "#f59e0b")) + ";");
+                    Toast.info(result.reason());
+                }));
+    }
+
+    private void allowFirewall() {
+        int port = currentPort;
+        CompletableFuture.runAsync(() -> {
+            String error = PortableServerManager.allowFirewall(port);
+            Platform.runLater(() -> {
+                if (error.isEmpty()) {
+                    Toast.ok(I18n.t("server.firewall.ok", "已放行 TCP ") + port);
+                } else {
+                    Toast.warn(I18n.t("server.firewall.failed", "放行失败（需要管理员权限）：") + error);
+                }
+            });
+        });
+    }
+
     private void autoMap(Button trigger) {
         int port = currentPort;
         trigger.setDisable(true);
@@ -310,7 +437,6 @@ public final class ServerPanel {
                 .thenAccept(result -> Platform.runLater(() -> {
                     trigger.setDisable(false);
                     if (result.ok()) {
-                        mapped = true;
                         upnpHint.setText(I18n.t("server.upnp.ok", "已自动映射 TCP ") + port
                                 + (result.externalIp().isEmpty() ? "" : " → " + result.externalIp() + ":" + port));
                         if (!result.externalIp().isEmpty()) {
@@ -328,27 +454,9 @@ public final class ServerPanel {
         int port = currentPort;
         CompletableFuture.supplyAsync(() -> UpnpPortMapper.unmap(port))
                 .thenAccept(result -> Platform.runLater(() -> {
-                    if (result.ok()) {
-                        mapped = false;
-                        upnpHint.setText(I18n.t("server.upnp.removed", "已删除端口映射"));
-                    } else {
-                        upnpHint.setText(result.message());
-                    }
+                    upnpHint.setText(result.message());
                     Toast.info(result.message());
                 }));
-    }
-    private void allowFirewall() {
-        int port = currentPort;
-        CompletableFuture.runAsync(() -> {
-            String error = PortableServerManager.allowFirewall(port);
-            Platform.runLater(() -> {
-                if (error.isEmpty()) {
-                    Toast.ok(I18n.t("server.firewall.ok", "已放行 TCP ") + port);
-                } else {
-                    Toast.warn(I18n.t("server.firewall.failed", "放行失败（需要管理员权限）：") + error);
-                }
-            });
-        });
     }
 
     private void refreshPublicIp() {
@@ -376,22 +484,9 @@ public final class ServerPanel {
                     "公网地址与局域网地址一致：本机可能直接持有公网 IP，朋友可直接连。"));
         } else {
             natHint.setText(I18n.t("server.ip.hintNat",
-                    "公网 IP 与局域网 IP 不同：你在路由器后面。需要在路由器上把 TCP "
-                            + currentPort + " 映射到本机 " + local + "，否则外网连不上。"));
+                    "公网 IP 与局域网 IP 不同：你在路由器后面。需要映射 TCP "
+                            + currentPort + " 到本机 " + local + "，否则外网连不上。"));
         }
-    }
-
-    private void appendLog(String line) {
-        if (line == null) {
-            return;
-        }
-        logArea.appendText(line + System.lineSeparator());
-        // 只保留最后 3000 行，避免长时间运行把内存吃满
-        String text = logArea.getText();
-        if (text.length() > 400_000) {
-            logArea.setText(text.substring(text.length() - 300_000));
-        }
-        logArea.positionCaret(logArea.getLength());
     }
 
     private void copy(String text) {
@@ -442,7 +537,9 @@ public final class ServerPanel {
     private Button small(String text, javafx.event.EventHandler<javafx.event.ActionEvent> action) {
         Button button = new Button(text);
         button.getStyleClass().addAll("btn-secondary", "btn-sm");
-        button.setOnAction(action);
+        if (action != null) {
+            button.setOnAction(action);
+        }
         return button;
     }
 }
