@@ -139,4 +139,38 @@ public final class ServerMetrics {
         }
         return out;
     }
+
+    // ==================== 备份管理 ====================
+
+    /** 备份列表，按时间倒序（最新的在前）。 */
+    public static List<File> listBackups(File serverDir) {
+        File backups = new File(serverDir, "backups");
+        File[] files = backups.listFiles((dir, name) -> name.startsWith("world-") && name.endsWith(".zip"));
+        List<File> list = new ArrayList<>();
+        if (files != null) {
+            list.addAll(List.of(files));
+            list.sort(java.util.Comparator.comparingLong(File::lastModified).reversed());
+        }
+        return list;
+    }
+
+    /**
+     * 用备份覆盖 world。
+     *
+     * <p>不直接删旧世界：先改名成 {@code world.before-restore-<时间>}，解压失败还能救回来。
+     */
+    public static File restoreBackup(File serverDir, File zip) throws Exception {
+        if (zip == null || !zip.isFile()) {
+            throw new IllegalArgumentException("备份文件不存在");
+        }
+        File world = new File(serverDir, "world");
+        if (world.exists()) {
+            String stamp = new java.text.SimpleDateFormat("yyyyMMdd-HHmmss").format(new java.util.Date());
+            File aside = new File(serverDir, "world.before-restore-" + stamp);
+            java.nio.file.Files.move(world.toPath(), aside.toPath());
+        }
+        java.nio.file.Files.createDirectories(world.toPath());
+        com.example.demo.core.download.ZipUtil.unzip(zip, world);
+        return world;
+    }
 }

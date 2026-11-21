@@ -562,7 +562,8 @@ public final class ServerPanel {
                 sectionLabel(I18n.t("server.panel.network", "外网访问")),
                 new HBox(8, upnp, unmap, reach, firewall),
                 upnpHint, reachHint,
-                scheduleSection(profile));
+                scheduleSection(profile),
+                backupSection(profile));
         box.setPadding(new Insets(12));
         return scroll(box);
     }
@@ -1059,6 +1060,85 @@ public final class ServerPanel {
                 }
             }
         }
+    }
+    // ==================== 备份 ====================
+
+    private VBox backupSection(PortableServerManager.Profile profile) {
+        File dir = new File(profile.dir());
+        VBox list = new VBox(4);
+        Label empty = new Label(I18n.t("server.panel.backupEmpty", "还没有备份"));
+        empty.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
+
+        Runnable[] reload = new Runnable[1];
+        reload[0] = () -> {
+            list.getChildren().clear();
+            var backups = com.example.demo.core.server.ServerMetrics.listBackups(dir);
+            if (backups.isEmpty()) {
+                list.getChildren().add(empty);
+                return;
+            }
+            for (File zip : backups) {
+                Label name = new Label(zip.getName());
+                name.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 11px;");
+                Label meta = new Label(humanSize(zip.length()) + " · "
+                        + new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm")
+                        .format(new java.util.Date(zip.lastModified())));
+                meta.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 10.5px;");
+                Button restore = new Button(I18n.t("server.panel.backupRestore", "恢复"));
+                restore.getStyleClass().addAll("btn-secondary", "btn-sm");
+                restore.setOnAction(e -> {
+                    if (running.containsKey(profile.id())) {
+                        Toast.warn(I18n.t("server.panel.stopFirst", "先停止再移除"));
+                        return;
+                    }
+                    try {
+                        com.example.demo.core.server.ServerMetrics.restoreBackup(dir, zip);
+                        Toast.ok(I18n.t("server.panel.backupRestored", "已恢复到 ") + zip.getName());
+                    } catch (Exception ex) {
+                        Toast.error(I18n.t("server.panel.backupRestoreFailed", "恢复失败：") + ex.getMessage());
+                    }
+                });
+                Button delete = new Button(I18n.t("server.panel.backupDelete", "删除"));
+                delete.getStyleClass().addAll("btn-ghost", "btn-sm");
+                delete.setOnAction(e -> {
+                    //noinspection ResultOfMethodCallIgnored
+                    zip.delete();
+                    reload[0].run();
+                });
+                Region gap = new Region();
+                HBox.setHgrow(gap, Priority.ALWAYS);
+                HBox row = new HBox(8, new VBox(1, name, meta), gap, restore, delete);
+                row.setAlignment(Pos.CENTER_LEFT);
+                list.getChildren().add(row);
+            }
+        };
+        reload[0].run();
+
+        Button backupNow = new Button(I18n.t("server.panel.backupNow", "立即备份"));
+        backupNow.getStyleClass().addAll("btn-secondary", "btn-sm");
+        backupNow.setOnAction(e -> {
+            backupNow.setDisable(true);
+            java.util.concurrent.CompletableFuture.runAsync(() -> {
+                try {
+                    File zip = com.example.demo.core.server.ServerMetrics.backupWorld(dir);
+                    Platform.runLater(() -> {
+                        backupNow.setDisable(false);
+                        reload[0].run();
+                        Toast.ok(I18n.t("server.panel.backupCreated", "已备份：") + zip.getName());
+                    });
+                } catch (Exception ex) {
+                    Platform.runLater(() -> {
+                        backupNow.setDisable(false);
+                        Toast.error(I18n.t("server.panel.backupFailedToast", "备份失败：") + ex.getMessage());
+                    });
+                }
+            });
+        });
+
+        return new VBox(8,
+                sectionLabel(I18n.t("server.panel.backups", "备份")),
+                new HBox(8, backupNow),
+                list);
     }
     // ==================== 地址与小工具 ====================
 

@@ -972,6 +972,15 @@ public class HelloApplication extends Application {
     // 全局代理要尽早生效：HttpClient 默认走 ProxySelector.getDefault()
     com.example.demo.core.app.ProxySettings.apply(this.config.getNetworkProxy());
 
+    // 服务器页自检：-Dmc.serverPage=1 时直接进入便携服务器页，省得每次点三层菜单
+    if (System.getProperty("mc.serverPage") != null) {
+      Platform.runLater(
+          () -> {
+            PauseTransition delayed = new PauseTransition(Duration.millis(2600));
+            delayed.setOnFinished(ev -> this.switchPage("server"));
+            delayed.play();
+          });
+    }
     // 环形进度自检：-Dmc.ringDemo=1 时居中展示一个 9 段 / 45% / 第 5 阶段的环，方便截图目检
     if (System.getProperty("mc.ringDemo") != null) {
       Platform.runLater(
