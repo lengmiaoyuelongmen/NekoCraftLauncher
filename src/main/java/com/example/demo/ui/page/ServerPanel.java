@@ -116,11 +116,15 @@ public final class ServerPanel {
         Label title = new Label(I18n.t("server.panel.list", "服务端"));
         title.setStyle("-fx-text-fill: -app-text; -fx-font-size: 12.5px; -fx-font-weight: bold;");
         Button create = new Button(I18n.t("server.panel.new", "＋ 新建"));
-        create.getStyleClass().addAll("btn-primary", "btn-sm");
+        create.getStyleClass().addAll("btn-ghost", "btn-sm");
         create.setOnAction(e -> showCreateForm());
+        // 一键开服：当前实例没有服务端就建一个再启动，省掉「新建 → 填表 → 启动」三步
+        Button quick = new Button(I18n.t("server.panel.quickStart", "⚡ 开服"));
+        quick.getStyleClass().addAll("btn-primary", "btn-sm");
+        quick.setOnAction(e -> quickStart(quick));
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        HBox head = new HBox(8, title, spacer, create);
+        HBox head = new HBox(8, title, spacer, quick, create);
         head.setAlignment(Pos.CENTER_LEFT);
 
         ScrollPane scroll = new ScrollPane(listBox);
@@ -147,6 +151,79 @@ public final class ServerPanel {
         root.getChildren().addAll(header, body);
     }
 
+    /**
+     * 一键开服：优先用当前实例对应的已有服务端；没有就按默认端口 + 配置内存建一个再启动。
+     *
+     * <p>把「新建 → 填端口/内存 → 创建 → 启动」压成一次点击，新手不用知道这些细节。
+     */
+    private void quickStart(Button trigger) {
+        String instanceId = config.getLastInstance();
+        if (instanceId == null || instanceId.isBlank()) {
+            Toast.warn(I18n.t("server.error.instance", "请先在启动页选一个实例"));
+            return;
+        }
+        var existing = PortableServerManager.load(gameDir).stream()
+                .filter(p -> instanceId.equals(p.name()))
+                .findFirst()
+                .orElse(null);
+        if (existing != null) {
+            selectedId = existing.id();
+            refreshList();
+            select(existing);
+            if (running.containsKey(existing.id())) {
+                Toast.info(I18n.t("server.panel.quickRunning", "这个服务端已经在运行了"));
+            } else {
+                startServer(existing);
+            }
+            return;
+        }
+        trigger.setDisable(true);
+        int port = nextFreePort();
+        int memory = Math.max(1024, config.getMemoryMb());
+        boolean isolation = com.example.demo.core.model.InstanceSettings.effectiveIsolation(
+                gameDir, instanceId, config.isIsolation());
+        Toast.info(I18n.t("server.panel.quickCreating", "正在为 ") + instanceId
+                + I18n.t("server.panel.quickCreatingTail", " 创建服务端…"));
+        CompletableFuture.runAsync(() -> {
+            try {
+                PortableServerManager.Profile created = PortableServerManager.create(
+                        gameDir, instanceId, isolation, port, memory, false, "Neko Server " + instanceId,
+                        p -> { });
+                Platform.runLater(() -> {
+                    trigger.setDisable(false);
+                    selectedId = created.id();
+                    refreshList();
+                    select(created);
+                    appendLog(created.id(), I18n.t("server.panel.quickCreated", "[已创建并准备启动] ") + port);
+                    startServer(created);
+                });
+            } catch (Exception ex) {
+                Platform.runLater(() -> {
+                    trigger.setDisable(false);
+                    Toast.error(I18n.t("server.create.failedToast", "创建失败：") + ex.getMessage());
+                });
+            }
+        });
+    }
+
+    /** 从 25565 往上找一个没被已有服务端占用的端口。 */
+    private int nextFreePort() {
+        var used = new java.util.HashSet<Integer>();
+        PortableServerManager.load(gameDir).forEach(p -> used.add(p.port()));
+        running.keySet().forEach(id -> {
+            var profile = PortableServerManager.load(gameDir).stream()
+                    .filter(p -> p.id().equals(id)).findFirst().orElse(null);
+            if (profile != null) {
+                used.add(profile.port());
+            }
+        });
+        for (int port = 25565; port < 25665; port++) {
+            if (!used.contains(port)) {
+                return port;
+            }
+        }
+        return 25565;
+    }
     private VBox placeholder() {
         Label label = new Label(I18n.t("server.panel.empty", "从左侧选一个服务端，或点「＋ 新建」"));
         label.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 12.5px;");

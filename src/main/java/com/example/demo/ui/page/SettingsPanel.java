@@ -686,7 +686,8 @@ public final class SettingsPanel extends VBox {
                 autoJava,
                 javaContainer(),
                 new HBox(8, smallButton("重新检测", e -> reloadJavaList()), hint("选中某一项会填进下面的路径")),
-                labeled("Java 路径", new HBox(8, javaPathField, browseButton("浏览", this::browseJava))));
+                labeled("Java 路径", new HBox(8, javaPathField, browseButton("浏览", this::browseJava),
+                        smallButton(I18n.t("settings.java.detect", "自动检测"), e -> detectLocalJava()))));
         return scroll(card);
     }
 
@@ -1563,6 +1564,61 @@ public final class SettingsPanel extends VBox {
         return row;
     }
 
+    /** 扫描本机已装的 JDK，点一个就填进 Java 路径 —— 比手敲路径省事，也不容易填错。 */
+    private void detectLocalJava() {
+        File gameDir = new File(config.getGameDir());
+        java.util.concurrent.CompletableFuture
+                .supplyAsync(() -> com.example.demo.core.game.JavaScanner.scan(gameDir, true))
+                .thenAccept(list -> javafx.application.Platform.runLater(() -> showJavaList(list)));
+    }
+
+    private void showJavaList(java.util.List<com.example.demo.core.game.JavaScanner.JavaInfo> list) {
+        javafx.scene.layout.VBox box = new javafx.scene.layout.VBox(6);
+        box.setPadding(new javafx.geometry.Insets(6));
+        if (list.isEmpty()) {
+            Label empty = new Label(I18n.t("settings.java.none",
+                    "没有在本机扫描到 Java；可以点「浏览」手动选 java.exe"));
+            empty.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 12px;");
+            box.getChildren().add(empty);
+        }
+        for (var info : list) {
+            // 跳过我们自己的 CRaC 备份目录，它不是可用的运行时
+            if (info.exe().getAbsolutePath().toLowerCase(java.util.Locale.ROOT).contains("crac")) {
+                continue;
+            }
+            Label name = new Label("Java " + info.major() + "  ·  " + info.vendor());
+            name.setStyle("-fx-text-fill: -app-text; -fx-font-size: 12px; -fx-font-weight: bold;");
+            Label path = new Label(info.exe().getAbsolutePath());
+            path.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 10.5px;");
+            javafx.scene.control.Button use = new javafx.scene.control.Button(
+                    I18n.t("settings.java.use", "使用这个"));
+            use.getStyleClass().addAll("btn-secondary", "btn-sm");
+            use.setOnAction(e -> {
+                javaPathField.setText(info.exe().getAbsolutePath());
+                config.setJavaPath(info.exe().getAbsolutePath());
+                config.save();
+                Toast.ok(I18n.t("settings.java.picked", "已选用 Java ") + info.major());
+                com.example.demo.ui.shell.InAppDialog.closeAll();
+            });
+            javafx.scene.layout.Region gap = new javafx.scene.layout.Region();
+            javafx.scene.layout.HBox.setHgrow(gap, javafx.scene.layout.Priority.ALWAYS);
+            javafx.scene.layout.HBox row = new javafx.scene.layout.HBox(8,
+                    new javafx.scene.layout.VBox(1, name, path), gap, use);
+            row.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+            row.getStyleClass().add("neko-card");
+            row.setPadding(new javafx.geometry.Insets(8, 10, 8, 10));
+            box.getChildren().add(row);
+        }
+        com.example.demo.ui.shell.InAppDialog.customSized(
+                com.example.demo.ui.shell.InAppDialog.globalHost(),
+                I18n.t("settings.java.title", "本机 Java"),
+                box,
+                java.util.List.of(com.example.demo.ui.shell.InAppDialog.Action.secondary(
+                        I18n.t("common.close", "关闭"), null)),
+                null,
+                620,
+                Math.min(520, 160 + list.size() * 62));
+    }
     private void browseJava() {
         FileChooser chooser = new FileChooser();
         chooser.setTitle("选择 java.exe");
