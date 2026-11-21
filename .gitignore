@@ -6,7 +6,7 @@ target/
 
 ### 閸氼垰濮╅崳銊ㄧ箥鐞涘本妞傞弫鐗堝祦閿涘牅绗夌仦鐐扮艾濠ф劗鐖滈敍?##
 config.json
-game/
+/game/
 launcher-theme-*.css
 *.log
 
