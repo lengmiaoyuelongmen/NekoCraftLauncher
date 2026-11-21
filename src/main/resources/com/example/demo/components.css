@@ -221,3 +221,24 @@
 .scroll-bar:vertical .thumb:hover {
     -fx-background-color: transparent;
 }
+
+/* 服务端控制台：终端观感。选择器带上 .text-area 提高优先级，
+   否则会被主题里的 `.text-area .content` 覆盖成浅色底 */
+.text-area.server-console {
+    -fx-font-family: 'Consolas', 'Microsoft YaHei', monospace;
+    -fx-font-size: 11.5px;
+    -fx-control-inner-background: #0b1416;
+    -fx-background-color: #0b1416;
+    -fx-text-fill: #c7f9ee;
+    -fx-highlight-fill: #134e4a;
+}
+.text-area.server-console .content {
+    -fx-background-color: #0b1416;
+}
+.text-area.server-console .scroll-pane,
+.text-area.server-console .scroll-pane .viewport {
+    -fx-background-color: #0b1416;
+}
+.text-area.server-console .text {
+    -fx-fill: #c7f9ee;
+}
