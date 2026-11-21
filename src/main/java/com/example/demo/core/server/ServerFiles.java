@@ -152,4 +152,30 @@ public final class ServerFiles {
     private static String get(JsonObject object, String key) {
         return object.has(key) && !object.get(key).isJsonNull() ? object.get(key).getAsString() : "";
     }
+
+    /** 从 ops.json 里移除某个玩家（按名字，大小写不敏感）。 */
+    public static void removeOp(File dir, String name) throws IOException {
+        removePlayer(new File(dir, "ops.json"), name);
+    }
+
+    /** 从 whitelist.json 里移除某个玩家。 */
+    public static void removeWhitelist(File dir, String name) throws IOException {
+        removePlayer(new File(dir, "whitelist.json"), name);
+    }
+
+    private static void removePlayer(File file, String name) throws IOException {
+        if (!file.isFile() || name == null || name.isBlank()) {
+            return;
+        }
+        JsonArray array = JsonParser.parseString(Files.readString(file.toPath(), StandardCharsets.UTF_8))
+                .getAsJsonArray();
+        JsonArray kept = new JsonArray();
+        for (var element : array) {
+            JsonObject object = element.getAsJsonObject();
+            if (!name.equalsIgnoreCase(get(object, "name"))) {
+                kept.add(object);
+            }
+        }
+        Files.writeString(file.toPath(), GSON.toJson(kept), StandardCharsets.UTF_8);
+    }
 }

@@ -48,7 +48,7 @@ import java.util.concurrent.CompletableFuture;
  */
 public final class ServerPanel {
 
-    private final HBox root = new HBox(12);
+    private final VBox root = new VBox(10);
     private final LauncherConfig config;
     private final File gameDir;
 
@@ -88,14 +88,24 @@ public final class ServerPanel {
         refreshList();
     }
 
-    public HBox node() {
+    public VBox node() {
         return root;
     }
 
     // ==================== 骨架 ====================
 
     private void build() {
-        root.setPadding(new Insets(4, 2, 4, 2));
+        root.setPadding(new Insets(8, 18, 16, 18));
+
+        // 与其它页面共用同一个模块头（编号 / 图形 / 水印），避免这一页自成一套视觉
+        com.example.demo.ui.shell.ModuleHeader header =
+                new com.example.demo.ui.shell.ModuleHeader(
+                        "05 / SERVER",
+                        I18n.t("server.title", "便携服务器"),
+                        I18n.t("server.subtitle2", "实例 · 端口 · 日志 · 备份"),
+                        "server",
+                        com.example.demo.ui.shell.ModuleHeader.Badge.SQUARE,
+                        "LAN / WAN");
 
         VBox sidebar = new VBox(10);
         sidebar.setPrefWidth(268);
@@ -103,8 +113,8 @@ public final class ServerPanel {
         sidebar.getStyleClass().add("neko-card");
         sidebar.setPadding(new Insets(12));
 
-        Label title = new Label(I18n.t("server.title", "便携服务器"));
-        title.setStyle("-fx-text-fill: -app-text; -fx-font-size: 14px; -fx-font-weight: bold;");
+        Label title = new Label(I18n.t("server.panel.list", "服务端"));
+        title.setStyle("-fx-text-fill: -app-text; -fx-font-size: 12.5px; -fx-font-weight: bold;");
         Button create = new Button(I18n.t("server.panel.new", "＋ 新建"));
         create.getStyleClass().addAll("btn-primary", "btn-sm");
         create.setOnAction(e -> showCreateForm());
@@ -115,18 +125,26 @@ public final class ServerPanel {
 
         ScrollPane scroll = new ScrollPane(listBox);
         scroll.setFitToWidth(true);
-        scroll.setStyle("-fx-background-color: transparent;");
+        scroll.setStyle("-fx-background-color: transparent; -fx-padding: 0;");
         VBox.setVgrow(scroll, Priority.ALWAYS);
 
-        sidebar.getChildren().addAll(head, new Label(), scroll);
+        Label listHint = new Label(I18n.t("server.panel.listHint", "点一行切换，绿点表示运行中"));
+        listHint.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 10.5px;");
+        listHint.setWrapText(true);
+
+        sidebar.getChildren().addAll(head, scroll, listHint);
 
         VBox main = new VBox(10);
         HBox.setHgrow(main, Priority.ALWAYS);
+        main.setMinWidth(0);
         main.getChildren().add(content);
         VBox.setVgrow(content, Priority.ALWAYS);
         content.getChildren().add(placeholder());
 
-        root.getChildren().addAll(sidebar, main);
+        HBox body = new HBox(12, sidebar, main);
+        VBox.setVgrow(body, Priority.ALWAYS);
+
+        root.getChildren().addAll(header, body);
     }
 
     private VBox placeholder() {
@@ -271,6 +289,9 @@ public final class ServerPanel {
                 tab(I18n.t("server.panel.tab.files", "文件"), filesPane(profile)),
                 tab(I18n.t("server.panel.tab.info", "信息"), infoPane(profile)));
         tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+        if (!tabs.getStyleClass().contains("server-tabs")) {
+            tabs.getStyleClass().add("server-tabs");
+        }
         VBox.setVgrow(tabs, Priority.ALWAYS);
 
         box.getChildren().addAll(header, chips, tabs);
@@ -317,7 +338,19 @@ public final class ServerPanel {
                 quickCommand(profile, "save-all"),
                 quickCommand(profile, "whitelist list"),
                 quickCommand(profile, "stop"));
-        HBox input = new HBox(6, commandField, send);
+        Button clear = new Button(I18n.t("server.log.clear", "清空日志"));
+        clear.getStyleClass().addAll("btn-ghost", "btn-sm");
+        clear.setOnAction(e -> {
+            console.clear();
+            StringBuilder buffer = logs.get(profile.id());
+            if (buffer != null) {
+                buffer.setLength(0);
+            }
+        });
+        Button copyLog = new Button(I18n.t("server.log.copy", "复制日志"));
+        copyLog.getStyleClass().addAll("btn-ghost", "btn-sm");
+        copyLog.setOnAction(e -> copy(console.getText()));
+        HBox input = new HBox(6, commandField, send, clear, copyLog);
         input.setAlignment(Pos.CENTER_LEFT);
 
         hintLine.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 10.5px;");
@@ -405,7 +438,7 @@ public final class ServerPanel {
         });
 
         VBox form = new VBox(10,
-                new Label(I18n.t("server.panel.configTitle", "server.properties（常用项）")),
+                sectionLabel(I18n.t("server.panel.configTitle", "server.properties（常用项）")),
                 row(I18n.t("server.form.port", "端口"), port),
                 row("MOTD", motd),
                 row(I18n.t("server.panel.maxPlayers", "最大人数"), maxPlayers),
@@ -424,15 +457,15 @@ public final class ServerPanel {
     private VBox playersPane(PortableServerManager.Profile profile) {
         File dir = new File(profile.dir());
         VBox lists = new VBox(10);
-        Runnable reload = () -> {
-            lists.getChildren().setAll(
-                    playerSection(I18n.t("server.panel.ops", "OP 列表"), ServerFiles.readOps(dir), true),
-                    playerSection(I18n.t("server.panel.whitelist", "白名单"),
-                            ServerFiles.readWhitelist(dir), false),
-                    playerSection(I18n.t("server.panel.banned", "封禁列表"),
-                            ServerFiles.readBanned(dir), false));
-        };
-        reload.run();
+        Runnable[] reload = new Runnable[1];
+        reload[0] = () -> lists.getChildren().setAll(
+                playerSection(I18n.t("server.panel.ops", "OP 列表"), ServerFiles.readOps(dir), true,
+                        dir, true, reload[0]),
+                playerSection(I18n.t("server.panel.whitelist", "白名单"),
+                        ServerFiles.readWhitelist(dir), false, dir, false, reload[0]),
+                playerSection(I18n.t("server.panel.banned", "封禁列表"),
+                        ServerFiles.readBanned(dir), false, dir, false, reload[0]));
+        reload[0].run();
 
         TextField name = new TextField();
         name.setPromptText(I18n.t("server.panel.playerName", "玩家名"));
@@ -448,7 +481,7 @@ public final class ServerPanel {
                 ServerFiles.addOp(dir, player, "");
                 Toast.ok(I18n.t("server.panel.opAdded", "已写入 ops.json，进服或 /reload 后生效"));
                 name.clear();
-                reload.run();
+                reload[0].run();
             } catch (Exception ex) {
                 Toast.error(I18n.t("server.panel.saveFailed", "保存失败：") + ex.getMessage());
             }
@@ -464,21 +497,22 @@ public final class ServerPanel {
                 ServerFiles.addWhitelist(dir, player, "");
                 Toast.ok(I18n.t("server.panel.whitelistAdded", "已写入 whitelist.json"));
                 name.clear();
-                reload.run();
+                reload[0].run();
             } catch (Exception ex) {
                 Toast.error(I18n.t("server.panel.saveFailed", "保存失败：") + ex.getMessage());
             }
         });
         Button refresh = new Button(I18n.t("server.panel.refresh", "刷新"));
         refresh.getStyleClass().addAll("btn-ghost", "btn-sm");
-        refresh.setOnAction(e -> reload.run());
+        refresh.setOnAction(e -> reload[0].run());
 
         VBox box = new VBox(10, lists, new HBox(8, name, addOp, addWhite, refresh));
         box.setPadding(new Insets(12));
         return box;
     }
 
-    private VBox playerSection(String title, List<ServerFiles.PlayerEntry> entries, boolean withLevel) {
+    private VBox playerSection(String title, List<ServerFiles.PlayerEntry> entries, boolean withLevel,
+                               File dir, boolean ops, Runnable onChange) {
         Label head = new Label(title + " (" + entries.size() + ")");
         head.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 11.5px; -fx-font-weight: bold;");
         VBox box = new VBox(4, head);

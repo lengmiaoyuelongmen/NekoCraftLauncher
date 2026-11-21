@@ -242,3 +242,29 @@
 .text-area.server-console .text {
     -fx-fill: #c7f9ee;
 }
+
+/* 服务器页的标签栏：和全局按钮视觉对齐（小字号、选中用强调色下划线） */
+.server-tabs .tab-header-area .tab-header-background {
+    -fx-background-color: transparent;
+}
+.server-tabs .tab {
+    -fx-background-color: transparent;
+    -fx-padding: 5 12;
+    -fx-background-radius: 8 8 0 0;
+}
+.server-tabs .tab .tab-label {
+    -fx-text-fill: -app-text-muted;
+    -fx-font-size: 11.5px;
+}
+.server-tabs .tab:selected .tab-label {
+    -fx-text-fill: -app-accent;
+    -fx-font-weight: bold;
+}
+.server-tabs .tab:selected {
+    -fx-border-color: transparent transparent -app-accent transparent;
+    -fx-border-width: 0 0 2 0;
+}
+.server-tabs .tab-content-area {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
