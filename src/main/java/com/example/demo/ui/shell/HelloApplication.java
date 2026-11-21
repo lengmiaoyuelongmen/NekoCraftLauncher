@@ -1732,7 +1732,8 @@ private static void setFlexible(Node node, boolean on) {
             () -> this.openInstanceSettings("overview"),
             () -> this.switchPage("download"),
             () -> this.switchPage("advisor"),
-            this::showHealthCheck);
+            this::showHealthCheck,
+            () -> this.switchPage("settings"));
     this.launchOverviewScroll = new javafx.scene.control.ScrollPane(this.launchOverviewPane);
     this.launchOverviewScroll.setFitToWidth(true);
     this.launchOverviewScroll.setHbarPolicy(

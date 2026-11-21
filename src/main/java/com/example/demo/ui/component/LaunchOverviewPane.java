@@ -40,6 +40,10 @@ public final class LaunchOverviewPane extends VBox {
     private final Supplier<String> currentInstance;
 
     private final Label statValue = new Label("—");
+    private final Label envJava = new Label("—");
+    private final Label envMemory = new Label("—");
+    private final Label envDisk = new Label("—");
+    private final Label envHead = new Label("—");
     private final Label statSub = caption("—");
     private final Label lastValue = new Label("—");
     private final Label totalValue = new Label("—");
@@ -48,6 +52,9 @@ public final class LaunchOverviewPane extends VBox {
     private final Label instanceValue = new Label("—");
     private final Label instanceSub = caption("—");
     private final VBox historyBox = new VBox(2.0);
+    private Label instanceMem = new Label();
+    private Label instanceDir = new Label();
+    private Label instanceMods = new Label();
 
     public LaunchOverviewPane(
             LauncherConfig config,
@@ -56,7 +63,8 @@ public final class LaunchOverviewPane extends VBox {
             Runnable openInstanceSettings,
             Runnable openDownload,
             Runnable openAdvisor,
-            Runnable openHealth) {
+            Runnable openHealth,
+            Runnable openSettings) {
         super(12.0);
         this.config = config;
         this.currentInstance = currentInstance;
@@ -77,13 +85,18 @@ public final class LaunchOverviewPane extends VBox {
         instanceValue.setTextOverrun(OverrunStyle.ELLIPSIS);
         instanceValue.setMaxWidth(Double.MAX_VALUE);
 
-        VBox statCard = card("启动记录", statValue, statSub);
+        // 第一张卡改成「运行环境」：Java / 内存 / 磁盘一眼看完，不健康就点进去改
+        envJava.setStyle(envLineStyle());
+        envMemory.setStyle(envLineStyle());
+        envDisk.setStyle(envLineStyle());
+        envHead.setStyle("-fx-text-fill: -app-text; -fx-font-size: 13px; -fx-font-weight: bold;");
+        VBox statCard = card("运行环境", envHead, envJava, envMemory, envDisk);
         VBox lastCard = card("最近一次启动", lastValue, lastSub);
         totalValue.setStyle(
                 "-fx-text-fill: -app-text; -fx-font-size: 16px; -fx-font-weight: bold;");
         VBox totalCard = card("累计游玩", totalValue, totalSub);
-        makeCardClickable(statCard, openAdvisor);
-        makeCardClickable(lastCard, openAdvisor);
+        makeCardClickable(statCard, openSettings);
+        makeCardClickable(lastCard, openHealth);
         makeCardClickable(totalCard, openAdvisor);
         // 两张统计卡等宽撑满一行，右侧不再留空
         statCard.setMaxWidth(Double.MAX_VALUE);
@@ -94,9 +107,9 @@ public final class LaunchOverviewPane extends VBox {
         HBox.setHgrow(totalCard, Priority.ALWAYS);
         HBox statRow = new HBox(12.0, statCard, lastCard, totalCard);
         statRow.setFillHeight(true);
-        statRow.setMinHeight(89.0);
-        statRow.setPrefHeight(89.0);
-        statRow.setMaxHeight(89.0);
+        statRow.setMinHeight(132.0);
+        statRow.setPrefHeight(132.0);
+        statRow.setMaxHeight(132.0);
 
         HBox historyHead =
                 new HBox(
@@ -118,15 +131,26 @@ public final class LaunchOverviewPane extends VBox {
         HBox.setHgrow(historyCard, Priority.ALWAYS);
 
         VBox instanceCard = card("当前实例", instanceValue, instanceSub);
-        Label instanceMem = new Label();
+        instanceMem = new Label();
         instanceMem.setStyle("-fx-text-fill: -app-text-dim-2; -fx-font-size: 11px;");
         instanceMem.setText("分配内存 " + config.getMemoryMb() + " MB");
-        Label instanceDir = new Label();
+        instanceDir = new Label();
         instanceDir.setStyle("-fx-text-fill: -app-text-dim-2; -fx-font-size: 11px;");
         instanceDir.setText("目录 " + config.getGameDir());
         instanceDir.setTextOverrun(OverrunStyle.ELLIPSIS);
         instanceDir.setMaxWidth(Double.MAX_VALUE);
-        instanceCard.getChildren().addAll(instanceMem, instanceDir);
+        instanceMods = new Label();
+        instanceMods.setStyle("-fx-text-fill: -app-text-dim-2; -fx-font-size: 11px;");
+        Button openDirBtn = new Button(I18n.t("overview.openDir", "打开目录"));
+        openDirBtn.getStyleClass().addAll("btn-ghost", "btn-sm");
+        openDirBtn.setOnAction(e -> {
+            try {
+                java.awt.Desktop.getDesktop().open(new File(config.getGameDir()));
+            } catch (Exception ignored) {
+                // 打不开就算了
+            }
+        });
+        instanceCard.getChildren().addAll(instanceMem, instanceMods, instanceDir, openDirBtn);
 
         GridPane quick = new GridPane();
         quick.setHgap(8.0);
@@ -134,9 +158,7 @@ public final class LaunchOverviewPane extends VBox {
         quick.add(quickButton("实例选择", openInstances), 0, 0);
         quick.add(quickButton("实例设置", openInstanceSettings), 1, 0);
         quick.add(quickButton("下载", openDownload), 0, 1);
-        quick.add(quickButton("启动顾问", openAdvisor), 1, 1);
-        Button health = quickButton("一键体检", openHealth);
-        quick.add(health, 0, 2, 2, 1);
+        quick.add(quickButton("一键体检", openHealth), 1, 1);
         for (int i = 0; i < 2; i++) {
             ColumnConstraints column = new ColumnConstraints();
             column.setPercentWidth(50.0);
@@ -214,6 +236,8 @@ public final class LaunchOverviewPane extends VBox {
             }
         }
 
+        refreshEnvironment();
+
         String instance = currentInstance == null ? null : currentInstance.get();
         if (instance == null || instance.isBlank()) {
             instance = config.getLastInstance();
@@ -225,6 +249,7 @@ public final class LaunchOverviewPane extends VBox {
             instanceValue.setText(instance);
             String mc = InstanceId.mcVersion(instance);
             instanceSub.setText("MC " + (mc == null ? "—" : mc) + " · " + loader(instance));
+            instanceMods.setText(I18n.t("overview.mods", "模组 ") + countMods(instance) + I18n.t("overview.modsUnit", " 个"));
         }
 
         long totalSession = 0L;
@@ -306,6 +331,66 @@ public final class LaunchOverviewPane extends VBox {
         return label;
     }
 
+    /** 环境卡的三行样式：小字号、次要色，异常行由 refreshEnvironment 换成警示色。 */
+    private static String envLineStyle() {
+        return "-fx-text-fill: -app-text-dim-2; -fx-font-size: 11px;";
+    }
+
+    /** 读 Java / 内存 / 磁盘，给一句能直接行动的结论。 */
+    private void refreshEnvironment() {
+        String javaPath = config.getJavaPath();
+        if (javaPath == null || javaPath.isBlank()) {
+            envJava.setText(I18n.t("overview.env.javaAuto", "Java：自动（优先用本机已装 JDK）"));
+            envJava.setStyle(envLineStyle());
+        } else {
+            File exe = new File(javaPath);
+            envJava.setText(I18n.t("overview.env.javaSet", "Java：") + exe.getName()
+                    + " · " + exe.getParentFile().getParentFile().getName());
+            envJava.setStyle(envLineStyle());
+        }
+
+        int memory = config.getMemoryMb();
+        envMemory.setText(I18n.t("overview.env.memory", "内存：") + memory + " MB");
+        boolean tooLow = memory < 2048;
+        envMemory.setStyle(tooLow
+                ? "-fx-text-fill: #f59e0b; -fx-font-size: 11px;"
+                : envLineStyle());
+
+        File gameDir = new File(config.getGameDir());
+        long freeBytes = gameDir.getUsableSpace();
+        double freeGb = freeBytes / 1024.0 / 1024.0 / 1024.0;
+        String freeText = String.format(java.util.Locale.ROOT, "%.1f GB", freeGb);
+        envDisk.setText(I18n.t("overview.env.disk", "磁盘剩余：") + freeText);
+        boolean lowDisk = freeGb < 2.0;
+        envDisk.setStyle(lowDisk
+                ? "-fx-text-fill: #ef4444; -fx-font-size: 11px;"
+                : envLineStyle());
+
+        String head;
+        if (lowDisk) {
+            head = I18n.t("overview.env.headBad", "需要处理：磁盘快满了");
+        } else if (tooLow) {
+            head = I18n.t("overview.env.headWarn", "建议调高内存");
+        } else {
+            head = I18n.t("overview.env.headOk", "环境就绪 · 点这里调整");
+        }
+        envHead.setText(head);
+        envHead.setStyle("-fx-text-fill: "
+                + (lowDisk ? "#ef4444" : (tooLow ? "#f59e0b" : "-app-text"))
+                + "; -fx-font-size: 13px; -fx-font-weight: bold;");
+    }
+
+    /** 数一下当前实例的模组数量；读不到就返回 0。 */
+    private int countMods(String instance) {
+        try {
+            File mods = com.example.demo.core.model.InstanceDirs.mods(
+                    new File(config.getGameDir()), instance, config.isIsolation());
+            File[] files = mods.listFiles((dir, name) -> name.toLowerCase(java.util.Locale.ROOT).endsWith(".jar"));
+            return files == null ? 0 : files.length;
+        } catch (Exception e) {
+            return 0;
+        }
+    }
     private static Label caption(String text) {
         Label label = new Label(text);
         label.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 10.5px;");
