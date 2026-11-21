@@ -4,27 +4,27 @@
  */
 
 .root {
-    -app-bg: #12080a;
-    -app-root-1: #2a1014;
-    -app-root-2: #1c0b0e;
-    -app-root-3: #120709;
-    -app-input: #241013;
+    -app-bg: #000000;
+    -app-root-1: #0d0d0d;
+    -app-root-2: #070707;
+    -app-root-3: #000000;
+    -app-input: #141414;
     -app-btn-2: #2a303b;
     -app-btn-3: #38404e;
     -app-arrow: #7b8494;
     -app-arrow-2: #9aa3b2;
     -app-border-6: #3a4150;
-    -app-log-bg: #170b0d;
+    -app-log-bg: #0a0a0a;
     -app-text-nav: #a4abba;
     -app-text-muted-c: #5c6572;
-    -app-surface: #1b0d10;
-    -app-card: #2a1418;
-    -app-card-hover: #351a1e;
-    -app-border: #3b2024;
+    -app-surface: #101010;
+    -app-card: #161616;
+    -app-card-hover: #1f1f1f;
+    -app-border: #2a2a2a;
     -app-border-soft: rgba(255, 255, 255, 0.08);
-    -app-text: #f5e8e6;
-    -app-text-dim: #d3b9b5;
-    -app-text-muted: #ad8a86;
+    -app-text: #f2f2f2;
+    -app-text-dim: #c9c9c9;
+    -app-text-muted: #8b8b8b;
     -app-launch-top: rgba(225,29,46,0.38);
     -app-launch-bottom: rgba(120,10,20,0.22);
     -app-launch-top-hover: rgba(255,70,60,0.52);
@@ -36,39 +36,39 @@
     -app-accent: #e11d2e;
     -app-accent-soft: rgba(225, 29, 46, 0.24);
     /* 界面里实际用到的深色值，统一成变量，浅色模式只改这里 */
-    -app-bg-2: #15090b;
-    -app-bg-3: #170b0e;
-    -app-surface-2: #1a0c0f;
-    -app-nav: #190c0f;
-    -app-nav-2: #180b0e;
-    -app-card-alt: #220f12;
-    -app-card-alt2: #2c1317;
-    -app-card-top: #38191e;
+    -app-bg-2: #0b0b0b;
+    -app-bg-3: #0e0e0e;
+    -app-surface-2: #121212;
+    -app-nav: #0b0b0b;
+    -app-nav-2: #0a0a0a;
+    -app-card-alt: #121212;
+    -app-card-alt2: #1a1a1a;
+    -app-card-top: #181818;
     /* 玻璃卡片：半透明 + 内描边，让页面底色透上来一点 */
-    -app-glass-top: rgba(64, 30, 36, 0.88);
-    -app-glass-bottom: rgba(40, 19, 23, 0.84);
+    -app-glass-top: rgba(24, 24, 24, 0.92);
+    -app-glass-bottom: rgba(15, 15, 15, 0.90);
     -app-glass-border: rgba(255, 255, 255, 0.10);
-    -app-card-top2: #3c1b20;
-    -app-row: #251114;
-    -app-row2: #281216;
-    -app-row3: #2b1418;
-    -app-hover: #351a1e;
-    -app-hover-2: #2c1418;
-    -app-hover-3: #3a1c20;
+    -app-card-top2: #1c1c1c;
+    -app-row: #131313;
+    -app-row2: #161616;
+    -app-row3: #191919;
+    -app-hover: #1f1f1f;
+    -app-hover-2: #242424;
+    -app-hover-3: #2a2a2a;
     -app-warn-bg: rgba(251,191,36,0.08);
     -app-warn-border: rgba(251,191,36,0.28);
     -app-warn-bg-hover: rgba(251,191,36,0.16);
     -app-warn-border-hover: rgba(251,191,36,0.55);
-    -app-border-2: #3a1f23;
-    -app-border-3: #3d2226;
-    -app-border-4: #4a292d;
-    -app-border-5: #351b1f;
-    -app-panel: #2a1418;
-    -app-panel-2: #200f12;
-    -app-text-strong: #f2e4e1;
-    -app-text-2: #eed7d3;
-    -app-text-dim-2: #b5928e;
-    -app-text-dim-3: #9a756f;
+    -app-border-2: #2c2c2c;
+    -app-border-3: #303030;
+    -app-border-4: #3a3a3a;
+    -app-border-5: #262626;
+    -app-panel: #161616;
+    -app-panel-2: #101010;
+    -app-text-strong: #f7f7f7;
+    -app-text-2: #e6e6e6;
+    -app-text-dim-2: #ababab;
+    -app-text-dim-3: #8f8f8f;
     -app-text-muted-2: #666666;
     -app-text-muted-3: #888888;
     -fx-font-family: 'Microsoft YaHei UI', 'Microsoft YaHei', 'Segoe UI', sans-serif;
@@ -499,9 +499,9 @@
 }
 /* 顶部标题栏：始终深色（含浅色模式），所以单独写死 */
 .app-topbar {
-    -fx-background-color: #0e2f26;
+    -fx-background-color: linear-gradient(to bottom, #b91c1c, #8f1220);
     -fx-background-radius: 16 16 0 0;
-    -fx-border-color: transparent transparent #1f5a46 transparent;
+    -fx-border-color: transparent transparent #7f1d1d transparent;
 }
 /* 对话框：跟随主题，避免深色界面里出现白色按钮区 */
 .dialog-pane {

@@ -87,7 +87,7 @@ public final class TopBar {
         Rectangle mark = new Rectangle(3.0, 18.0);
         mark.setArcWidth(3.0);
         mark.setArcHeight(3.0);
-        mark.setStyle("-fx-fill: #14b8a6;");
+        mark.setStyle("-fx-fill: #ffe4e6;");
 
         Label appTitle = new Label("Neko Craft Launcher");
         appTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
@@ -96,11 +96,11 @@ public final class TopBar {
         appTitle.setMinWidth(Region.USE_PREF_SIZE);
         Label badge = new Label("NEKO");
         badge.setStyle("-fx-font-size: 10.5px; -fx-font-weight: bold;");
-        badge.setTextFill(Color.web("#5eead4"));
+        badge.setTextFill(Color.web("#fecdd3"));
 
         Label liveClock = new Label();
         // 等宽字体优先 Consolas：Cascadia Mono 在部分机器上缺字时会退回到奇怪的字形
-        liveClock.setStyle("-fx-text-fill: #7b818b; -fx-font-size: 10.5px;"
+        liveClock.setStyle("-fx-text-fill: #fca5a5; -fx-font-size: 10.5px;"
                 + " -fx-font-family: 'Consolas', 'Cascadia Mono', monospace;"
                 + " -fx-font-smoothing-type: gray;");
         DateTimeFormatter clockFormat = DateTimeFormatter.ofPattern("HH:mm:ss");
