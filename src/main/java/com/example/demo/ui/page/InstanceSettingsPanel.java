@@ -521,69 +521,109 @@ public final class InstanceSettingsPanel extends HBox {
         personalCard.getChildren().add(personal);
         InstanceSettings.Settings override = InstanceSettings.get(gameDir, instance.id);
         VBox launchCard = card("启动设置（本实例）", new String[][]{});
-        javafx.scene.control.CheckBox useMemory = new javafx.scene.control.CheckBox("覆盖最大内存");
+        Label overrideHint = new Label(
+                "每一行都可以「跟随全局」或「本实例单独设置」；保存后只影响这个实例。");
+        overrideHint.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
+        overrideHint.setWrapText(true);
+
+        // ---- 内存 ----
+        javafx.scene.control.CheckBox memoryCustom = new javafx.scene.control.CheckBox("单独设置");
         javafx.scene.control.Spinner<Integer> memorySpinner = new javafx.scene.control.Spinner<>(
-                512, 16384, override.memoryMb() == null ? 2048 : override.memoryMb(), 512);
-        memorySpinner.setPrefWidth(120);
-        useMemory.setSelected(override.memoryMb() != null);
-        memorySpinner.setDisable(!useMemory.isSelected());
-        useMemory.selectedProperty().addListener((o, a, b) -> memorySpinner.setDisable(!b));
+                512, 16384, override.memoryMb() == null ? Math.max(1024, config.getMemoryMb()) : override.memoryMb(), 512);
+        memorySpinner.setPrefWidth(110);
+        memoryCustom.setSelected(override.memoryMb() != null);
+        memorySpinner.setDisable(!memoryCustom.isSelected());
+        memoryCustom.selectedProperty().addListener((o, a, b) -> memorySpinner.setDisable(!b));
         javafx.scene.control.Button smartMemory = ghostButton("智能分配");
         smartMemory.setOnAction(e -> {
             MemoryAdvisor.Suggestion suggestion = MemoryAdvisor.suggest(
                     InstanceDirs.mods(gameDir, instance.id, effectiveIsolation(instance.id)));
-            useMemory.setSelected(true);
+            memoryCustom.setSelected(true);
             memorySpinner.getValueFactory().setValue(suggestion.memoryMb());
             Toast.ok("建议 " + suggestion.memoryMb() + " MB：" + suggestion.reason());
         });
-        javafx.scene.control.TextField jvmField = new javafx.scene.control.TextField(
-                override.jvmArgs() == null ? "" : override.jvmArgs());
-        jvmField.setPromptText("留空 = 使用全局 JVM 参数");
+        HBox memoryRow = new HBox(10, memoryCustom, memorySpinner, smartMemory,
+                followLabel("全局 " + config.getMemoryMb() + " MB"));
+        memoryRow.setAlignment(Pos.CENTER_LEFT);
+
+        // ---- JVM 参数 ----
+        javafx.scene.control.CheckBox jvmCustom = new javafx.scene.control.CheckBox("单独设置");
+        javafx.scene.control.TextField jvmField = new javafx.scene.control.TextField(override.jvmArgs() == null ? "" : override.jvmArgs());
+        jvmField.setPromptText("例如 -XX:+UseG1GC -XX:MaxGCPauseMillis=50");
         HBox.setHgrow(jvmField, Priority.ALWAYS);
-        javafx.scene.control.TextField javaField = new javafx.scene.control.TextField(
-                override.javaPath() == null ? "" : override.javaPath());
-        javaField.setPromptText("留空 = 使用全局 Java；可填 java.exe 完整路径");
+        jvmCustom.setSelected(override.jvmArgs() != null && !override.jvmArgs().isBlank());
+        jvmField.setDisable(!jvmCustom.isSelected());
+        jvmCustom.selectedProperty().addListener((o, a, b) -> jvmField.setDisable(!b));
+
+        // ---- Java 路径 ----
+        javafx.scene.control.CheckBox javaCustom = new javafx.scene.control.CheckBox("单独设置");
+        javafx.scene.control.TextField javaField = new javafx.scene.control.TextField(override.javaPath() == null ? "" : override.javaPath());
+        javaField.setPromptText("java.exe 完整路径；留空时点「自动检测」也行");
         HBox.setHgrow(javaField, Priority.ALWAYS);
-        javafx.scene.control.TextField gameArgsField = new javafx.scene.control.TextField(
-                override.gameArgs() == null ? "" : override.gameArgs());
-        gameArgsField.setPromptText("留空 = 使用全局游戏参数；例如 --width 1920 --height 1080");
+        javaCustom.setSelected(override.javaPath() != null && !override.javaPath().isBlank());
+        javaField.setDisable(!javaCustom.isSelected());
+        javaCustom.selectedProperty().addListener((o, a, b) -> javaField.setDisable(!b));
+
+        // ---- 游戏参数 ----
+        javafx.scene.control.CheckBox argsCustom = new javafx.scene.control.CheckBox("单独设置");
+        javafx.scene.control.TextField gameArgsField = new javafx.scene.control.TextField(override.gameArgs() == null ? "" : override.gameArgs());
+        gameArgsField.setPromptText("例如 --width 1920 --height 1080");
         HBox.setHgrow(gameArgsField, Priority.ALWAYS);
-        // 版本隔离也可以按实例覆盖：默认跟随全局，跟 Prism 的实例级设置一致
+        argsCustom.setSelected(override.gameArgs() != null && !override.gameArgs().isBlank());
+        gameArgsField.setDisable(!argsCustom.isSelected());
+        argsCustom.selectedProperty().addListener((o, a, b) -> gameArgsField.setDisable(!b));
+
+        // ---- 版本隔离 ----
         javafx.scene.control.ComboBox<String> isolationBox = new javafx.scene.control.ComboBox<>();
         isolationBox.getItems().addAll("版本隔离：跟随全局", "版本隔离：开启", "版本隔离：关闭");
         isolationBox.getSelectionModel().select(
                 override.isolation() == null ? 0 : (override.isolation() ? 1 : 2));
-        isolationBox.setPrefWidth(220);
+        isolationBox.setPrefWidth(200);
+
         javafx.scene.control.Button saveOverride = ghostButton("保存本实例设置");
         saveOverride.setOnAction(e -> {
-            Integer memory = useMemory.isSelected() ? memorySpinner.getValue() : null;
-            InstanceSettings.save(gameDir, instance.id, memory, jvmField.getText(), javaField.getText(),
-                    gameArgsField.getText());
+            Integer memory = memoryCustom.isSelected() ? memorySpinner.getValue() : null;
+            InstanceSettings.save(gameDir, instance.id, memory,
+                    jvmCustom.isSelected() ? jvmField.getText() : "",
+                    javaCustom.isSelected() ? javaField.getText() : "",
+                    argsCustom.isSelected() ? gameArgsField.getText() : "");
             int isolationMode = isolationBox.getSelectionModel().getSelectedIndex();
             InstanceSettings.saveIsolation(gameDir, instance.id,
                     isolationMode == 0 ? null : isolationMode == 1);
             Toast.ok("已保存本实例启动设置");
-            log("🎛 实例 " + instance.id + " 启动设置已保存");
+            log("🎛 实例 " + instance.id + " 启动设置已保存（"
+                    + summaryOf(memory, jvmCustom.isSelected(), javaCustom.isSelected(), argsCustom.isSelected())
+                    + "）");
         });
-        javafx.scene.control.Button clearOverride = ghostButton("恢复全局");
+        javafx.scene.control.Button clearOverride = ghostButton("全部跟随全局");
         clearOverride.setOnAction(e -> {
             InstanceSettings.save(gameDir, instance.id, null, "", "");
             InstanceSettings.saveIsolation(gameDir, instance.id, null);
-            useMemory.setSelected(false);
-            memorySpinner.setDisable(true);
+            memoryCustom.setSelected(false);
+            jvmCustom.setSelected(false);
+            javaCustom.setSelected(false);
+            argsCustom.setSelected(false);
             jvmField.clear();
             javaField.clear();
             gameArgsField.clear();
             isolationBox.getSelectionModel().select(0);
             Toast.ok("已恢复为全局设置");
         });
-        HBox memoryRow = new HBox(12, useMemory, memorySpinner, smartMemory);
-        memoryRow.setAlignment(Pos.CENTER_LEFT);
+
         HBox saveRow = new HBox(10, saveOverride, clearOverride);
         saveRow.setAlignment(Pos.CENTER_LEFT);
-        launchCard.getChildren().addAll(memoryRow, jvmField, javaField, gameArgsField,
-                new HBox(10, isolationBox), saveRow);
-        VBox advancedCard = card("高级管理", new String[][]{});
+        launchCard.getChildren().addAll(
+                overrideHint,
+                rowWith("最大内存", memoryRow),
+                rowWith("JVM 参数", new HBox(10, jvmCustom, jvmField, followLabel("全局：" + jvmText()))),
+                rowWith("Java 路径", new HBox(10, javaCustom, javaField, followLabel("全局："
+                        + (config.getJavaPath() == null || config.getJavaPath().isBlank()
+                        ? "自动检测" : new File(config.getJavaPath()).getName())))),
+                rowWith("游戏参数", new HBox(10, argsCustom, gameArgsField,
+                        followLabel("全局：" + (config.getGameArgs() == null || config.getGameArgs().isBlank()
+                                ? "无" : config.getGameArgs())))),
+                new HBox(10, new Label("版本隔离"), isolationBox),
+                saveRow);        VBox advancedCard = card("高级管理", new String[][]{});
         advanced.setAlignment(Pos.CENTER_LEFT);
         advancedCard.getChildren().add(advanced);
 
@@ -597,6 +637,51 @@ public final class InstanceSettingsPanel extends HBox {
         return wrap;
     }
 
+    /** 「跟随全局」提示标签：值写清楚，不用去设置页查。 */
+    private static Label followLabel(String text) {
+        Label label = new Label(text);
+        label.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 10.5px;");
+        return label;
+    }
+
+    /** 让「标签 + 控件」对齐成一行。 */
+    private static HBox rowWith(String label, javafx.scene.Node control) {
+        Label name = new Label(label);
+        name.setStyle("-fx-text-fill: -app-text-dim-2; -fx-font-size: 11.5px;");
+        name.setMinWidth(74);
+        HBox.setHgrow(control, Priority.ALWAYS);
+        HBox box = new HBox(10, name, control);
+        box.setAlignment(Pos.CENTER_LEFT);
+        return box;
+    }
+
+    /** 全局 JVM 参数的简短展示（太长就截断）。 */
+    private String jvmText() {
+        String args = config.getJvmArgs();
+        if (args == null || args.isBlank()) {
+            return "无";
+        }
+        String text = args.trim();
+        return text.length() > 42 ? text.substring(0, 42) + "…" : text;
+    }
+
+    /** 保存时写进日志的一句话摘要。 */
+    private static String summaryOf(Integer memory, boolean jvm, boolean javaPath, boolean args) {
+        java.util.List<String> parts = new java.util.ArrayList<>();
+        if (memory != null) {
+            parts.add("内存 " + memory + " MB");
+        }
+        if (jvm) {
+            parts.add("JVM 参数");
+        }
+        if (javaPath) {
+            parts.add("Java 路径");
+        }
+        if (args) {
+            parts.add("游戏参数");
+        }
+        return parts.isEmpty() ? "全部跟随全局" : String.join(" / ", parts);
+    }
     /** 把本地文件复制进实例目录（资源包 / 光影包等）。 */
     private void installFiles(File dir) {
         javafx.stage.FileChooser chooser = new javafx.stage.FileChooser();

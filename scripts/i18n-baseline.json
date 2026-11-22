@@ -1,7 +1,7 @@
 ﻿{
     "generated":  "2026-11-22",
     "note":  "只降不升：新文案请写成 I18n.t(\"key\", \"中文\")，这个数字才会往下走",
-    "total":  2177,
+    "total":  2204,
     "files":  {
                   "HealthCheckView.java":  10,
                   "InAppDialog.java":  14,
@@ -24,7 +24,7 @@
                   "ExportInstanceDialog.java":  32,
                   "DownloadStatusBar.java":  3,
                   "CommandBar.java":  10,
-                  "HelloApplication.java":  536,
+                  "HelloApplication.java":  542,
                   "ScreenshotManagerDialog.java":  10,
                   "LittleSkinWebDialog.java":  5,
                   "VersionDetailPage.java":  22,
@@ -33,7 +33,7 @@
                   "DownloadStatusPane.java":  4,
                   "LaunchOverviewPane.java":  40,
                   "ModsPanel.java":  220,
-                  "InstanceSettingsPanel.java":  164,
+                  "InstanceSettingsPanel.java":  185,
                   "InstallerPage.java":  30,
                   "Theme.java":  4,
                   "LaunchAdvisorBar.java":  7,

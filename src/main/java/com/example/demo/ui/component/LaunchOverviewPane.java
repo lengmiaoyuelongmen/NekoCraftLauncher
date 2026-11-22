@@ -58,6 +58,7 @@ public final class LaunchOverviewPane extends VBox {
     private final javafx.scene.control.CheckBox onlyFailed = new javafx.scene.control.CheckBox(I18n.t("overview.onlyFailed", "只看失败"));
     private final Label lastReason = new Label();
     private final Button fixEnvButton = new Button(I18n.t("overview.env.fix", "一键修复"));
+    private final HBox failActions = new HBox(8.0);
 
     public LaunchOverviewPane(
             LauncherConfig config,
@@ -67,7 +68,8 @@ public final class LaunchOverviewPane extends VBox {
             Runnable openDownload,
             Runnable openAdvisor,
             Runnable openHealth,
-            Runnable openSettings) {
+            Runnable openSettings,
+            Runnable openLogs) {
         super(12.0);
         this.config = config;
         this.currentInstance = currentInstance;
@@ -100,8 +102,27 @@ public final class LaunchOverviewPane extends VBox {
         VBox statCard = card("运行环境", envHead, envJava, envMemory, envDisk, fixEnvButton);
         lastReason.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11px;");
         lastReason.setWrapText(true);
+        Button openLogsBtn = new Button(I18n.t("overview.openLogs", "查看日志"));
+        openLogsBtn.getStyleClass().addAll("btn-ghost", "btn-sm");
+        openLogsBtn.setOnAction(e -> openLogs.run());
+        Button openCrash = new Button(I18n.t("overview.openCrash", "崩溃报告"));
+        openCrash.getStyleClass().addAll("btn-ghost", "btn-sm");
+        openCrash.setOnAction(e -> {
+            try {
+                File reports = new File(new File(config.getGameDir()), "crash-reports");
+                if (!reports.isDirectory()) {
+                    reports.mkdirs();
+                }
+                java.awt.Desktop.getDesktop().open(reports);
+            } catch (Exception ignored) {
+                // 打不开就忽略
+            }
+        });
+        failActions.getChildren().setAll(openLogsBtn, openCrash);
+        failActions.setVisible(false);
+        failActions.setManaged(false);
         lastReason.setMaxWidth(210);
-        VBox lastCard = card("最近一次启动", lastValue, lastSub, lastReason);
+        VBox lastCard = card("最近一次启动", lastValue, lastSub, lastReason, failActions);
         totalValue.setStyle(
                 "-fx-text-fill: -app-text; -fx-font-size: 16px; -fx-font-weight: bold;");
         VBox totalCard = card("累计游玩", totalValue, totalSub);
@@ -245,6 +266,8 @@ public final class LaunchOverviewPane extends VBox {
             } else {
                 lastValue.setText(time(last.time()));
                 lastReason.setText(last.crash() ? crashReason(dir) : "");
+                failActions.setVisible(last.crash());
+                failActions.setManaged(last.crash());
                 lastSub.setText(
                         LaunchHistory.outcomeLabel(last)
                                 + " · 准备 "

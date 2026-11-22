@@ -961,7 +961,11 @@ public class HelloApplication extends Application {
     scene.addEventFilter(
         javafx.scene.input.KeyEvent.KEY_PRESSED,
         event -> {
-          if (event.getCode() == javafx.scene.input.KeyCode.ESCAPE) {
+          if (event.getCode() == javafx.scene.input.KeyCode.F1) {
+            this.showShortcutHelp();
+            event.consume();
+            return;
+          }          if (event.getCode() == javafx.scene.input.KeyCode.ESCAPE) {
             if (com.example.demo.ui.shell.InAppDialog.globalHost() != null
                 && !com.example.demo.ui.shell.InAppDialog.globalHost().getChildren().isEmpty()) {
               com.example.demo.ui.shell.InAppDialog.closeAll();
@@ -1761,7 +1765,8 @@ private static void setFlexible(Node node, boolean on) {
             () -> this.switchPage("download"),
             () -> this.switchPage("advisor"),
             this::showHealthCheck,
-            () -> this.switchPage("settings"));
+            () -> this.switchPage("settings"),
+            () -> this.switchPage("logs"));
     this.launchOverviewScroll = new javafx.scene.control.ScrollPane(this.launchOverviewPane);
     this.launchOverviewScroll.setFitToWidth(true);
     this.launchOverviewScroll.setHbarPolicy(
@@ -5371,6 +5376,38 @@ private static void setFlexible(Node node, boolean on) {
     }
   }
 
+  /** F1：把所有快捷键列出来，不用去翻文档。 */
+  private void showShortcutHelp() {
+    javafx.scene.layout.VBox box = new javafx.scene.layout.VBox(6);
+    box.setPadding(new javafx.geometry.Insets(4));
+    String[][] rows = {
+            {"Ctrl + K", "命令面板（搜索页面与操作）"},
+            {"Ctrl + ,", "打开设置"},
+            {"Enter", "启动页直接启动游戏"},
+            {"F1", "显示这份快捷键说明"},
+            {"Esc", "关闭最上层弹窗"},
+            {"F9", "收起 / 展开运行日志"},
+    };
+    for (String[] row : rows) {
+      javafx.scene.control.Label key = new javafx.scene.control.Label(row[0]);
+      key.setStyle("-fx-text-fill: -app-accent; -fx-font-size: 11.5px; -fx-font-weight: bold;"
+              + " -fx-font-family: 'Consolas', monospace;");
+      key.setMinWidth(84);
+      javafx.scene.control.Label desc = new javafx.scene.control.Label(row[1]);
+      desc.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 11.5px;");
+      javafx.scene.layout.HBox line = new javafx.scene.layout.HBox(12, key, desc);
+      line.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+      box.getChildren().add(line);
+    }
+    InAppDialog.customSized(
+        InAppDialog.globalHost(),
+        I18n.t("help.shortcuts.title", "快捷键"),
+        box,
+        java.util.List.of(InAppDialog.Action.secondary(I18n.t("common.close", "关闭"), null)),
+        null,
+        460,
+        320);
+  }
   /** 更新启动阶段：主按钮下方一行文字 + 顶栏取消胶囊，让「卡在哪一步」看得见。 */
   private void setLaunchStage(String stage) {
     if (this.accountColumn != null && this.accountColumn.launchButton() != null) {
