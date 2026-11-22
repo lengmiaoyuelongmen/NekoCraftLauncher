@@ -463,6 +463,31 @@ public final class LaunchOverviewPane extends VBox {
         com.example.demo.ui.shell.Toast.ok(I18n.t("overview.env.fixed", "已把内存调到 ") + target + " MB");
     }
 
+    /** 诊断用的环境快照：实例 / Java / 内存 / 模组 / 系统。 */
+    private String environmentSnapshot() {
+        String instance = currentInstance == null ? null : currentInstance.get();
+        if (instance == null || instance.isBlank()) {
+            instance = config.getLastInstance();
+        }
+        String javaPath = config.getJavaPath();
+        String javaText = javaPath == null || javaPath.isBlank()
+                ? I18n.t("overview.env.javaAuto", "Java：自动（优先用本机已装 JDK）").replace("Java：", "")
+                : new File(javaPath).getName() + "（实例级/全局指定）";
+        StringBuilder builder = new StringBuilder();
+        builder.append(I18n.t("overview.diagEnv", "【环境】")).append('\n');
+        builder.append(I18n.t("overview.diagInstance", "实例：")).append(instance == null ? "—" : instance).append('\n');
+        builder.append(I18n.t("overview.diagJava", "Java：")).append(javaText).append('\n');
+        builder.append(I18n.t("overview.diagMemory", "内存：")).append(config.getMemoryMb()).append(" MB").append('\n');
+        if (instance != null && !instance.isBlank()) {
+            builder.append(I18n.t("overview.diagMods", "模组：")).append(countMods(instance)).append('\n');
+        }
+        builder.append(I18n.t("overview.diagSystem", "系统："))
+                .append(System.getProperty("os.name")).append(' ')
+                .append(System.getProperty("os.version")).append(" / ")
+                .append(System.getProperty("os.arch")).append('\n');
+        builder.append(I18n.t("overview.diagDir", "目录：")).append(config.getGameDir());
+        return builder.toString();
+    }
     /** 启动报错检测：把崩溃报告里的结论整理成一份可复制的诊断。 */
     private void showDiagnosis() {
         File gameDir = new File(config.getGameDir());
@@ -474,6 +499,10 @@ public final class LaunchOverviewPane extends VBox {
         } catch (Exception e) {
             text = "读取崩溃报告失败：" + e.getMessage();
         }
+        // 把环境信息拼在崩溃报告前面：复现问题常常就差这几行
+        StringBuilder withEnv = new StringBuilder(environmentSnapshot());
+        withEnv.append(System.lineSeparator()).append(System.lineSeparator()).append(text);
+        text = withEnv.toString();
         javafx.scene.control.TextArea area = new javafx.scene.control.TextArea(text);
         area.setEditable(false);
         area.setWrapText(true);
