@@ -75,6 +75,18 @@ jobs:
         shell: pwsh
         run: .\package-exe.ps1 -JavaHome $env:JAVA_HOME -AppVersion "${{ steps.version.outputs.version }}" -SkipBuild
 
+      - name: Ensure WiX Toolset 3
+        shell: pwsh
+        run: |
+          $wix = Join-Path $env:LOCALAPPDATA "Programs\wix314"
+          if (-not (Test-Path (Join-Path $wix "candle.exe"))) {
+            $zip = Join-Path $env:RUNNER_TEMP "wix314-binaries.zip"
+            Invoke-WebRequest -Uri "https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip" -OutFile $zip
+            New-Item -ItemType Directory -Path $wix -Force | Out-Null
+            Expand-Archive -Path $zip -DestinationPath $wix -Force
+          }
+          Get-ChildItem $wix -Filter "*.exe" | Select-Object -First 5 Name
+
       - name: Package installer
         shell: pwsh
         run: .\package-installer.ps1 -JavaHome $env:JAVA_HOME -AppVersion "${{ steps.version.outputs.version }}" -SkipBuild
