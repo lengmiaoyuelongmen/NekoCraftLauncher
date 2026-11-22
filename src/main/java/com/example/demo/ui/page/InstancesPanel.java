@@ -335,6 +335,26 @@ public final class InstancesPanel extends HBox {
         }
     }
 
+    /** 把实例覆盖的内容写成一行，给悬浮提示用。 */
+    private static String overrideSummary(com.example.demo.core.model.InstanceSettings.Settings settings) {
+        java.util.List<String> parts = new java.util.ArrayList<>();
+        if (settings.memoryMb() != null) {
+            parts.add("内存 " + settings.memoryMb() + " MB");
+        }
+        if (settings.jvmArgs() != null && !settings.jvmArgs().isBlank()) {
+            parts.add("JVM 参数");
+        }
+        if (settings.javaPath() != null && !settings.javaPath().isBlank()) {
+            parts.add("Java：" + new File(settings.javaPath()).getName());
+        }
+        if (settings.gameArgs() != null && !settings.gameArgs().isBlank()) {
+            parts.add("游戏参数");
+        }
+        if (settings.isolation() != null) {
+            parts.add(settings.isolation() ? "强制隔离" : "不隔离");
+        }
+        return parts.isEmpty() ? "跟随全局" : "本实例：" + String.join(" · ", parts);
+    }
     private VBox groupCard(String loader, List<Instance> instances) {
         VBox card = new VBox(0);
         card.getStyleClass().add("neko-card");
@@ -432,7 +452,22 @@ public final class InstancesPanel extends HBox {
         Label tag = new Label(selected ? "当前" : "");
         tag.setStyle("-fx-text-fill: #9ca3af; -fx-font-size: 11px;");
 
-        row.getChildren().addAll(indicator, icon, info, star, tag);
+        // 不跟随全局的实例给一个标记，省得逐个点进去看
+        com.example.demo.core.model.InstanceSettings.Settings override =
+                com.example.demo.core.model.InstanceSettings.get(gameDir, instance.id);
+        Label overrideBadge = new Label();
+        if (!override.isEmpty()) {
+            overrideBadge.setText(I18n.t("instances.overrideBadge", "独立设置"));
+            overrideBadge.setStyle("-fx-text-fill: #f59e0b; -fx-font-size: 10px; -fx-font-weight: bold;"
+                    + " -fx-background-color: rgba(245,158,11,0.14); -fx-background-radius: 6;"
+                    + " -fx-padding: 1 6;");
+            javafx.scene.control.Tooltip tip = new javafx.scene.control.Tooltip(
+                    overrideSummary(override));
+            tip.setShowDelay(javafx.util.Duration.millis(200));
+            javafx.scene.control.Tooltip.install(overrideBadge, tip);
+        }
+
+        row.getChildren().addAll(indicator, icon, info, overrideBadge, star, tag);
         Motion.hoverLift(row);
         row.setOnMouseEntered(e -> {
             if (!instance.id.equals(selectedId)) {
