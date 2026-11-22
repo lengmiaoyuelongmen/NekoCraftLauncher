@@ -1820,7 +1820,8 @@ private static void setFlexible(Node node, boolean on) {
             this::showHealthCheck,
             () -> this.switchPage("settings"),
             () -> this.switchPage("logs"),
-            () -> this.exportLaunchScript(this.currentInstanceId()));
+            () -> this.exportLaunchScript(this.currentInstanceId()),
+            () -> this.reproduceCommand(this.currentInstanceId()));
     this.launchOverviewScroll = new javafx.scene.control.ScrollPane(this.launchOverviewPane);
     this.launchOverviewScroll.setFitToWidth(true);
     this.launchOverviewScroll.setHbarPolicy(
@@ -6565,6 +6566,45 @@ private static void setFlexible(Node node, boolean on) {
         });
   }
 
+  /** 诊断用的「一行复现命令」：和启动器实际执行的一致，能直接粘到 cmd 里跑。 */
+  private String reproduceCommand(String id) {
+    if (id == null || id.isBlank()) {
+      return I18n.t("overview.reproNoInstance", "（还没有选中实例）");
+    }
+    if (this.currentSession == null) {
+      return I18n.t("overview.reproNoSession", "（请先登录，命令里需要账号参数）");
+    }
+    try {
+      File gameDir = new File(this.config.getGameDir());
+      VersionProfile profile = VersionProfile.load(gameDir, id);
+      String java =
+          this.config.getJavaPath() == null || this.config.getJavaPath().isBlank()
+              ? new File(new File(gameDir, "java"),
+                      "zulu" + profile.getJavaMajorVersion() + "/bin/java.exe").getAbsolutePath()
+              : this.config.getJavaPath();
+      java.util.List<String> command =
+          LaunchPlanner.plan(
+                  profile,
+                  this.currentSession,
+                  this.config,
+                  gameDir,
+                  InstanceDirs.root(gameDir, id, this.isIsolated(id)),
+                  java,
+                  InstanceDirs.natives(gameDir, id, this.isIsolated(id)),
+                  null)
+              .command();
+      StringBuilder line = new StringBuilder();
+      for (String part : command) {
+        if (!line.isEmpty()) {
+          line.append(' ');
+        }
+        line.append(part.indexOf(' ') >= 0 ? "\"" + part + "\"" : part);
+      }
+      return line.toString();
+    } catch (Exception e) {
+      return "（生成失败：" + e.getMessage() + "）";
+    }
+  }
   private void exportLaunchScript(String id) {
     if (this.currentSession == null) {
       this.logMessage("⚠️ 请先登录，再导出启动脚本（需要账号参数）");

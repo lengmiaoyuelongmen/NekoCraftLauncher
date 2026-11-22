@@ -60,6 +60,7 @@ public final class LaunchOverviewPane extends VBox {
     private final Button fixEnvButton = new Button(I18n.t("overview.env.fix", "一键修复"));
     private final HBox failActions = new HBox(8.0);
     private final Runnable exportReproScript;
+    private final java.util.function.Supplier<String> reproduceCommand;
 
     public LaunchOverviewPane(
             LauncherConfig config,
@@ -71,11 +72,13 @@ public final class LaunchOverviewPane extends VBox {
             Runnable openHealth,
             Runnable openSettings,
             Runnable openLogs,
-            Runnable exportReproScript) {
+            Runnable exportReproScript,
+            java.util.function.Supplier<String> reproduceCommand) {
         super(12.0);
         this.config = config;
         this.currentInstance = currentInstance;
         this.exportReproScript = exportReproScript;
+        this.reproduceCommand = reproduceCommand;
 
         Label title = new Label("启动概览");
         title.setStyle("-fx-text-fill: -app-text; -fx-font-size: 15px; -fx-font-weight: bold;");
@@ -504,6 +507,9 @@ public final class LaunchOverviewPane extends VBox {
         }
         // 把环境信息拼在崩溃报告前面：复现问题常常就差这几行
         StringBuilder withEnv = new StringBuilder(environmentSnapshot());
+        withEnv.append(System.lineSeparator()).append(System.lineSeparator())
+                .append(I18n.t("overview.reproTitle", "【复现命令】")).append(System.lineSeparator())
+                .append(reproduceCommand == null ? "-" : reproduceCommand.get());
         withEnv.append(System.lineSeparator()).append(System.lineSeparator()).append(text);
         text = withEnv.toString();
         javafx.scene.control.TextArea area = new javafx.scene.control.TextArea(text);
