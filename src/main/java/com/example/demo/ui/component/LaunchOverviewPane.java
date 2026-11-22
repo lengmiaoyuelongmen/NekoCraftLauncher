@@ -59,6 +59,7 @@ public final class LaunchOverviewPane extends VBox {
     private final Label lastReason = new Label();
     private final Button fixEnvButton = new Button(I18n.t("overview.env.fix", "一键修复"));
     private final HBox failActions = new HBox(8.0);
+    private final Runnable exportReproScript;
 
     public LaunchOverviewPane(
             LauncherConfig config,
@@ -69,10 +70,12 @@ public final class LaunchOverviewPane extends VBox {
             Runnable openAdvisor,
             Runnable openHealth,
             Runnable openSettings,
-            Runnable openLogs) {
+            Runnable openLogs,
+            Runnable exportReproScript) {
         super(12.0);
         this.config = config;
         this.currentInstance = currentInstance;
+        this.exportReproScript = exportReproScript;
 
         Label title = new Label("启动概览");
         title.setStyle("-fx-text-fill: -app-text; -fx-font-size: 15px; -fx-font-weight: bold;");
@@ -517,6 +520,8 @@ public final class LaunchOverviewPane extends VBox {
                 box,
                 java.util.List.of(
                         com.example.demo.ui.shell.InAppDialog.Action.primary(
+                                I18n.t("overview.diagnoseScript", "导出启动脚本"), () -> exportReproScript.run()),
+                        com.example.demo.ui.shell.InAppDialog.Action.secondary(
                                 I18n.t("overview.diagnoseCopy", "复制诊断"), () -> {
                                     javafx.scene.input.ClipboardContent content =
                                             new javafx.scene.input.ClipboardContent();

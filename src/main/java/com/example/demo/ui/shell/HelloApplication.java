@@ -1006,6 +1006,59 @@ public class HelloApplication extends Application {
     // 全局代理要尽早生效：HttpClient 默认走 ProxySelector.getDefault()
     com.example.demo.core.app.ProxySettings.apply(this.config.getNetworkProxy());
 
+    // 无头冒烟：-Dmc.smoke=1 依次切页并检查内容非空，最后打印 SMOKE DONE 并退出。
+    // 给 CI 用：不需要桌面截图，只要能构造出各个页面就说明布局代码没炸。
+    if (System.getProperty("mc.smoke") != null) {
+      Platform.runLater(
+          () -> {
+            String[] pages = {"download", "settings", "tools", "instances", "advisor", "launch"};
+            int[] index = {0};
+            Runnable[] tick = new Runnable[1];
+            tick[0] = () -> {
+              if (index[0] >= pages.length) {
+                System.out.println("SMOKE DONE ok");
+                Platform.exit();
+                return;
+              }
+              String page = pages[index[0]++];
+              try {
+                this.switchPage(page);
+              } catch (Exception ex) {
+                System.out.println("SMOKE page=" + page + " error: " + ex);
+                System.out.println("SMOKE DONE fail");
+                Platform.exit();
+                return;
+              }
+              // 切页后先让布局跑一拍，再判断尺寸，否则永远是 0
+              PauseTransition settle = new PauseTransition(Duration.millis(700));
+              settle.setOnFinished(
+                  e -> {
+                    boolean ok = false;
+                    for (javafx.scene.Node child : this.contentStack.getChildren()) {
+                      if (child.isVisible()
+                          && child.getBoundsInLocal().getWidth() > 20
+                          && child.getBoundsInLocal().getHeight() > 20) {
+                        ok = true;
+                        break;
+                      }
+                    }
+                    System.out.println("SMOKE page=" + page + (ok ? " ok" : " empty"));
+                    if (!ok) {
+                      System.out.println("SMOKE DONE fail");
+                      Platform.exit();
+                      return;
+                    }
+                    PauseTransition next = new PauseTransition(Duration.millis(300));
+                    next.setOnFinished(e2 -> tick[0].run());
+                    next.play();
+                  });
+              settle.play();
+            };
+            PauseTransition boot = new PauseTransition(Duration.millis(2200));
+            boot.setOnFinished(e -> tick[0].run());
+            boot.play();
+          });
+    }
     // 服务器页自检：-Dmc.serverPage=1 时直接进入便携服务器页，省得每次点三层菜单
     if (System.getProperty("mc.serverPage") != null) {
       Platform.runLater(
@@ -1766,7 +1819,8 @@ private static void setFlexible(Node node, boolean on) {
             () -> this.switchPage("advisor"),
             this::showHealthCheck,
             () -> this.switchPage("settings"),
-            () -> this.switchPage("logs"));
+            () -> this.switchPage("logs"),
+            () -> this.exportLaunchScript(this.currentInstanceId()));
     this.launchOverviewScroll = new javafx.scene.control.ScrollPane(this.launchOverviewPane);
     this.launchOverviewScroll.setFitToWidth(true);
     this.launchOverviewScroll.setHbarPolicy(

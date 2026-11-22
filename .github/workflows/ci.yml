@@ -43,6 +43,27 @@ jobs:
         shell: pwsh
         run: .\scripts\i18n-report.ps1 -Check -Top 5
 
+      - name: Headless UI smoke
+        shell: pwsh
+        run: |
+          $jar = "target/mc-launcher.jar"
+          if (-not (Test-Path $jar)) { throw "找不到 $jar" }
+          $out = Join-Path $env:RUNNER_TEMP "smoke.out"
+          $err = Join-Path $env:RUNNER_TEMP "smoke.err"
+          $process = Start-Process -FilePath "java" `
+            -ArgumentList "-Dmc.smoke=1","-jar",$jar `
+            -RedirectStandardOutput $out -RedirectStandardError $err -PassThru
+          if (-not $process.WaitForExit(180000)) {
+            $process.Kill()
+            Get-Content $out -ErrorAction SilentlyContinue
+            throw "无头冒烟超时（180 秒）"
+          }
+          Get-Content $out -ErrorAction SilentlyContinue
+          $log = Get-Content $out -Raw -ErrorAction SilentlyContinue
+          if ($log -notmatch "SMOKE DONE ok") {
+            Get-Content $err -ErrorAction SilentlyContinue
+            throw "无头冒烟失败：没有看到 SMOKE DONE ok"
+          }
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
