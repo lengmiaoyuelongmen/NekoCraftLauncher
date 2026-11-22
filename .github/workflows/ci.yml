@@ -1,0 +1,61 @@
+name: CI
+
+# 只做「不依赖桌面」的检查：单元测试、架构守卫、文案基线。
+# UI 冒烟与夜间基线需要真实桌面，留在本地 scripts\ci.ps1 跑。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Build and test
+        shell: pwsh
+        run: .\mvnw.cmd -B clean package
+
+      - name: Architecture guard
+        shell: pwsh
+        run: .\scripts\check-architecture.ps1
+
+      - name: Translation baseline
+        shell: pwsh
+        run: .\scripts\i18n-report.ps1 -Check -Top 5
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: target/surefire-reports/**
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: mc-launcher-jar
+          path: target/mc-launcher.jar
+          if-no-files-found: error
+          retention-days: 7

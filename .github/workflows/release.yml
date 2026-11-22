@@ -1,17 +1,30 @@
 name: Release
 
+# tag 推送时产出可下载的构建，并创建 GitHub Release。
+# 与本地 scripts\ci.ps1 的分工：这里不跑 UI 冒烟/夜间基线（需要真实桌面），
+# 但会跑完整单测 + 架构守卫 + 文案基线，任何一项失败都不会发版。
+
 on:
   push:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      version:
+        description: "版本号（例如 2.37.0），仅在手动触发时使用"
+        required: false
 
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  windows:
+  build-and-release:
     runs-on: windows-latest
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,14 +34,18 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+          cache: maven
 
-      - name: Resolve version from tag
+      - name: Resolve version
         id: version
         shell: pwsh
         run: |
           $version = "${{ github.ref_name }}" -replace '^v', ''
           if ([string]::IsNullOrWhiteSpace($version) -or $version -eq 'workflow_dispatch') {
-            $version = "1.0.0"
+            $version = "${{ inputs.version }}"
+          }
+          if ([string]::IsNullOrWhiteSpace($version)) {
+            throw "无法从 tag 或输入解析版本号"
           }
           $path = "src/main/java/com/example/demo/core/app/AppVersion.java"
           $content = Get-Content $path -Raw
@@ -40,27 +57,61 @@ jobs:
           Set-Content -Path $path -Value $updated -Encoding UTF8
           "version=$version" >> $env:GITHUB_OUTPUT
 
-      - name: Build app image and run tests
+      - name: Build and test
         shell: pwsh
-        run: .\package-exe.ps1 -JavaHome $env:JAVA_HOME -AppVersion "${{ steps.version.outputs.version }}"
+        run: .\mvnw.cmd -B clean package
 
-      - name: Ensure Inno Setup
+      - name: Architecture guard
+        shell: pwsh
+        run: .\scripts\check-architecture.ps1
+
+      - name: Translation baseline
+        shell: pwsh
+        run: .\scripts\i18n-report.ps1 -Check -Top 5
+
+      - name: Package portable exe
+        shell: pwsh
+        run: .\package-exe.ps1 -JavaHome $env:JAVA_HOME -AppVersion "${{ steps.version.outputs.version }}" -SkipBuild
+
+      - name: Package installer
+        shell: pwsh
+        run: .\package-installer.ps1 -JavaHome $env:JAVA_HOME -AppVersion "${{ steps.version.outputs.version }}" -SkipBuild
+
+      - name: Feature document
         shell: pwsh
         run: |
-          if (-not (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) {
-            choco install innosetup --no-progress -y
+          if (Get-Command node -ErrorAction SilentlyContinue) {
+            node scripts/gen-feature-doc.mjs "${{ steps.version.outputs.version }}"
+          } else {
+            Write-Host "node 不可用，跳过功能文档"
           }
 
-      - name: Build installer
+      - name: Checksums
         shell: pwsh
-        run: .\package-inno.ps1 -SkipAppImage -AppVersion "${{ steps.version.outputs.version }}"
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $files = @(
+            "release/installer/NekoCraftLauncher-$version.exe",
+            "release/NekoCraftLauncher-$version-win64.zip",
+            "release/NekoCraftLauncher-$version-Features.docx"
+          ) | Where-Object { Test-Path $_ }
+          $lines = foreach ($file in $files) {
+            $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
+            "$hash  $(Split-Path -Leaf $file)"
+          }
+          $lines | Set-Content -Path "release/SHA256SUMS.txt" -Encoding ascii
+          Get-Content "release/SHA256SUMS.txt"
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version }}
-          name: Neko Craft Launcher v${{ steps.version.outputs.version }}
+          name: Neko Craft Launcher ${{ steps.version.outputs.version }}
           generate_release_notes: true
+          fail_on_unmatched_files: false
           files: |
-            release/installer-inno/NekoCraftLauncher-Setup-*-x64.exe
-            release/NekoCraftLauncher-exe.zip
+            release/installer/NekoCraftLauncher-*-2*.exe
+            release/installer/NekoCraftLauncher-${{ steps.version.outputs.version }}.exe
+            release/NekoCraftLauncher-*-win64.zip
+            release/NekoCraftLauncher-*-Features.docx
+            release/SHA256SUMS.txt
