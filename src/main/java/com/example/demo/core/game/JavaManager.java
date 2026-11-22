@@ -45,6 +45,19 @@ public final class JavaManager {
                 log.accept("✅ 使用本机已安装的 Java " + majorVersion + "：" + localJava.getAbsolutePath());
                 return localJava.getAbsolutePath();
             }
+            // 没找到就把「找过哪些目录、为什么跳过」写进日志：
+            // 用户贴日志时能直接看出是没装、还是版本对不上，不用再猜。
+            List<File> candidates = localJavaCandidates();
+            log.accept("🔎 本机没有 Java " + majorVersion + "，已检查 " + candidates.size() + " 个位置");
+            for (File dir : candidates) {
+                File exe = new File(new File(dir, "bin"), "java.exe");
+                int major = releaseMajor(dir);
+                if (!exe.isFile()) {
+                    log.accept("   · " + dir.getAbsolutePath() + "（没有 bin/java.exe）");
+                } else if (major != majorVersion) {
+                    log.accept("   · " + dir.getAbsolutePath() + "（Java " + (major <= 0 ? "未知" : major) + "）");
+                }
+            }
             if (javaExe.isFile()) {
                 File backup = new File(javaDir, "zulu" + majorVersion + "-crac-backup-" + System.currentTimeMillis());
                 log.accept("⚠ 检测到 Azul CRaC 实验版，正在替换为标准运行时…");
@@ -83,7 +96,8 @@ public final class JavaManager {
                 }
             }
             throw new IllegalStateException("Java " + majorVersion + " 自动补全失败: "
-                    + (lastError == null ? "没有可用下载源" : lastError.getMessage()), lastError);
+                    + (lastError == null ? "没有可用下载源" : lastError.getMessage())
+                    + "；可以到 设置 → Java 手动指定 java.exe，或安装 JDK " + majorVersion, lastError);
         });
     }
 

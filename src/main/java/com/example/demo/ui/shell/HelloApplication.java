@@ -6264,9 +6264,33 @@ private static void setFlexible(Node node, boolean on) {
             ex -> {
               Platform.runLater(
                   () -> {
-                    this.logArea.appendText("❌ 环境准备失败: " + ex.getMessage() + "\n");
+                    Throwable cause = ex.getCause() == null ? ex : ex.getCause();
+                    String detail = cause.getMessage() == null ? cause.toString() : cause.getMessage();
+                    this.logArea.appendText("❌ 环境准备失败: " + detail + "\n");
                     this.launchBtn.setDisable(false);
                     this.finishLaunching();
+                    // Java 没准备好是最常见的「点了没反应」，直接把设置入口给出来
+                    boolean javaIssue = "java".equalsIgnoreCase(String.valueOf(cause))
+                        || detail.toLowerCase(java.util.Locale.ROOT).contains("java");
+                    if (javaIssue) {
+                      InAppDialog.custom(
+                          InAppDialog.globalHost(),
+                          I18n.t("java.missing.title", "缺少 Java ") + requiredJava,
+                          new javafx.scene.control.Label(
+                              I18n.t("java.missing.body", "这台机器上没找到 Java ")
+                                  + requiredJava
+                                  + I18n.t("java.missing.bodyTail",
+                                          "，自动下载也没成功。\n\n可以到「设置 → Java」手动选择已安装的 java.exe，"
+                                                  + "或先装一个同版本 JDK 再重试。\n\n")
+                                  + detail),
+                          java.util.List.of(
+                              InAppDialog.Action.primary(
+                                  I18n.t("java.missing.openSettings", "打开 Java 设置"), () -> {
+                                    this.switchPage("settings");
+                                  }),
+                              InAppDialog.Action.secondary(I18n.t("common.close", "关闭"), null)),
+                          null);
+                    }
                   });
               return null;
             });
