@@ -339,6 +339,8 @@ public class HelloApplication extends Application {
   private int lastLaunchLogStart;
   private long gameStartAt;
   private long launchPrepareStart;
+  /** 准备阶段的兜底看门狗：超时就收场，绝不把界面永远留在「运行中」。 */
+  private javafx.animation.PauseTransition prepareWatchdog;
   private long lastLaunchPrepMs;
   /** 最近一次预览请求，供加载页的「重试」真正重新拉取。 */
   /** 版本列表加载页的重试按钮（失败时才显示）。 */
@@ -6222,6 +6224,7 @@ private static void setFlexible(Node node, boolean on) {
       return;
     }
     this.launchPrepareStart = System.currentTimeMillis();
+    this.armPrepareWatchdog(profile.getId());
     File gameDir = new File(this.config.getGameDir());
     boolean isolated =
         InstanceSettings.effectiveIsolation(gameDir, profile.getId(), this.config.isIsolation());
@@ -6296,6 +6299,64 @@ private static void setFlexible(Node node, boolean on) {
             });
   }
 
+  /**
+   * 布置准备阶段看门狗。
+   *
+   * <p>用户现场是「点了启动，按钮一直运行中，什么也不发生」——准备链路里任何一步卡住（网络、
+   * 下载、解压、杀软拦截）都会造成这种状态。这里给一个绝对上限，超时就把阶段写清楚、
+   * 收掉运行状态，并给出诊断入口，绝不让界面无限等待。
+   */
+  private void armPrepareWatchdog(String instanceId) {
+    this.disarmPrepareWatchdog();
+    javafx.animation.PauseTransition watchdog =
+        new javafx.animation.PauseTransition(javafx.util.Duration.seconds(150));
+    watchdog.setOnFinished(
+        e -> {
+          if (this.launchState.isRunning()) {
+            return; // 进程已经起来了，正常
+          }
+          this.logLine(I18n.t("launch.watchdog.log",
+                  "⏱ 准备超过 150 秒仍未启动游戏，已停止等待（实例 ")
+              + instanceId + I18n.t("launch.watchdog.logTail", "）。可以先看日志或复制内容。"));
+          this.setLaunchStage(null);
+          this.finishLaunching();
+          this.launchBtn.setDisable(false);
+          String stage = I18n.t("launch.watchdog.stage", "准备阶段");
+          InAppDialog.custom(
+              InAppDialog.globalHost(),
+              I18n.t("launch.watchdog.title", "启动卡住了"),
+              new javafx.scene.control.Label(
+                  I18n.t("launch.watchdog.body", "实例「") + instanceId
+                      + I18n.t("launch.watchdog.body2b", "」准备了 150 秒还没进入游戏，已停止等待。")
+                      + "\n\n"
+                      + I18n.t("launch.watchdog.body3", "常见原因：网络下载失败、杀毒软件拦截 java.exe、或磁盘空间不足。")
+                      + "\n\n"
+                      + I18n.t("launch.watchdog.body4", "下面两个按钮可以直接拿到细节。")
+                      + "\n\n" + I18n.t("launch.watchdog.stage.label", "卡在：") + stage),
+              java.util.List.of(
+                  InAppDialog.Action.primary(
+                      I18n.t("launch.watchdog.diagnose", "复制日志"), () -> {
+                        javafx.scene.input.ClipboardContent content =
+                            new javafx.scene.input.ClipboardContent();
+                        content.putString(this.logArea.getText());
+                        javafx.scene.input.Clipboard.getSystemClipboard().setContent(content);
+                        Toast.ok(I18n.t("launch.watchdog.copied", "日志已复制"));
+                      }),
+                  InAppDialog.Action.secondary(
+                      I18n.t("overview.openLogs", "日志"), () -> this.switchPage("logs"))),
+              null);
+        });
+    this.prepareWatchdog = watchdog;
+    watchdog.play();
+  }
+
+  /** 收掉准备阶段看门狗。 */
+  private void disarmPrepareWatchdog() {
+    if (this.prepareWatchdog != null) {
+      this.prepareWatchdog.stop();
+      this.prepareWatchdog = null;
+    }
+  }
   private void applyGamePriority(long pid) {
     String level = this.config.getGamePriority();
     if (level == null || "normal".equals(level)) {
@@ -6468,6 +6529,7 @@ private static void setFlexible(Node node, boolean on) {
     Process process = plan.start();
     this.gameProcess = process;
     this.launchState.markRunning();
+    this.disarmPrepareWatchdog();
     this.setGameStatus(true);
     // 游戏已起来：主按钮保持「正在运行」，停止按钮收起（进程已在跑，不能靠它取消）
     this.setLaunchingUi(true);

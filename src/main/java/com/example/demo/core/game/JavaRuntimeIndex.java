@@ -112,7 +112,12 @@ public final class JavaRuntimeIndex {
     }
 
     private static String get(String url) throws Exception {
-        HttpRequest request = HttpRequest.newBuilder(URI.create(url)).GET().build();
+        // 必须给整体请求超时：只设 connectTimeout 时，服务端「连上了但不回」会一直挂着，
+        // 界面就永远停在「运行中」（用户的现场就是这样）。
+        HttpRequest request = HttpRequest.newBuilder(URI.create(url))
+                .timeout(Duration.ofSeconds(20))
+                .GET()
+                .build();
         HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 200) {
             throw new IllegalStateException("HTTP " + response.statusCode());
