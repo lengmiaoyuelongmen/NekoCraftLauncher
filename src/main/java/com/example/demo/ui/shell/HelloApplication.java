@@ -6602,7 +6602,7 @@ private static void setFlexible(Node node, boolean on) {
       }
       return line.toString();
     } catch (Exception e) {
-      return "（生成失败：" + e.getMessage() + "）";
+      return I18n.t("overview.reproFailed", "（生成失败：") + e.getMessage() + "）";
     }
   }
   private void exportLaunchScript(String id) {
