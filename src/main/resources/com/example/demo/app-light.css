@@ -68,9 +68,9 @@
 
 /* 顶栏始终深色 */
 .app-topbar {
-    -fx-background-color: linear-gradient(to bottom, #c62828, #991b1b);
+    -fx-background-color: linear-gradient(to bottom, #0e2f26, #123f33);
     -fx-background-radius: 16 16 0 0;
-    -fx-border-color: transparent transparent #7f1d1d transparent;
+    -fx-border-color: transparent transparent #1f5a46 transparent;
 }
 
 .text-field,

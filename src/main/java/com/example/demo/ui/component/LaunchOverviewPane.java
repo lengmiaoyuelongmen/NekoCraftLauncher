@@ -102,10 +102,10 @@ public final class LaunchOverviewPane extends VBox {
         VBox statCard = card("运行环境", envHead, envJava, envMemory, envDisk, fixEnvButton);
         lastReason.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 11px;");
         lastReason.setWrapText(true);
-        Button openLogsBtn = new Button(I18n.t("overview.openLogs", "查看日志"));
+        Button openLogsBtn = new Button(I18n.t("overview.openLogs", "日志"));
         openLogsBtn.getStyleClass().addAll("btn-ghost", "btn-sm");
         openLogsBtn.setOnAction(e -> openLogs.run());
-        Button openCrash = new Button(I18n.t("overview.openCrash", "崩溃报告"));
+        Button openCrash = new Button(I18n.t("overview.openCrash", "报告"));
         openCrash.getStyleClass().addAll("btn-ghost", "btn-sm");
         openCrash.setOnAction(e -> {
             try {
@@ -118,7 +118,10 @@ public final class LaunchOverviewPane extends VBox {
                 // 打不开就忽略
             }
         });
-        failActions.getChildren().setAll(openLogsBtn, openCrash);
+        Button diagnose = new Button(I18n.t("overview.diagnose", "诊断"));
+        diagnose.getStyleClass().addAll("btn-secondary", "btn-sm");
+        diagnose.setOnAction(e -> showDiagnosis());
+        failActions.getChildren().setAll(openLogsBtn, diagnose, openCrash);
         failActions.setVisible(false);
         failActions.setManaged(false);
         lastReason.setMaxWidth(210);
@@ -460,6 +463,45 @@ public final class LaunchOverviewPane extends VBox {
         com.example.demo.ui.shell.Toast.ok(I18n.t("overview.env.fixed", "已把内存调到 ") + target + " MB");
     }
 
+    /** 启动报错检测：把崩溃报告里的结论整理成一份可复制的诊断。 */
+    private void showDiagnosis() {
+        File gameDir = new File(config.getGameDir());
+        String text;
+        try {
+            com.example.demo.core.game.CrashAnalyzer.Report report =
+                    com.example.demo.core.game.CrashAnalyzer.analyze(gameDir);
+            text = report == null ? "没有找到崩溃报告。" : com.example.demo.core.game.CrashAnalyzer.toText(report);
+        } catch (Exception e) {
+            text = "读取崩溃报告失败：" + e.getMessage();
+        }
+        javafx.scene.control.TextArea area = new javafx.scene.control.TextArea(text);
+        area.setEditable(false);
+        area.setWrapText(true);
+        area.setPrefRowCount(12);
+        area.setStyle("-fx-font-family: 'Consolas','Microsoft YaHei',monospace; -fx-font-size: 11px;");
+        final String diagnosisText = text;
+        javafx.scene.layout.VBox box = new javafx.scene.layout.VBox(8, area);
+        box.setPrefWidth(560);
+        com.example.demo.ui.shell.InAppDialog.customSized(
+                com.example.demo.ui.shell.InAppDialog.globalHost(),
+                I18n.t("overview.diagnoseTitle", "启动报错诊断"),
+                box,
+                java.util.List.of(
+                        com.example.demo.ui.shell.InAppDialog.Action.primary(
+                                I18n.t("overview.diagnoseCopy", "复制诊断"), () -> {
+                                    javafx.scene.input.ClipboardContent content =
+                                            new javafx.scene.input.ClipboardContent();
+                                    content.putString(diagnosisText);
+                                    javafx.scene.input.Clipboard.getSystemClipboard().setContent(content);
+                                    com.example.demo.ui.shell.Toast.ok(
+                                            I18n.t("overview.diagnoseCopied", "诊断已复制到剪贴板"));
+                                }),
+                        com.example.demo.ui.shell.InAppDialog.Action.secondary(
+                                I18n.t("common.close", "关闭"), null)),
+                null,
+                600,
+                420);
+    }
     /** 从崩溃报告里提一句最关键的错误；读不到就返回空。 */
     private String crashReason(File gameDir) {
         try {

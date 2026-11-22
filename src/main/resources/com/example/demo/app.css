@@ -499,9 +499,9 @@
 }
 /* 顶部标题栏：始终深色（含浅色模式），所以单独写死 */
 .app-topbar {
-    -fx-background-color: linear-gradient(to bottom, #b91c1c, #8f1220);
+    -fx-background-color: linear-gradient(to bottom, #0b1f1a, #07130f);
     -fx-background-radius: 16 16 0 0;
-    -fx-border-color: transparent transparent #7f1d1d transparent;
+    -fx-border-color: transparent transparent #17392e transparent;
 }
 /* 对话框：跟随主题，避免深色界面里出现白色按钮区 */
 .dialog-pane {
