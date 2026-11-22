@@ -99,7 +99,7 @@ public class SmokeWin {
         Add-Type -AssemblyName System.Drawing
         $path = Join-Path $outDir "$name.png"
         # 机器慢的时候窗口会出现「已创建但还没画第一帧」的状态，拍到就是纯底色。
-        # 这里循环重拍直到画面有内容（颜色数 > 60），最多等 15 秒。
+        # 这里循环重拍直到画面有内容（颜色数 > 20），最多等 15 秒。
         $deadline = (Get-Date).AddSeconds(15)
         $colors = 0
         while ($true) {
@@ -115,7 +115,9 @@ public class SmokeWin {
             $g.CopyFromScreen($r.Left, $r.Top, 0, 0, (New-Object System.Drawing.Size($w, $ht)))
             $g.Dispose()
             $colors = Count-ScreenColors $bmp
-            if ($colors -gt 60) {
+            # 内容页也可能很「素」（工具页的环境摘要就是白底几行灰字），
+            # 所以门槛放宽到 20 种颜色：够区分「纯底色没画出来」和「真的有内容」
+            if ($colors -gt 20) {
                 $bmp.Save($path, [System.Drawing.Imaging.ImageFormat]::Png)
                 $bmp.Dispose()
                 return
@@ -331,7 +333,7 @@ public class SmokeWin {
     $blank = @()
     foreach ($shot in (Get-ChildItem $outDir -Filter *.png)) {
         $count = Get-DistinctColors $shot.FullName
-        if ($count -lt 60) { $blank += ("{0}（只有 {1} 种颜色）" -f $shot.Name, $count) }
+        if ($count -lt 20) { $blank += ("{0}（只有 {1} 种颜色）" -f $shot.Name, $count) }
     }
     if ($blank.Count -gt 0) {
         Write-Host ("FAIL: 页面几乎是空白: {0}" -f ($blank -join '; ')) -ForegroundColor Red
