@@ -1120,12 +1120,42 @@ public final class SettingsPanel extends VBox {
             status.setText("下载完成，正在自动安装 " + info.version() + "…");
             status.setStyle("-fx-text-fill: #4CAF50; -fx-font-size: 11px;");
             Toast.ok("更新已下载，正在自动安装");
+            // 安装程序会被 UAC / 杀软拦，先把路径说清楚：装不上也知道去哪找
+            log.accept(I18n.t("update.downloaded.log", "⬆ 更新包已下载：") + target
+                    + I18n.t("update.downloaded.logTail", "（等待确认后启动安装程序）"));
+            // 不静默退出：用户反馈过「等了 5 分钟什么也没提示」，所以要显式告知并让他决定
+            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+                    javafx.scene.control.Alert.AlertType.INFORMATION);
+            alert.initOwner(owner());
+            alert.setTitle(I18n.t("update.downloaded.title", "更新已下载"));
+            alert.setHeaderText(I18n.t("update.downloaded.header", "Neko Craft Launcher ") + info.version() + I18n.t("update.downloaded.headerTail", " 已下载完成"));
+            alert.setContentText(I18n.t("update.downloaded.body", "点「立即安装」会启动安装程序并关闭启动器。\n")
+                    + I18n.t("update.downloaded.path", "安装包位置：") + target);
+            javafx.scene.control.ButtonType installNow =
+                    new javafx.scene.control.ButtonType(I18n.t("update.downloaded.now", "立即安装"),
+                            javafx.scene.control.ButtonBar.ButtonData.OK_DONE);
+            javafx.scene.control.ButtonType later =
+                    new javafx.scene.control.ButtonType(I18n.t("update.downloaded.later", "稍后自己装"));
+            alert.getButtonTypes().setAll(installNow, later);
+            javafx.scene.control.ButtonType choice = alert.showAndWait().orElse(later);
+            if (choice != installNow) {
+                updateBusy = false;
+                button.setDisable(false);
+                status.setText(I18n.t("update.downloaded.kept", "更新包已下载到 ") + target + I18n.t("update.downloaded.keptTail", "，随时可以手动安装。"));
+                try {
+                    java.awt.Desktop.getDesktop().open(target.getParent().toFile());
+                } catch (Exception ignored) {
+                    // 打不开目录就算了，路径已经写在状态里
+                }
+                return;
+            }
             try {
                 ProcessBuilder installer = new ProcessBuilder(target.toString(),
                         "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART",
                         "/CLOSEAPPLICATIONS");
                 installer.directory(target.getParent().toFile());
                 installer.start();
+                status.setText(I18n.t("update.downloaded.starting", "安装程序已启动，启动器即将关闭…"));
                 // 给安装程序一点时间接管，然后退出启动器以便覆盖 exe
                 Thread shutdown = new Thread(() -> {
                     try {

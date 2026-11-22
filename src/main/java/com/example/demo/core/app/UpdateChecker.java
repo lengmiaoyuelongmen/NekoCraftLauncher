@@ -175,6 +175,33 @@ public final class UpdateChecker {
         return clean;
     }
 
+    /**
+     * 带停顿检测的读：超过 {@code stallMillis} 没有读到新字节就抛异常。
+     *
+     * <p>用单独线程读 32KB，主线程按 500ms 轮询进度；这样即使底层 socket 卡死，
+     * 也能在 45 秒内失败退出，而不是让界面永远停在「正在下载…」。
+     */
+    private static int readWithWatchdog(InputStream in, byte[] buffer, long stallMillis,
+                                        long lastBytes, long lastChange) throws Exception {
+        java.util.concurrent.CompletableFuture<Integer> future = java.util.concurrent.CompletableFuture
+                .supplyAsync(() -> {
+                    try {
+                        return in.read(buffer);
+                    } catch (java.io.IOException e) {
+                        throw new java.util.concurrent.CompletionException(e);
+                    }
+                });
+        long deadline = System.currentTimeMillis() + stallMillis;
+        while (!future.isDone()) {
+            if (System.currentTimeMillis() > deadline) {
+                future.cancel(true);
+                throw new java.io.IOException("下载停滞超过 " + (stallMillis / 1000)
+                        + " 秒（已下载 " + lastBytes + " 字节），请检查网络后重试");
+            }
+            Thread.sleep(500);
+        }
+        return future.get();
+    }
     /** 下载安装包到本地，progress 为 0~1，未知总大小时为 -1。 */
     public static void download(String url, Path target, DoubleConsumer progress) throws Exception {
         try {
@@ -206,10 +233,27 @@ public final class UpdateChecker {
             byte[] buffer = new byte[32768];
             long readTotal = 0;
             int read;
-            while ((read = in.read(buffer)) != -1) {
+            // 停顿保护：45 秒一个字节都没涨就判定断了。
+            // 用户反馈过「点了更新，等 5 分钟什么也没提示」，就是这种静默停顿。
+            long lastBytes = 0;
+            long lastChange = System.currentTimeMillis();
+            while (true) {
+                // read 可能长时间阻塞，所以用一个短超时的读线程来判断有没有进展
+                int nextRead = readWithWatchdog(in, buffer, 45_000L, lastBytes, lastChange);
+                if (nextRead == -1) {
+                    break;
+                }
+                read = nextRead;
                 out.write(buffer, 0, read);
                 readTotal += read;
+                if (readTotal != lastBytes) {
+                    lastBytes = readTotal;
+                    lastChange = System.currentTimeMillis();
+                }
                 if (progress != null && total > 0) progress.accept((double) readTotal / total);
+            }
+            if (readTotal == 0) {
+                throw new java.io.IOException("下载到的内容为空");
             }
         }
     }
