@@ -40,12 +40,14 @@ jobs:
         id: version
         shell: pwsh
         run: |
-          $version = "${{ github.ref_name }}" -replace '^v', ''
-          if ([string]::IsNullOrWhiteSpace($version) -or $version -eq 'workflow_dispatch') {
+          # 手动触发时 github.ref_name 是分支名（main），不能当版本号用
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
             $version = "${{ inputs.version }}"
+          } else {
+            $version = "${{ github.ref_name }}" -replace '^v', ''
           }
-          if ([string]::IsNullOrWhiteSpace($version)) {
-            throw "无法从 tag 或输入解析版本号"
+          if ([string]::IsNullOrWhiteSpace($version) -or $version -notmatch '^\d+\.\d+(\.\d+)?$') {
+            throw "版本号无效：$version（手动触发请填形如 2.40.0 的版本号）"
           }
           $path = "src/main/java/com/example/demo/core/app/AppVersion.java"
           $content = Get-Content $path -Raw

@@ -102,6 +102,20 @@ jobs:
         shell: pwsh
         run: .\mvnw.cmd -B -q package -DskipTests
 
+      - name: Prepare deterministic config
+        shell: pwsh
+        run: |
+          # runner 是全新用户目录：先关掉首启动的性能向导，固定浅色主题，
+          # 否则截到的是引导页，和基线（设置页）当然对不上。
+          $config = @{
+            lightTheme = $true
+            performanceAsked = $true
+            windowWidth = 1060
+            windowHeight = 830
+          } | ConvertTo-Json
+          Set-Content -Path config.json -Value $config -Encoding utf8
+          Get-Content config.json
+
       - name: Launch app for capture
         shell: pwsh
         run: |
