@@ -1150,16 +1150,19 @@ public final class SettingsPanel extends VBox {
                 return;
             }
             try {
-                ProcessBuilder installer = new ProcessBuilder(target.toString(),
-                        "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART",
-                        "/CLOSEAPPLICATIONS");
-                installer.directory(target.getParent().toFile());
-                installer.start();
-                status.setText(I18n.t("update.downloaded.starting", "安装程序已启动，启动器即将关闭…"));
-                // 给安装程序一点时间接管，然后退出启动器以便覆盖 exe
+                // 真正能用的安装：jpackage 产出的 exe 静默参数是 /quiet。
+                // 先摆好助手脚本（等本进程退出 → 静默安装 → 重新拉起），再退出自己。
+                java.io.File stashed = com.example.demo.core.app.UpdateInstaller
+                        .stashInstaller(target.toFile(), info.version());
+                java.io.File relaunch = com.example.demo.core.app.UpdateInstaller.currentLauncherExe();
+                com.example.demo.core.app.UpdateInstaller.writePending(info.version(), stashed);
+                java.io.File script = com.example.demo.core.app.UpdateInstaller
+                        .prepareApplyScript(stashed, relaunch);
+                com.example.demo.core.app.UpdateInstaller.runDetached(script);
+                status.setText(I18n.t("update.downloaded.starting2", "安装程序已启动，启动器即将关闭…装好会自动重新打开"));
                 Thread shutdown = new Thread(() -> {
                     try {
-                        Thread.sleep(1200);
+                        Thread.sleep(800);
                     } catch (InterruptedException ignored) {
                     }
                     Platform.runLater(() -> {
@@ -1290,7 +1293,12 @@ public final class SettingsPanel extends VBox {
             }).thenAccept(info -> Platform.runLater(() -> {
                 ((Button) e.getSource()).setDisable(false);
                 if (UpdateChecker.isNewer(info.version(), AppVersion.CURRENT)) {
-                    status.setText("发现新版本 " + info.version()
+                    // 下载前就把版本、大小、说明说清楚：用户不用点下去才知道要下多大的东西
+                    String size = info.sizeBytes() > 0
+                            ? String.format(java.util.Locale.ROOT, "%.1f MB", info.sizeBytes() / 1024.0 / 1024.0)
+                            : I18n.t("update.sizeUnknown", "大小未知");
+                    status.setText(I18n.t("update.found", "发现新版本 ") + info.version()
+                            + "（" + size + "）"
                             + (info.notes().isBlank() ? "" : "：" + info.notes()));
                     status.setStyle("-fx-text-fill: #4CAF50; -fx-font-size: 11px;");
                     if (!info.url().isBlank()) {

@@ -24,7 +24,11 @@ import java.time.Duration;
  */
 public final class UpdateChecker {
 
-    public record Info(String version, String url, String notes) {
+    public record Info(String version, String url, String notes, long sizeBytes) {
+
+        public Info(String version, String url, String notes) {
+            this(version, url, notes, -1L);
+        }
     }
 
     private static final HttpClient CLIENT = HttpClient.newBuilder()
@@ -128,6 +132,7 @@ public final class UpdateChecker {
             String notes = json.has("body") && !json.get("body").isJsonNull()
                     ? json.get("body").getAsString() : "";
             String download = "";
+            long downloadSize = -1L;
             if (json.has("assets") && json.get("assets").isJsonArray()) {
                 String fallback = "";
                 for (var element : json.getAsJsonArray("assets")) {
@@ -137,6 +142,9 @@ public final class UpdateChecker {
                             ? asset.get("browser_download_url").getAsString() : "";
                     if (assetUrl.isBlank()) continue;
                     if (name.toLowerCase(java.util.Locale.ROOT).endsWith(".exe")) {
+                        if (asset.has("size") && !asset.get("size").isJsonNull()) {
+                            downloadSize = asset.get("size").getAsLong();
+                        }
                         if (name.toLowerCase(java.util.Locale.ROOT).contains("setup")) {
                             download = assetUrl;
                             break;
@@ -150,7 +158,7 @@ public final class UpdateChecker {
                 download = json.get("html_url").getAsString();
             }
             if (version.isBlank()) throw new RuntimeException("GitHub Release 缺少 tag_name");
-            return new Info(version.trim(), download.trim(), notes);
+            return new Info(version.trim(), download.trim(), notes, downloadSize);
         }
 
         // 静态 JSON: {"version":"1.1.0","url":"...","notes":"..."}

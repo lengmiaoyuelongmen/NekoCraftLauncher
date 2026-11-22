@@ -469,6 +469,34 @@ public final class LaunchOverviewPane extends VBox {
         com.example.demo.ui.shell.Toast.ok(I18n.t("overview.env.fixed", "已把内存调到 ") + target + " MB");
     }
 
+    /** 常见安全软件检测：它们拦 java.exe 时表现就是「点了没反应」，日志里写出来省一轮排查。 */
+    private static String antivirusHint() {
+        String[] known = {"360tray", "360Safe", "ZhuDongFangYu", "QQPCTray", "HipsTray",
+                "MsMpEng", "avp", "Kxetray", "huorong"};
+        java.util.List<String> found = new java.util.ArrayList<>();
+        try {
+            for (ProcessHandle handle : ProcessHandle.allProcesses().toList()) {
+                String name = handle.info().command().orElse("");
+                if (name.isBlank()) {
+                    continue;
+                }
+                String file = new File(name).getName().replace(".exe", "");
+                for (String key : known) {
+                    if (file.toLowerCase(java.util.Locale.ROOT)
+                            .contains(key.toLowerCase(java.util.Locale.ROOT))) {
+                        if (!found.contains(file)) {
+                            found.add(file);
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+            // 拿不到进程列表就不写这一行
+        }
+        return found.isEmpty()
+                ? I18n.t("overview.diagAvNone", "未检测到常见安全软件")
+                : String.join(" / ", found) + I18n.t("overview.diagAvWarn", "（若启动无反应，先把它加进信任区）");
+    }
     /** 诊断用的环境快照：实例 / Java / 内存 / 模组 / 系统。 */
     private String environmentSnapshot() {
         String instance = currentInstance == null ? null : currentInstance.get();
@@ -487,6 +515,7 @@ public final class LaunchOverviewPane extends VBox {
         if (instance != null && !instance.isBlank()) {
             builder.append(I18n.t("overview.diagMods", "模组：")).append(countMods(instance)).append('\n');
         }
+        builder.append(I18n.t("overview.diagAv", "安全软件：")).append(antivirusHint()).append('\n');
         builder.append(I18n.t("overview.diagSystem", "系统："))
                 .append(System.getProperty("os.name")).append(' ')
                 .append(System.getProperty("os.version")).append(" / ")

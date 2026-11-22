@@ -1008,6 +1008,8 @@ public class HelloApplication extends Application {
     // 全局代理要尽早生效：HttpClient 默认走 ProxySelector.getDefault()
     com.example.demo.core.app.ProxySettings.apply(this.config.getNetworkProxy());
 
+    // 更新落地确认：启动时看到 pending 标记就提示「已更新到 X」或「需要重启安装」。
+    Platform.runLater(this::checkPendingUpdate);
     // 无头冒烟：-Dmc.smoke=1 依次切页并检查内容非空，最后打印 SMOKE DONE 并退出。
     // 给 CI 用：不需要桌面截图，只要能构造出各个页面就说明布局代码没炸。
     if (System.getProperty("mc.smoke") != null) {
@@ -5464,6 +5466,44 @@ private static void setFlexible(Node node, boolean on) {
         null,
         460,
         320);
+  }
+  /** 检查上次「立即安装」留下的标记：装成功就报喜并清理，没装上就提示重启。 */
+  private void checkPendingUpdate() {
+    try {
+      com.example.demo.core.app.UpdateInstaller.Pending pending =
+          com.example.demo.core.app.UpdateInstaller.readPending();
+      if (pending == null || pending.version() == null) {
+        return;
+      }
+      String target = pending.version().trim();
+      String current = com.example.demo.core.app.AppVersion.CURRENT;
+      if (!com.example.demo.core.app.UpdateChecker.isNewer(target, current)) {
+        com.example.demo.core.app.UpdateInstaller.clearPending();
+        Toast.ok(I18n.t("update.applied", "已更新到 ") + current);
+        this.logLine(I18n.t("update.applied.log", "✅ 更新已完成：当前版本 ") + current);
+        return;
+      }
+      InAppDialog.custom(
+          InAppDialog.globalHost(),
+          I18n.t("update.pending.title", "更新等待完成"),
+          new javafx.scene.control.Label(
+              I18n.t("update.pending.bodyLead", "更新包 ") + target
+                  + I18n.t("update.pending.bodyMid", " 已下载，但当前仍是 ") + current
+                  + I18n.t("update.pending.bodyTail", "。\n\n可以现在重启安装，或者稍后在 设置 → 软件更新 里再装一次。")),
+          java.util.List.of(
+              InAppDialog.Action.primary(I18n.t("update.pending.restart", "现在重启安装"), () -> {
+                try {
+                  javafx.application.Platform.exit();
+                  System.exit(0);
+                } catch (Exception ignored) {
+                  // 退出失败也不能卡住界面
+                }
+              }),
+              InAppDialog.Action.secondary(I18n.t("common.close", "关闭"), null)),
+          null);
+    } catch (Exception ignored) {
+      // 更新检查失败不能影响正常启动
+    }
   }
   /** 更新启动阶段：主按钮下方一行文字 + 顶栏取消胶囊，让「卡在哪一步」看得见。 */
   private void setLaunchStage(String stage) {
