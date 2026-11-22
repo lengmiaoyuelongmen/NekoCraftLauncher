@@ -550,9 +550,52 @@ public final class SettingsPanel extends VBox {
             entry.getValue().setManaged(match);
             if (match && first == null) first = name;
         }
-        if (!q.isBlank() && first != null) selectTab(first);
+        if (!q.isBlank() && first != null) {
+            final String targetTab = first;
+            selectTab(targetTab);
+            javafx.application.Platform.runLater(() -> highlightMatch(targetTab, q));
+        }
     }
 
+    /** 搜索命中时把右侧页面滚到第一个匹配项，并短暂高亮，省得自己找。 */
+    private void highlightMatch(String tabName, String query) {
+        final javafx.scene.Node node = tabPages.get(tabName);
+        final javafx.scene.control.ScrollPane page =
+                node instanceof javafx.scene.control.ScrollPane scroll ? scroll : null;
+        if (page == null || page.getContent() == null) {
+            return;
+        }
+        String needle = query.toLowerCase(java.util.Locale.ROOT).trim();
+        if (needle.isEmpty()) {
+            return;
+        }
+        javafx.scene.Node hit = null;
+        for (javafx.scene.Node candidate : page.getContent().lookupAll(".label")) {
+            if (candidate instanceof javafx.scene.control.Label label
+                    && label.getText() != null
+                    && label.getText().toLowerCase(java.util.Locale.ROOT).contains(needle)) {
+                hit = label;
+                break;
+            }
+        }
+        if (hit == null) {
+            page.setVvalue(0);
+            return;
+        }
+        javafx.scene.Node target = hit;
+        double contentHeight = page.getContent().getBoundsInLocal().getHeight();
+        double y = target.getBoundsInParent().getMinY();
+        if (contentHeight > 1) {
+            page.setVvalue(Math.max(0, Math.min(1, y / contentHeight)));
+        }
+        String original = target.getStyle();
+        target.setStyle(original + "; -fx-background-color: rgba(20,184,166,0.22);"
+                + " -fx-background-radius: 6; -fx-padding: 1 4;");
+        javafx.animation.PauseTransition revert =
+                new javafx.animation.PauseTransition(javafx.util.Duration.millis(1400));
+        revert.setOnFinished(e -> target.setStyle(original));
+        revert.play();
+    }
     private void selectTab(String name) {
         currentTab = name;
         for (Map.Entry<String, HBox> entry : tabItems.entrySet()) {

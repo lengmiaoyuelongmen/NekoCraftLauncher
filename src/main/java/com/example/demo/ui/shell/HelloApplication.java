@@ -952,6 +952,34 @@ public class HelloApplication extends Application {
     this.mouseSheen.heightProperty().bind(rootWrap.heightProperty());
     rootWrap.getChildren().add(Math.max(0, rootWrap.getChildren().indexOf(this.dialogLayer)), this.mouseSheen);
     Scene scene = this.createScene(rootWrap, stage);
+    // 键盘流：Ctrl+, 打开设置；Esc 关掉最上层弹窗；启动页按 Enter 直接启动
+    scene.getAccelerators().put(
+        new javafx.scene.input.KeyCodeCombination(
+            javafx.scene.input.KeyCode.COMMA,
+            javafx.scene.input.KeyCombination.CONTROL_DOWN),
+        () -> this.switchPage("settings"));
+    scene.addEventFilter(
+        javafx.scene.input.KeyEvent.KEY_PRESSED,
+        event -> {
+          if (event.getCode() == javafx.scene.input.KeyCode.ESCAPE) {
+            if (com.example.demo.ui.shell.InAppDialog.globalHost() != null
+                && !com.example.demo.ui.shell.InAppDialog.globalHost().getChildren().isEmpty()) {
+              com.example.demo.ui.shell.InAppDialog.closeAll();
+              event.consume();
+            }
+            return;
+          }
+          if (event.getCode() == javafx.scene.input.KeyCode.ENTER
+              && "launch".equals(String.valueOf(this.primaryStage.getProperties().get("page")))) {
+            // 在输入框里按 Enter 是提交内容，不触发启动
+            if (event.getTarget() instanceof javafx.scene.control.TextInputControl) {
+              return;
+            }
+            // 焦点停在导航按钮上时，Enter 优先启动游戏（启动页的语义），并吃掉事件
+            this.handleLaunch();
+            event.consume();
+          }
+        });
     Navigation.bind(this::switchPage);
     if (this.mouseSheen != null) {
       this.mouseSheen.bindTo(scene);
@@ -5343,6 +5371,18 @@ private static void setFlexible(Node node, boolean on) {
     }
   }
 
+  /** 更新启动阶段：主按钮下方一行文字 + 顶栏取消胶囊，让「卡在哪一步」看得见。 */
+  private void setLaunchStage(String stage) {
+    if (this.accountColumn != null && this.accountColumn.launchButton() != null) {
+      this.accountColumn.launchButton().setStage(stage);
+    }
+    if (this.cancelLaunchButton != null
+        && this.cancelLaunchButton.isVisible()
+        && stage != null
+        && !stage.isBlank()) {
+      this.cancelLaunchButton.setText(I18n.t("launch.stage.cancelPrefix", "取消启动 · ") + stage);
+    }
+  }
   /** 统一切换启动按钮与停止按钮的显示状态。 */
   private void setLaunchingUi(boolean launching) {
     if (this.accountColumn != null) {
@@ -5470,6 +5510,7 @@ private static void setFlexible(Node node, boolean on) {
     CrashAnalyzer.markSessionStart(System.currentTimeMillis());
     this.setLaunchingUi(true);
     this.logArea.appendText("准备启动版本: " + id + "（运行中可点「■ 停止」中止）\n");
+    this.setLaunchStage(I18n.t("launch.stage.parse", "解析版本"));
     CompletableFuture.runAsync(
         () -> {
           Consumer<String> log =
@@ -5477,6 +5518,7 @@ private static void setFlexible(Node node, boolean on) {
           try {
             // 启动前再确认一次父版本（历史实例可能是缺父版本的半成品）
             this.ensureParentVersion(gameDir, id, log);
+            Platform.runLater(() -> this.setLaunchStage(I18n.t("launch.stage.verify", "校验资源")));
             VersionProfile profile = this.ensureInstalled(id, jsonUrl, log);
             this.checkLaunchCancelled();
             this.preflight(profile, log);
@@ -5542,6 +5584,7 @@ private static void setFlexible(Node node, boolean on) {
             }
             this.checkLaunchCancelled();
             log.accept("✅ 下载任务全部完成，开始启动游戏。");
+            Platform.runLater(() -> this.setLaunchStage(I18n.t("launch.stage.start", "启动进程")));
             Platform.runLater(() -> this.startGame(profile));
           } catch (LaunchCancelledException stopped) {
             Platform.runLater(
@@ -5582,6 +5625,7 @@ private static void setFlexible(Node node, boolean on) {
 
   /** 结束「启动准备」状态，恢复按钮。 */
   private void finishLaunching() {
+    this.setLaunchStage(null);
     this.launchState.finish();
     // 调用点有的在后台线程（下载/准备回调），界面更新必须切回 FX 线程
     Runnable uiUpdate =

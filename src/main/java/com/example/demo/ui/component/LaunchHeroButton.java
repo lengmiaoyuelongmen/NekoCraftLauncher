@@ -27,6 +27,8 @@ public final class LaunchHeroButton extends Button {
   private boolean launching;
   private final Label titleLabel = new Label("★ 启动游戏");
   private final Label versionLabel = new Label("");
+  /** 启动阶段文字：解析版本 / 校验资源 / 启动进程 */
+  private final Label stageLabel = new Label("");
 
   public LaunchHeroButton(Region widthSource) {
     DoubleBinding bannerWidth =
@@ -56,7 +58,15 @@ public final class LaunchHeroButton extends Button {
         "-fx-text-fill: #6b8f60; -fx-font-size: 11px;"
             + " -fx-font-family: 'Microsoft YaHei UI', 'Segoe UI';");
 
-    VBox text = new VBox(2.0, title, versionLabel);
+    stageLabel.setMaxWidth(Double.MAX_VALUE);
+    stageLabel.setAlignment(Pos.CENTER);
+    stageLabel.setStyle(
+        "-fx-text-fill: #4a6b5c; -fx-font-size: 10px;"
+            + " -fx-font-family: 'Microsoft YaHei UI', 'Segoe UI';");
+    stageLabel.setVisible(false);
+    stageLabel.setManaged(false);
+
+    VBox text = new VBox(2.0, title, versionLabel, stageLabel);
     text.setAlignment(Pos.CENTER);
     text.setMouseTransparent(true);
     text.maxWidthProperty().bind(bannerWidth.multiply(0.52));
@@ -93,6 +103,14 @@ public final class LaunchHeroButton extends Button {
             : "-fx-text-fill: #5f9e4f; -fx-font-size: 21px; -fx-font-weight: bold;"
                 + " -fx-font-family: 'Microsoft YaHei UI', 'Segoe UI';");
     setCursor(launching ? javafx.scene.Cursor.DEFAULT : javafx.scene.Cursor.HAND);
+  }
+
+  /** 启动阶段：按钮显示「解析版本 → 校验资源 → 启动进程」，null 即隐藏。 */
+  public void setStage(String text) {
+    boolean show = text != null && !text.isBlank();
+    stageLabel.setText(show ? text : "");
+    stageLabel.setVisible(show);
+    stageLabel.setManaged(show);
   }
 
   /** 是否处于启动/运行中状态。 */
