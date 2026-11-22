@@ -742,13 +742,70 @@ public final class SettingsPanel extends VBox {
         return box;
     }
 
+    /** 导出所有实例的启动设置到一个 zip。 */
+    private void exportInstanceSettings() {
+        javafx.stage.FileChooser chooser = new javafx.stage.FileChooser();
+        chooser.setTitle(I18n.t("settings.instances.export", "导出实例设置"));
+        chooser.setInitialFileName("neko-instance-settings.zip");
+        chooser.getExtensionFilters().add(
+                new javafx.stage.FileChooser.ExtensionFilter("ZIP", "*.zip"));
+        File target = chooser.showSaveDialog(getScene() == null ? null : getScene().getWindow());
+        if (target == null) {
+            return;
+        }
+        try {
+            File gameDir = new File(config.getGameDir());
+            var result = com.example.demo.core.model.InstanceSettingsBundle.exportAll(gameDir, target);
+            Toast.ok(I18n.t("settings.instances.exported", "已导出 ") + result.exported()
+                    + I18n.t("settings.instances.exportedTail", " 个实例的设置"));
+            this.log.accept("🗂 导出实例设置：" + target.getAbsolutePath() + "（" + result.exported() + " 个）");
+        } catch (Exception ex) {
+            Toast.error(I18n.t("settings.instances.failed", "操作失败：") + ex.getMessage());
+        }
+    }
+
+    /** 从 zip 还原实例设置（同名实例会被覆盖）。 */
+    private void importInstanceSettings() {
+        javafx.stage.FileChooser chooser = new javafx.stage.FileChooser();
+        chooser.setTitle(I18n.t("settings.instances.import", "导入实例设置"));
+        chooser.getExtensionFilters().add(
+                new javafx.stage.FileChooser.ExtensionFilter("ZIP", "*.zip"));
+        File source = chooser.showOpenDialog(getScene() == null ? null : getScene().getWindow());
+        if (source == null) {
+            return;
+        }
+        try {
+            File gameDir = new File(config.getGameDir());
+            var result = com.example.demo.core.model.InstanceSettingsBundle.importAll(gameDir, source);
+            Toast.ok(I18n.t("settings.instances.imported", "已还原 ") + result.exported()
+                    + I18n.t("settings.instances.importedTail", " 个实例的设置"));
+            if (result.skipped() > 0) {
+                Toast.info(I18n.t("settings.instances.skipped", "跳过 ") + result.skipped()
+                        + I18n.t("settings.instances.skippedTail", " 个（本机没有对应实例）"));
+            }
+            this.log.accept("🗂 导入实例设置：" + source.getName() + "（" + result.exported() + " 个）");
+        } catch (Exception ex) {
+            Toast.error(I18n.t("settings.instances.failed", "操作失败：") + ex.getMessage());
+        }
+    }
     private ScrollPane buildManageTab() {
         HBox downloadRow = new HBox(18,
                 inline("最大并发", concurrentSpinner, "个连接"),
                 inline("限速", speedSpinner, "KB/s，0=不限"));
         downloadRow.setAlignment(Pos.CENTER_LEFT);
 
+        Button exportInstanceSettings = smallButton(
+                I18n.t("settings.instances.export", "导出实例设置"));
+        exportInstanceSettings.setOnAction(e -> exportInstanceSettings());
+        Button importInstanceSettings = smallButton(
+                I18n.t("settings.instances.import", "导入实例设置"));
+        importInstanceSettings.setOnAction(e -> importInstanceSettings());
+
         VBox card = card(
+                section(I18n.t("settings.instances.section", "实例设置包")),
+                new HBox(10, exportInstanceSettings, importInstanceSettings),
+                hint(I18n.t("settings.instances.hint",
+                        "只打包各实例的 instance.json（内存/JVM/Java/游戏参数/隔离），不含模组与世界")),
                 section("下载"),
                 labeled("下载源", new HBox(10, sourceCombo, hint("auto=镜像优先失败回官方；official/mirror=只用其一"))),
                 labeled("下载策略", downloadRow),

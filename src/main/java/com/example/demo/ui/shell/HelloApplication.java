@@ -6057,11 +6057,40 @@ private static void setFlexible(Node node, boolean on) {
                       LaunchCompatibility.firstBlocking(issues);
                   if (blocker != null) {
                     this.logLine("⛔ 启动已取消：" + blocker.message());
-                    InAppDialog.alert(
-                        "启动失败",
-                        "启动已取消：" + blocker.message() + "\n\n修正后可直接重试启动。");
+                    // 如果是本实例单独指定了 Java 导致版本不符，给一键回到全局并重试
+                    InstanceSettings.Settings javaOverride =
+                        InstanceSettings.get(gameDir, profile.getId());
+                    boolean javaOverrideMismatch = javaOverride.javaPath() != null
+                        && !javaOverride.javaPath().isBlank()
+                        && (blocker.kind() == LaunchCompatibility.Kind.JAVA_TOO_OLD
+                            || blocker.kind() == LaunchCompatibility.Kind.JAVA_PATH_INVALID
+                            || blocker.kind() == LaunchCompatibility.Kind.JAVA_UNKNOWN);
                     this.launchBtn.setDisable(false);
                     this.finishLaunching();
+                    if (javaOverrideMismatch) {
+                      InAppDialog.custom(
+                          InAppDialog.globalHost(),
+                          "启动失败：实例的 Java 不匹配",
+                          new javafx.scene.control.Label(
+                              "实例「" + profile.getId() + "」单独指定了 Java：\n"
+                                  + javaOverride.javaPath() + "\n\n"
+                                  + blocker.message() + "\n\n"
+                                  + "可以清除这条覆盖，改用全局 Java（需要 Java "
+                                  + required + "）后重试。"),
+                          java.util.List.of(
+                              InAppDialog.Action.primary("改用全局 Java 并重试", () -> {
+                                InstanceSettings.save(gameDir, profile.getId(), null, "", "");
+                                InstanceSettings.saveIsolation(gameDir, profile.getId(), null);
+                                this.logLine("🎛 已清除实例 Java 覆盖，正在用全局设置重试");
+                                javafx.application.Platform.runLater(this::handleLaunch);
+                              }),
+                              InAppDialog.Action.secondary("取消", null)),
+                          null);
+                    } else {
+                      InAppDialog.alert(
+                          "启动失败",
+                          "启动已取消：" + blocker.message() + "\n\n修正后可直接重试启动。");
+                    }
                     return;
                   }
                   if (actual > 0) {
