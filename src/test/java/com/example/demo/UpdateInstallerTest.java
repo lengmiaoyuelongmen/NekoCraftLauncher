@@ -38,6 +38,8 @@ class UpdateInstallerTest {
         assertTrue(body.contains(exe.getAbsolutePath()), "装完要重新拉起启动器: " + body);
         assertTrue(body.indexOf("timeout") < body.indexOf("/quiet"),
                 "等待要发生在安装之前: " + body);
+        // 测试写的是真实更新目录，收尾删掉，别在用户机器上留垃圾
+        assertTrue(script.delete());
     }
 
     @Test
