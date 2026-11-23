@@ -1092,14 +1092,22 @@ public final class SettingsPanel extends VBox {
             status.setText("更新正在下载或安装中，请稍候…");
             return;
         }
-        String url = info.url() == null ? "" : info.url().trim();
-        if (!url.startsWith("https://") || !url.toLowerCase(java.util.Locale.ROOT).contains(".exe")) {
-            openLink(url);
+        // 安装版走 setup.exe（jpackage /quiet）；免安装版走 win64.zip 就地覆盖
+        java.io.File launcher = com.example.demo.core.app.UpdateInstaller.currentLauncherExe();
+        boolean installed = com.example.demo.core.app.UpdateInstaller.isInstalledLayout(launcher);
+        String setupUrl = info.url() == null ? "" : info.url().trim();
+        String zipUrl = info.portableUrl() == null ? "" : info.portableUrl().trim();
+        String url = installed || zipUrl.isBlank() ? setupUrl : zipUrl;
+        boolean useZip = !installed && !zipUrl.isBlank();
+        if (!url.startsWith("https://") || !(url.toLowerCase(java.util.Locale.ROOT).contains(".exe")
+                || url.toLowerCase(java.util.Locale.ROOT).contains(".zip"))) {
+            openLink(url.isBlank() ? setupUrl : url);
             return;
         }
         String safeVersion = info.version().replaceAll("[^0-9A-Za-z._-]", "_");
-        java.nio.file.Path target = java.nio.file.Paths.get(System.getProperty("java.io.tmpdir"),
-                "NekoCraftLauncher-Setup-" + safeVersion + ".exe");
+        String fileName = (useZip ? "NekoCraftLauncher-" + safeVersion + "-win64.zip"
+                : "NekoCraftLauncher-Setup-" + safeVersion + ".exe");
+        java.nio.file.Path target = java.nio.file.Paths.get(System.getProperty("java.io.tmpdir"), fileName);
         updateBusy = true;
         button.setDisable(true);
         status.setText("正在下载更新 " + info.version() + "…");
@@ -1150,7 +1158,31 @@ public final class SettingsPanel extends VBox {
                 return;
             }
             try {
-                // 真正能用的安装：jpackage 产出的 exe 静默参数是 /quiet。
+                // 免安装版：解压覆盖 app / runtime / exe；game 与 config.json 不在 zip 里，不会被碰
+                if (useZip) {
+                    java.io.File root = com.example.demo.core.app.UpdateInstaller.portableRoot(launcher);
+                    java.io.File relaunch = launcher;
+                    com.example.demo.core.app.UpdateInstaller.writePending(info.version(),
+                            target.toFile());
+                    java.io.File zipScript = com.example.demo.core.app.UpdateInstaller
+                            .preparePortableScript(target.toFile(), root, relaunch);
+                    com.example.demo.core.app.UpdateInstaller.runPowerShellDetached(zipScript);
+                    status.setText(I18n.t("update.downloaded.starting2", "安装程序已启动，启动器即将关闭…装好会自动重新打开"));
+                    Thread exitThread = new Thread(() -> {
+                        try {
+                            Thread.sleep(800);
+                        } catch (InterruptedException ignored) {
+                        }
+                        Platform.runLater(() -> {
+                            Platform.exit();
+                            System.exit(0);
+                        });
+                    }, "neko-update-shutdown-portable");
+                    exitThread.setDaemon(true);
+                    exitThread.start();
+                    return;
+                }
+                // 安装版：jpackage 产出的 exe 静默参数是 /quiet。
                 // 先摆好助手脚本（等本进程退出 → 静默安装 → 重新拉起），再退出自己。
                 java.io.File stashed = com.example.demo.core.app.UpdateInstaller
                         .stashInstaller(target.toFile(), info.version());
@@ -1294,8 +1326,13 @@ public final class SettingsPanel extends VBox {
                 ((Button) e.getSource()).setDisable(false);
                 if (UpdateChecker.isNewer(info.version(), AppVersion.CURRENT)) {
                     // 下载前就把版本、大小、说明说清楚：用户不用点下去才知道要下多大的东西
-                    String size = info.sizeBytes() > 0
-                            ? String.format(java.util.Locale.ROOT, "%.1f MB", info.sizeBytes() / 1024.0 / 1024.0)
+                    boolean portableMode = !com.example.demo.core.app.UpdateInstaller
+                            .isInstalledLayout(com.example.demo.core.app.UpdateInstaller.currentLauncherExe());
+                    long bytes = portableMode && info.portableSize() > 0
+                            ? info.portableSize()
+                            : info.sizeBytes();
+                    String size = bytes > 0
+                            ? String.format(java.util.Locale.ROOT, "%.1f MB", bytes / 1024.0 / 1024.0)
                             : I18n.t("update.sizeUnknown", "大小未知");
                     status.setText(I18n.t("update.found", "发现新版本 ") + info.version()
                             + "（" + size + "）"

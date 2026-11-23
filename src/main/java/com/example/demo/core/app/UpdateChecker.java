@@ -24,10 +24,15 @@ import java.time.Duration;
  */
 public final class UpdateChecker {
 
-    public record Info(String version, String url, String notes, long sizeBytes) {
+    public record Info(String version, String url, String notes, long sizeBytes,
+                        String portableUrl, long portableSize) {
+
+        public Info(String version, String url, String notes, long sizeBytes) {
+            this(version, url, notes, sizeBytes, "", -1L);
+        }
 
         public Info(String version, String url, String notes) {
-            this(version, url, notes, -1L);
+            this(version, url, notes, -1L, "", -1L);
         }
     }
 
@@ -133,6 +138,8 @@ public final class UpdateChecker {
                     ? json.get("body").getAsString() : "";
             String download = "";
             long downloadSize = -1L;
+            String portable = "";
+            long portableSize = -1L;
             if (json.has("assets") && json.get("assets").isJsonArray()) {
                 String fallback = "";
                 for (var element : json.getAsJsonArray("assets")) {
@@ -141,6 +148,13 @@ public final class UpdateChecker {
                     String assetUrl = asset.has("browser_download_url")
                             ? asset.get("browser_download_url").getAsString() : "";
                     if (assetUrl.isBlank()) continue;
+                    if (name.toLowerCase(java.util.Locale.ROOT).endsWith(".zip")
+                            && name.toLowerCase(java.util.Locale.ROOT).contains("win64")) {
+                        portable = assetUrl;
+                        if (asset.has("size") && !asset.get("size").isJsonNull()) {
+                            portableSize = asset.get("size").getAsLong();
+                        }
+                    }
                     if (name.toLowerCase(java.util.Locale.ROOT).endsWith(".exe")) {
                         if (asset.has("size") && !asset.get("size").isJsonNull()) {
                             downloadSize = asset.get("size").getAsLong();
@@ -158,7 +172,8 @@ public final class UpdateChecker {
                 download = json.get("html_url").getAsString();
             }
             if (version.isBlank()) throw new RuntimeException("GitHub Release 缺少 tag_name");
-            return new Info(version.trim(), download.trim(), notes, downloadSize);
+            return new Info(version.trim(), download.trim(), notes, downloadSize,
+                    portable.trim(), portableSize);
         }
 
         // 静态 JSON: {"version":"1.1.0","url":"...","notes":"..."}
