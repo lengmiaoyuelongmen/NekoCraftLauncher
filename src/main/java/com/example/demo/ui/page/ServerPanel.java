@@ -3,6 +3,7 @@ package com.example.demo.ui.page;
 import com.example.demo.core.app.LauncherConfig;
 import com.example.demo.core.i18n.I18n;
 import com.example.demo.core.server.PortReachability;
+import com.example.demo.core.server.PlayerInventory;
 import com.example.demo.core.server.PortableServerManager;
 import com.example.demo.core.server.ServerFiles;
 import com.example.demo.core.server.UpnpPortMapper;
@@ -672,11 +673,105 @@ public final class ServerPanel {
                     + (entry.reason().isEmpty() ? "" : "  ·  " + entry.reason());
             Label label = new Label(text);
             label.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 11px;");
-            box.getChildren().add(label);
+            Button inventory = new Button(I18n.t("server.player.inventory", "背包"));
+            inventory.getStyleClass().addAll("btn-ghost", "btn-sm");
+            inventory.setOnAction(e -> openInventoryEditor(dir, entry, onChange));
+            HBox rowBox = new HBox(8, label, inventory);
+            rowBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+            box.getChildren().add(rowBox);
         }
         return box;
     }
 
+    /** 编辑玩家背包：读 playerdata/<uuid>.dat 的 Inventory，改数量 / 删除 / 新增后写回（带备份）。 */
+    private void openInventoryEditor(File serverDir, ServerFiles.PlayerEntry entry, Runnable onChange) {
+        File dat = PlayerInventory.datFile(serverDir, entry.uuid());
+        if (dat == null || !dat.isFile()) {
+            Toast.info(I18n.t("server.player.noData", "这个玩家还没有进过服，暂时没有背包存档（先进一次服务器）"));
+            return;
+        }
+        List<PlayerInventory.Slot> slots;
+        try {
+            slots = PlayerInventory.read(dat);
+        } catch (Exception ex) {
+            Toast.error(I18n.t("server.player.readFailed", "读取背包失败：") + ex.getMessage());
+            return;
+        }
+        VBox rows = new VBox(6);
+        java.util.Map<Integer, javafx.scene.control.Spinner<Integer>> counts = new java.util.LinkedHashMap<>();
+        if (slots.isEmpty()) {
+            Label empty = new Label(I18n.t("server.player.empty", "背包是空的"));
+            empty.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
+            rows.getChildren().add(empty);
+        }
+        for (PlayerInventory.Slot slot : slots) {
+            Label name = new Label("#" + slot.slot() + "  " + PlayerInventory.shortId(slot.itemId()));
+            name.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 11px;");
+            name.setMinWidth(210);
+            javafx.scene.control.Spinner<Integer> count =
+                    new javafx.scene.control.Spinner<>(0, 64, Math.max(0, Math.min(64, slot.count())));
+            count.setPrefWidth(90);
+            Label hint = new Label(I18n.t("server.player.countHint", "0 = 删除"));
+            hint.setStyle("-fx-text-fill: -app-text-dim-3; -fx-font-size: 10px;");
+            counts.put(slot.slot(), count);
+            HBox line = new HBox(10, name, count, hint);
+            line.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+            rows.getChildren().add(line);
+        }
+        TextField addId = new TextField();
+        addId.setPromptText(I18n.t("server.player.addId", "要新增的物品 id，例如 minecraft:bread"));
+        javafx.scene.control.Spinner<Integer> addCount =
+                new javafx.scene.control.Spinner<>(1, 64, 1);
+        addCount.setPrefWidth(90);
+        HBox addRow = new HBox(8, addId, addCount);
+        HBox.setHgrow(addId, javafx.scene.layout.Priority.ALWAYS);
+        Label note = new Label(I18n.t("server.player.note", "保存前会在 server-backups\\ 留一份存档副本；其余数据（生命、经验）不动"));
+        note.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 10.5px;");
+        note.setWrapText(true);
+        VBox sheet = new VBox(10, rows, new javafx.scene.control.Separator(), addRow, note);
+        sheet.setPrefWidth(560);
+        javafx.scene.control.ScrollPane scroll = new javafx.scene.control.ScrollPane(sheet);
+        scroll.setFitToWidth(true);
+        scroll.setPrefHeight(420);
+        com.example.demo.ui.shell.InAppDialog.customSized(
+                com.example.demo.ui.shell.InAppDialog.globalHost(),
+                I18n.t("server.player.inventoryTitle", "编辑背包 · ") + entry.name(),
+                scroll,
+                java.util.List.of(
+                        com.example.demo.ui.shell.InAppDialog.Action.primary(
+                                I18n.t("server.player.save", "保存背包"), () -> {
+                                    java.util.Map<Integer, Integer> edits = new java.util.LinkedHashMap<>();
+                                    java.util.List<PlayerInventory.Slot> adds = new java.util.ArrayList<>();
+                                    for (java.util.Map.Entry<Integer, javafx.scene.control.Spinner<Integer>> item
+                                            : counts.entrySet()) {
+                                        edits.put(item.getKey(), item.getValue().getValue());
+                                    }
+                                    String id = addId.getText() == null ? "" : addId.getText().trim();
+                                    if (!id.isEmpty()) {
+                                        if (!id.contains(":")) {
+                                            id = "minecraft:" + id;
+                                        }
+                                        adds.add(new PlayerInventory.Slot(0, id, addCount.getValue()));
+                                    }
+                                    try {
+                                        List<PlayerInventory.Slot> after =
+                                                PlayerInventory.apply(dat, edits, adds);
+                                        Toast.ok(I18n.t("server.player.saved", "背包已保存，共 ")
+                                                + after.size() + I18n.t("server.player.savedTail", " 个物品"));
+                                        if (onChange != null) {
+                                            onChange.run();
+                                        }
+                                    } catch (Exception ex) {
+                                        Toast.error(I18n.t("server.player.saveFailed", "保存失败：")
+                                                + ex.getMessage());
+                                    }
+                                }),
+                        com.example.demo.ui.shell.InAppDialog.Action.secondary(
+                                I18n.t("common.close", "关闭"), null)),
+                null,
+                620,
+                520);
+    }
     // ==================== 信息 ====================
 
     private ScrollPane infoPane(PortableServerManager.Profile profile) {

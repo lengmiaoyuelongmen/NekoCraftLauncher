@@ -1306,7 +1306,7 @@ public final class SettingsPanel extends VBox {
     }
 
     private ScrollPane buildUpdateTab() {
-        Label version = new Label("当前版本：Neko Craft Launcher " + AppVersion.CURRENT);
+        Label version = new Label(I18n.t("settings.version", "当前版本：Neko Craft Launcher ") + AppVersion.CURRENT);
         version.setStyle("-fx-text-fill: -app-text; -fx-font-size: 13px;");
 
         javafx.scene.control.TextField urlField = new javafx.scene.control.TextField(config.getUpdateUrl());
@@ -1317,13 +1317,13 @@ public final class SettingsPanel extends VBox {
         mirrorField.setPromptText("备用更新源 / Gitee / 自建 manifest（可选）");
         HBox.setHgrow(mirrorField, Priority.ALWAYS);
 
-        Button saveUrl = smallButton("保存更新源", e -> {
+        Button saveUrl = smallButton(I18n.t("settings.update.saveSource", "保存更新源"), e -> {
             config.setUpdateUrl(urlField.getText().trim());
             config.setUpdateMirrorUrl(mirrorField.getText().trim());
             config.save();
-            Toast.ok("更新源已保存");
+            Toast.ok(I18n.t("settings.update.sourceSaved", "更新源已保存"));
         });
-        Button download = smallButton("下载并安装更新", e -> { });
+        Button download = smallButton(I18n.t("settings.update.download", "下载并安装更新"), e -> { });
         download.setVisible(false);
         download.setManaged(false);
 
@@ -1437,22 +1437,22 @@ public final class SettingsPanel extends VBox {
                     380);
         });
 
-        Label status = new Label("更新检查使用静态 JSON：version / url / notes。");
+        Label status = new Label(I18n.t("settings.update.hint", "更新检查使用静态 JSON：version / url / notes。"));
         status.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
         status.setWrapText(true);
 
-        Button check = smallButton("检查更新", e -> {
+        Button check = smallButton(I18n.t("settings.update.check", "检查更新"), e -> {
             String url = urlField.getText().trim();
             String mirror = mirrorField.getText().trim();
             config.setUpdateUrl(url);
             config.setUpdateMirrorUrl(mirror);
             config.save();
             if (url.isBlank()) {
-                Toast.info("请先填写更新源 JSON 地址");
+                Toast.info(I18n.t("settings.update.needUrl", "请先填写更新源 JSON 地址"));
                 return;
             }
             ((Button) e.getSource()).setDisable(true);
-            status.setText("正在检查更新…");
+            status.setText(I18n.t("settings.update.checking", "正在检查更新…"));
             status.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
             java.util.concurrent.CompletableFuture.supplyAsync(() -> {
                 try {

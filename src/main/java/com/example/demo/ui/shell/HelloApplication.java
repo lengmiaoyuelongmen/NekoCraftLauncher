@@ -1392,7 +1392,11 @@ public class HelloApplication extends Application {
     }
     if ("download".equals(pageName) && !this.downloadInitialized) {
       this.downloadInitialized = true;
-      this.ensureCommunityPrewarm();
+      // 预热延后到页面首帧之后：先让界面画出来，再去拉社区数据，首帧不被网络请求拖住
+      javafx.animation.PauseTransition prewarmDelay =
+          new javafx.animation.PauseTransition(javafx.util.Duration.millis(600));
+      prewarmDelay.setOnFinished(ev -> this.ensureCommunityPrewarm());
+      prewarmDelay.play();
       Platform.runLater(
           () -> {
             this.communityBrowser.search();
