@@ -1134,6 +1134,9 @@ public class HelloApplication extends Application {
     rootWrap.getChildren().add(boot);
     stage.setScene(scene);
     stage.show();
+        // 首帧耗时：启动慢时先看这个数，别靠感觉
+        javafx.application.Platform.runLater(() -> System.out.println(
+                "STARTUP first-frame " + com.example.demo.Launcher.sinceStartMs() + " ms"));
 
     // 网络加速：启动后异步测速并配置 DNS（失败只写日志，不影响使用）
     if (this.config.isNetworkBoost()) {

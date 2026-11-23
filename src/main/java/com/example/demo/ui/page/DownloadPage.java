@@ -88,17 +88,17 @@ public final class DownloadPage {
         navScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         navScroll.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
 
-        navBox.getChildren().add(group("游戏", false));
+        navBox.getChildren().add(group(I18n.t("download.group.game", "游戏"), false));
         navBox.getChildren().add(navItem("Minecraft", "play"));
-        navBox.getChildren().add(group("社区资源", true));
+        navBox.getChildren().add(group(I18n.t("download.group.community", "社区资源"), true));
         String[][] communityItems = {
-                {"模组", "layers"},
-                {"整合包", "package"},
-                {"数据包", "folder"},
-                {"资源包", "image"},
-                {"光影包", "sparkles"},
-                {"世界", "globe"},
-                {"收藏夹", "star"}
+                {I18n.t("download.nav.mods", "模组"), "layers"},
+                {I18n.t("download.nav.modpacks", "整合包"), "package"},
+                {I18n.t("download.nav.datapacks", "数据包"), "folder"},
+                {I18n.t("download.nav.resourcepacks", "资源包"), "image"},
+                {I18n.t("download.nav.shaders", "光影包"), "sparkles"},
+                {I18n.t("download.nav.worlds", "世界"), "globe"},
+                {I18n.t("download.nav.favorites", "收藏夹"), "star"}
         };
         for (String[] entry : communityItems) {
             String item = entry[0];
@@ -108,7 +108,7 @@ public final class DownloadPage {
             }
             navBox.getChildren().add(node);
         }
-        navBox.getChildren().add(group("安装包", true));
+        navBox.getChildren().add(group(I18n.t("download.group.installers", "安装包"), true));
         for (String loader : new String[]{"Fabric", "Quilt", "Forge", "NeoForge"}) {
             DownloadNavItem node = navItem(loader, "tools");
             installerItems.add(node);

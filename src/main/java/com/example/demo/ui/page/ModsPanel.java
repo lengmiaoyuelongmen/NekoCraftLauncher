@@ -485,18 +485,12 @@ public final class ModsPanel extends VBox {
                 enabledFiles.add(file);
             }
         }
+        // 分批渲染：先出分组头，剩下的每帧补一批。
+        // 200+ 模组一次性建完会卡住界面几百毫秒，分批后就顺畅了。
         if (!enabledFiles.isEmpty()) {
             localList.getChildren().add(modsSection("已启用 · " + enabledFiles.size()));
-            for (File file : enabledFiles) {
-                localList.getChildren().add(localRow(file));
-            }
         }
-        if (!disabledFiles.isEmpty()) {
-            localList.getChildren().add(modsSection("已禁用 · " + disabledFiles.size()));
-            for (File file : disabledFiles) {
-                localList.getChildren().add(localRow(file));
-            }
-        }
+        addRowsInBatches(enabledFiles, disabledFiles);
         // 列表项入场：错落淡入，避免刷新时整块"啪"地出现
         java.util.List<javafx.scene.Node> rows = new java.util.ArrayList<>();
         for (javafx.scene.Node node : localList.getChildren()) {
@@ -510,6 +504,36 @@ public final class ModsPanel extends VBox {
         }
     }
 
+    /** 把模组行分批塞进列表：每帧一批，界面先出来再慢慢补全。 */
+    private void addRowsInBatches(java.util.List<File> enabledFiles,
+                                  java.util.List<File> disabledFiles) {
+        final int batch = 30;
+        final java.util.List<File> queue = new java.util.ArrayList<>(enabledFiles);
+        final int enabledCount = enabledFiles.size();
+        queue.addAll(disabledFiles);
+        if (queue.isEmpty()) {
+            return;
+        }
+        final int[] index = {0};
+        final boolean[] headerDone = {false};
+        Runnable[] step = new Runnable[1];
+        step[0] = () -> {
+            if (index[0] >= queue.size()) {
+                return;
+            }
+            int end = Math.min(queue.size(), index[0] + batch);
+            for (int i = index[0]; i < end; i++) {
+                if (!headerDone[0] && i >= enabledCount && !disabledFiles.isEmpty()) {
+                    localList.getChildren().add(modsSection("已禁用 · " + disabledFiles.size()));
+                    headerDone[0] = true;
+                }
+                localList.getChildren().add(localRow(queue.get(i)));
+            }
+            index[0] = end;
+            Platform.runLater(step[0]);
+        };
+        step[0].run();
+    }
     private Label modsSection(String text) {
         Label label = new Label(text);
         label.setStyle("-fx-text-fill: -app-text-dim-3; -fx-font-size: 11px; -fx-font-weight: bold;");

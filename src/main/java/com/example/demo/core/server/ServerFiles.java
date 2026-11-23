@@ -132,6 +132,19 @@ public final class ServerFiles {
     }
 
     /** 追加一条 whitelist.json。 */
+    /** 白名单里没有就追加；返回 true 表示这次真的加了。 */
+    public static boolean addWhitelistIfMissing(File dir, String name) throws IOException {
+        if (name == null || name.isBlank()) {
+            return false;
+        }
+        for (PlayerEntry entry : readWhitelist(dir)) {
+            if (entry.name() != null && entry.name().equalsIgnoreCase(name.trim())) {
+                return false;
+            }
+        }
+        addWhitelist(dir, name.trim(), "");
+        return true;
+    }
     public static void addWhitelist(File dir, String name, String uuid) throws IOException {
         File file = new File(dir, "whitelist.json");
         JsonArray array = file.isFile()

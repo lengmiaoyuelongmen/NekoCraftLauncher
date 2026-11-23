@@ -583,8 +583,67 @@ public final class ServerPanel {
         refresh.getStyleClass().addAll("btn-ghost", "btn-sm");
         refresh.setOnAction(e -> reload[0].run());
 
-        VBox box = new VBox(10, lists, new HBox(8, name, addOp, addWhite, refresh));
+        // 批量导入：一次粘贴多个名字（逗号/空格/换行都行），省得一个个加
+        Button bulk = new Button(I18n.t("server.panel.bulk", "批量导入"));
+        bulk.getStyleClass().addAll("btn-secondary", "btn-sm");
+        bulk.setOnAction(e -> {
+            javafx.scene.control.TextArea input = new javafx.scene.control.TextArea();
+            input.setPromptText(I18n.t("server.panel.bulk.prompt", "每行一个玩家名，也支持逗号或空格分隔"));
+            input.setPrefRowCount(8);
+            javafx.scene.layout.VBox sheet = new javafx.scene.layout.VBox(8, input,
+                    new Label(I18n.t("server.panel.bulk.hint", "会追加到白名单；已经在名单里的自动跳过")));
+            sheet.setPrefWidth(420);
+            com.example.demo.ui.shell.InAppDialog.customSized(
+                    com.example.demo.ui.shell.InAppDialog.globalHost(),
+                    I18n.t("server.panel.bulk.title", "批量导入白名单"),
+                    sheet,
+                    java.util.List.of(
+                            com.example.demo.ui.shell.InAppDialog.Action.primary(
+                                    I18n.t("server.panel.bulk.apply", "导入"), () -> {
+                                        String raw = input.getText() == null ? "" : input.getText();
+                                        int added = 0;
+                                        int skipped = 0;
+                                        for (String token : raw.split("[,\\s]+")) {
+                                            String player = token.trim();
+                                            if (player.isEmpty() || player.length() > 16) {
+                                                continue;
+                                            }
+                                            try {
+                                                if (ServerFiles.addWhitelistIfMissing(dir, player)) {
+                                                    added++;
+                                                } else {
+                                                    skipped++;
+                                                }
+                                            } catch (Exception ex) {
+                                                skipped++;
+                                            }
+                                        }
+                                        Toast.ok(I18n.t("server.panel.bulk.done", "导入完成：新增 ")
+                                                + added + I18n.t("server.panel.bulk.doneTail", " 个，跳过 ") + skipped);
+                                        reload[0].run();
+                                    }),
+                            com.example.demo.ui.shell.InAppDialog.Action.secondary(
+                                    I18n.t("common.close", "关闭"), null)),
+                    null,
+                    480,
+                    320);
+        });
+
+
+        VBox box = new VBox(10, lists, new HBox(8, name, addOp, addWhite, refresh, bulk));
         box.setPadding(new Insets(12));
+        // 自动刷新：面板可见时每 5 秒重读一次名单，别人加白名单后不用手动点
+        javafx.animation.Timeline auto = new javafx.animation.Timeline(
+                new javafx.animation.KeyFrame(javafx.util.Duration.seconds(5),
+                        ev -> reload[0].run()));
+        auto.setCycleCount(javafx.animation.Animation.INDEFINITE);
+        box.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene == null) {
+                auto.stop();
+            } else {
+                auto.play();
+            }
+        });
         return box;
     }
 
