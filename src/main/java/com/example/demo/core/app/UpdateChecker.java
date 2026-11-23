@@ -25,14 +25,14 @@ import java.time.Duration;
 public final class UpdateChecker {
 
     public record Info(String version, String url, String notes, long sizeBytes,
-                        String portableUrl, long portableSize) {
+                        String portableUrl, long portableSize, String checksumsUrl) {
 
         public Info(String version, String url, String notes, long sizeBytes) {
-            this(version, url, notes, sizeBytes, "", -1L);
+            this(version, url, notes, sizeBytes, "", -1L, "");
         }
 
         public Info(String version, String url, String notes) {
-            this(version, url, notes, -1L, "", -1L);
+            this(version, url, notes, -1L, "", -1L, "");
         }
     }
 
@@ -140,6 +140,7 @@ public final class UpdateChecker {
             long downloadSize = -1L;
             String portable = "";
             long portableSize = -1L;
+            String checksums = "";
             if (json.has("assets") && json.get("assets").isJsonArray()) {
                 String fallback = "";
                 for (var element : json.getAsJsonArray("assets")) {
@@ -148,6 +149,9 @@ public final class UpdateChecker {
                     String assetUrl = asset.has("browser_download_url")
                             ? asset.get("browser_download_url").getAsString() : "";
                     if (assetUrl.isBlank()) continue;
+                    if (name.equalsIgnoreCase("SHA256SUMS.txt")) {
+                        checksums = assetUrl;
+                    }
                     if (name.toLowerCase(java.util.Locale.ROOT).endsWith(".zip")
                             && name.toLowerCase(java.util.Locale.ROOT).contains("win64")) {
                         portable = assetUrl;
@@ -173,7 +177,7 @@ public final class UpdateChecker {
             }
             if (version.isBlank()) throw new RuntimeException("GitHub Release 缺少 tag_name");
             return new Info(version.trim(), download.trim(), notes, downloadSize,
-                    portable.trim(), portableSize);
+                    portable.trim(), portableSize, checksums.trim());
         }
 
         // 静态 JSON: {"version":"1.1.0","url":"...","notes":"..."}
@@ -281,6 +285,66 @@ public final class UpdateChecker {
         }
     }
 
+    /** 从 SHA256SUMS.txt 里查出某个文件名的期望哈希（找不到返回 null）。 */
+    public static String expectedSha256(String sums, String fileName) {
+        if (sums == null || sums.isBlank() || fileName == null) {
+            return null;
+        }
+        for (String line : sums.split("\r?\n")) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            // 格式：<64 hex>  <文件名>（两空格，和 sha256sum 一致）
+            int split = trimmed.indexOf("  ");
+            if (split < 0) {
+                split = trimmed.indexOf(' ');
+            }
+            if (split <= 0) {
+                continue;
+            }
+            String hash = trimmed.substring(0, split).trim();
+            String name = trimmed.substring(split).trim();
+            if (name.equalsIgnoreCase(fileName) && hash.matches("[0-9a-fA-F]{64}")) {
+                return hash.toLowerCase(java.util.Locale.ROOT);
+            }
+        }
+        return null;
+    }
+
+    /** 计算文件的 SHA-256（小写十六进制）。 */
+    public static String sha256(Path file) throws Exception {
+        java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+        try (InputStream in = Files.newInputStream(file)) {
+            byte[] buffer = new byte[65536];
+            int read;
+            while ((read = in.read(buffer)) != -1) {
+                digest.update(buffer, 0, read);
+            }
+        }
+        StringBuilder hex = new StringBuilder();
+        for (byte b : digest.digest()) {
+            hex.append(String.format("%02x", b));
+        }
+        return hex.toString();
+    }
+
+    /** 下载校验清单文本（失败返回空串，不阻断更新）。 */
+    public static String fetchChecksums(String url) {
+        if (url == null || url.isBlank()) {
+            return "";
+        }
+        try {
+            HttpRequest request = HttpRequest.newBuilder(URI.create(url))
+                    .timeout(Duration.ofSeconds(15))
+                    .header("User-Agent", "NekoCraftLauncher/" + AppVersion.CURRENT)
+                    .GET().build();
+            HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            return response.statusCode() == 200 ? response.body() : "";
+        } catch (Exception e) {
+            return "";
+        }
+    }
     /** 简单的语义化版本比较：返回 true 表示 remote 比 current 新。 */
     public static boolean isNewer(String remote, String current) {
         int[] a = parse(remote);

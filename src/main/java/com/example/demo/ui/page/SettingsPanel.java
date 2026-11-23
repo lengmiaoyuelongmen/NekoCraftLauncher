@@ -1123,7 +1123,34 @@ public final class SettingsPanel extends VBox {
             } catch (Exception ex) {
                 throw new java.util.concurrent.CompletionException(ex);
             }
-        }).thenAccept(v -> Platform.runLater(() -> {
+        }).thenAccept(v -> {
+            // 装之前先校验：清单来自同一个 Release，哈希对不上就删包重下，别把半截包装进去
+            String expected = null;
+            String sums = com.example.demo.core.app.UpdateChecker.fetchChecksums(info.checksumsUrl());
+            if (!sums.isBlank()) {
+                expected = com.example.demo.core.app.UpdateChecker
+                        .expectedSha256(sums, target.getFileName().toString());
+            }
+            if (expected != null) {
+                try {
+                    String actual = com.example.demo.core.app.UpdateChecker.sha256(target);
+                    if (!expected.equalsIgnoreCase(actual)) {
+                        java.nio.file.Files.deleteIfExists(target);
+                        final String detail = I18n.t("update.checksum.mismatch", "更新包校验失败（哈希不一致），已删除，请重试")
+                                + " expected=" + expected + " actual=" + actual;
+                        Platform.runLater(() -> {
+                            updateBusy = false;
+                            button.setDisable(false);
+                            status.setText(detail);
+                            status.setStyle("-fx-text-fill: #f87171; -fx-font-size: 11px;");
+                        });
+                        return;
+                    }
+                } catch (Exception hashError) {
+                    // 算不出来就继续，不因为校验工具问题挡住更新
+                }
+            }
+            Platform.runLater(() -> {
             // 保持按钮禁用，避免下载完成到安装启动之间被再次点击
             status.setText("下载完成，正在自动安装 " + info.version() + "…");
             status.setStyle("-fx-text-fill: #4CAF50; -fx-font-size: 11px;");
@@ -1215,7 +1242,8 @@ public final class SettingsPanel extends VBox {
                     status.setStyle("-fx-text-fill: #f87171; -fx-font-size: 11px;");
                 }
             }
-        })).exceptionally(ex -> {
+            });
+        }).exceptionally(ex -> {
             Throwable cause = ex;
             while (cause.getCause() != null) cause = cause.getCause();
             final Throwable root = cause;
@@ -1299,6 +1327,45 @@ public final class SettingsPanel extends VBox {
         download.setVisible(false);
         download.setManaged(false);
 
+        // 回退：只有免安装版留下过备份才出现
+        java.io.File latestBackup = com.example.demo.core.app.UpdateInstaller.latestBackup();
+        Button rollback = smallButton(I18n.t("update.rollback", "回退到上一版"), e -> {
+            java.io.File launcher = com.example.demo.core.app.UpdateInstaller.currentLauncherExe();
+            java.io.File root = com.example.demo.core.app.UpdateInstaller.portableRoot(launcher);
+            java.io.File backup = com.example.demo.core.app.UpdateInstaller.latestBackup();
+            if (root == null || backup == null) {
+                Toast.info(I18n.t("update.rollback.none", "没有可用的备份，先更新一次才会有"));
+                return;
+            }
+            javafx.scene.control.Alert confirm = new javafx.scene.control.Alert(
+                    javafx.scene.control.Alert.AlertType.CONFIRMATION);
+            confirm.initOwner(owner());
+            confirm.setTitle(I18n.t("update.rollback.title", "回退到上一版"));
+            confirm.setHeaderText(I18n.t("update.rollback.header", "将用备份覆盖当前程序文件"));
+            confirm.setContentText(I18n.t("update.rollback.body", "备份时间：")
+                    + new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm")
+                    .format(new java.util.Date(backup.lastModified()))
+                    + "\n" + I18n.t("update.rollback.body2", "存档 game\\ 与 config.json 不受影响。回退会关闭启动器并自动重新打开。"));
+            if (confirm.showAndWait().orElse(javafx.scene.control.ButtonType.CANCEL)
+                    != javafx.scene.control.ButtonType.OK) {
+                return;
+            }
+            try {
+                java.io.File script = com.example.demo.core.app.UpdateInstaller
+                        .prepareRollbackScript(backup, root);
+                com.example.demo.core.app.UpdateInstaller.runPowerShellDetached(script);
+                Toast.ok(I18n.t("update.rollback.running", "正在回退，启动器即将重启"));
+                javafx.application.Platform.runLater(() -> {
+                    javafx.application.Platform.exit();
+                    System.exit(0);
+                });
+            } catch (Exception ex) {
+                Toast.error(I18n.t("update.rollback.failed", "回退失败：") + ex.getMessage());
+            }
+        });
+        rollback.setVisible(latestBackup != null);
+        rollback.setManaged(latestBackup != null);
+
         Label status = new Label("更新检查使用静态 JSON：version / url / notes。");
         status.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
         status.setWrapText(true);
@@ -1374,6 +1441,8 @@ public final class SettingsPanel extends VBox {
                 hint("支持 GitHub Releases API、仓库地址，或静态 JSON：version / url / notes。"),
                 hint("GitHub 仓库地址会自动转换为 releases/latest；留空则不检查。"),
                 new HBox(10, urlField, saveUrl, check, download),
+                new HBox(10, rollback, hint(I18n.t("update.rollback.hint",
+                        "只在免安装版更新过之后可用；卸载版由安装程序自己管理版本"))),
                 new HBox(10, mirrorField),
                 status);
         return scroll(card);
