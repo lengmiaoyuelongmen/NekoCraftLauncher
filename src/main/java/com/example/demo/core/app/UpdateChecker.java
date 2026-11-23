@@ -345,6 +345,25 @@ public final class UpdateChecker {
             return "";
         }
     }
+    /**
+     * 两个版本之间差多少个「小版本」（major 不同时按 major 差 ×100 粗算）。
+     *
+     * <p>用来在跨版本更新时提醒「建议先看更新说明」，避免用户从 2.40 直接跳到 3.0 才发现变了天。
+     */
+    public static int versionGap(String remote, String current) {
+        int[] a = parse(remote);
+        int[] b = parse(current);
+        if (a.length == 0 || b.length == 0) {
+            return 0;
+        }
+        int majorDiff = Math.abs(a[0] - b[0]);
+        if (majorDiff > 0) {
+            return majorDiff * 100;
+        }
+        int minorA = a.length > 1 ? a[1] : 0;
+        int minorB = b.length > 1 ? b[1] : 0;
+        return Math.abs(minorA - minorB);
+    }
     /** 简单的语义化版本比较：返回 true 表示 remote 比 current 新。 */
     public static boolean isNewer(String remote, String current) {
         int[] a = parse(remote);

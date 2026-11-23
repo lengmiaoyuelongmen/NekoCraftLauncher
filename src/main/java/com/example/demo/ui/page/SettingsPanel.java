@@ -1366,6 +1366,77 @@ public final class SettingsPanel extends VBox {
         rollback.setVisible(latestBackup != null);
         rollback.setManaged(latestBackup != null);
 
+        // 更新内容：可滚动，跨版本时提示先看说明
+        javafx.scene.control.TextArea notesArea = new javafx.scene.control.TextArea();
+        notesArea.setEditable(false);
+        notesArea.setWrapText(true);
+        notesArea.setPrefRowCount(6);
+        notesArea.setStyle("-fx-font-family: 'Consolas','Microsoft YaHei',monospace; -fx-font-size: 11px;");
+        notesArea.setVisible(false);
+        notesArea.setManaged(false);
+
+        Button manageBackups = smallButton(I18n.t("update.backup.manage", "管理备份"), e -> {
+            java.util.List<java.io.File> backups = com.example.demo.core.app.UpdateInstaller.listBackups();
+            if (backups.isEmpty()) {
+                Toast.info(I18n.t("update.backup.none", "还没有备份：免安装版更新一次后会自动留一份"));
+                return;
+            }
+            javafx.scene.control.ListView<java.io.File> list = new javafx.scene.control.ListView<>();
+            list.getItems().setAll(backups);
+            list.setPrefHeight(220);
+            list.setCellFactory(view -> new javafx.scene.control.ListCell<>() {
+                @Override
+                protected void updateItem(java.io.File item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty || item == null) {
+                        setText(null);
+                        return;
+                    }
+                    long mb = com.example.demo.core.app.UpdateInstaller.backupSize(item) / 1024 / 1024;
+                    setText(item.getName() + "    " + new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm")
+                            .format(new java.util.Date(item.lastModified())) + "    " + mb + " MB");
+                }
+            });
+            Label total = new Label();
+            Runnable refreshTotal = () -> {
+                long sum = 0;
+                for (java.io.File backup : com.example.demo.core.app.UpdateInstaller.listBackups()) {
+                    sum += com.example.demo.core.app.UpdateInstaller.backupSize(backup);
+                }
+                total.setText(I18n.t("update.backup.total", "共占用 ") + (sum / 1024 / 1024) + " MB");
+                total.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
+            };
+            refreshTotal.run();
+            javafx.scene.control.Button delete = new javafx.scene.control.Button(
+                    I18n.t("update.backup.delete", "删除选中"));
+            delete.setOnAction(ev -> {
+                java.io.File selected = list.getSelectionModel().getSelectedItem();
+                if (selected == null) {
+                    Toast.info(I18n.t("update.backup.pick", "先选中一个备份"));
+                    return;
+                }
+                if (com.example.demo.core.app.UpdateInstaller.deleteBackup(selected)) {
+                    Toast.ok(I18n.t("update.backup.deleted", "备份已删除"));
+                    list.getItems().setAll(com.example.demo.core.app.UpdateInstaller.listBackups());
+                    refreshTotal.run();
+                } else {
+                    Toast.error(I18n.t("update.backup.deleteFailed", "删除失败（文件可能被占用）"));
+                }
+            });
+            javafx.scene.layout.VBox box = new javafx.scene.layout.VBox(8, list, total,
+                    new javafx.scene.layout.HBox(10, delete));
+            box.setPrefWidth(520);
+            com.example.demo.ui.shell.InAppDialog.customSized(
+                    com.example.demo.ui.shell.InAppDialog.globalHost(),
+                    I18n.t("update.backup.title", "更新备份"),
+                    box,
+                    java.util.List.of(com.example.demo.ui.shell.InAppDialog.Action.secondary(
+                            I18n.t("common.close", "关闭"), null)),
+                    null,
+                    560,
+                    380);
+        });
+
         Label status = new Label("更新检查使用静态 JSON：version / url / notes。");
         status.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
         status.setWrapText(true);
@@ -1410,6 +1481,22 @@ public final class SettingsPanel extends VBox {
                         download.setManaged(true);
                         download.setOnAction(ev -> downloadAndInstall(info, status, download));
                     }
+                    // 更新内容内嵌展示（原来只有一行拼接，长说明直接看不见）
+                    if (!info.notes().isBlank()) {
+                        notesArea.setText(info.notes());
+                        notesArea.setVisible(true);
+                        notesArea.setManaged(true);
+                    } else {
+                        notesArea.setVisible(false);
+                        notesArea.setManaged(false);
+                    }
+                    // 跨版本提醒：相隔 3 个小版本以上就别急着点，先看说明
+                    int gap = com.example.demo.core.app.UpdateChecker
+                            .versionGap(info.version(), AppVersion.CURRENT);
+                    if (gap >= 3) {
+                        status.setText(status.getText() + "\n"
+                                + I18n.t("update.gap.hint", "这次跨了好几个版本，建议先看完下面的更新说明再装。"));
+                    }
                 } else {
                     status.setText("已是最新版本（远端 " + info.version() + "）");
                     status.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
@@ -1441,10 +1528,11 @@ public final class SettingsPanel extends VBox {
                 hint("支持 GitHub Releases API、仓库地址，或静态 JSON：version / url / notes。"),
                 hint("GitHub 仓库地址会自动转换为 releases/latest；留空则不检查。"),
                 new HBox(10, urlField, saveUrl, check, download),
-                new HBox(10, rollback, hint(I18n.t("update.rollback.hint",
+                new HBox(10, rollback, manageBackups, hint(I18n.t("update.rollback.hint",
                         "只在免安装版更新过之后可用；卸载版由安装程序自己管理版本"))),
                 new HBox(10, mirrorField),
-                status);
+                status,
+                notesArea);
         return scroll(card);
     }
 

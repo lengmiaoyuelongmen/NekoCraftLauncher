@@ -230,6 +230,55 @@ public final class UpdateInstaller {
         return dir;
     }
 
+    /** 现有备份列表（按时间新到旧）。 */
+    public static java.util.List<File> listBackups() {
+        File[] dirs = backupRoot().listFiles(File::isDirectory);
+        java.util.List<File> result = new java.util.ArrayList<>();
+        if (dirs != null) {
+            result.addAll(java.util.Arrays.asList(dirs));
+        }
+        result.sort((left, right) -> Long.compare(right.lastModified(), left.lastModified()));
+        return result;
+    }
+
+    /** 备份目录大小（字节），用于在管理界面显示占用。 */
+    public static long backupSize(File backup) {
+        if (backup == null || !backup.isDirectory()) {
+            return 0L;
+        }
+        long[] total = {0L};
+        try (java.util.stream.Stream<java.nio.file.Path> walk = Files.walk(backup.toPath())) {
+            walk.filter(Files::isRegularFile).forEach(path -> {
+                try {
+                    total[0] += Files.size(path);
+                } catch (java.io.IOException ignored) {
+                    // 单个文件读不到就跳过
+                }
+            });
+        } catch (java.io.IOException ignored) {
+            return total[0];
+        }
+        return total[0];
+    }
+
+    /** 删除一个备份目录；返回是否删干净。 */
+    public static boolean deleteBackup(File backup) {
+        if (backup == null || !backup.isDirectory()) {
+            return false;
+        }
+        try (java.util.stream.Stream<java.nio.file.Path> walk = Files.walk(backup.toPath())) {
+            walk.sorted(java.util.Comparator.reverseOrder()).forEach(path -> {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (java.io.IOException ignored) {
+                    // 文件被占用时留给下次
+                }
+            });
+        } catch (java.io.IOException e) {
+            return false;
+        }
+        return !backup.exists();
+    }
     /** 最近一次备份（没有则返回 null）。 */
     public static File latestBackup() {
         File[] dirs = backupRoot().listFiles(File::isDirectory);
