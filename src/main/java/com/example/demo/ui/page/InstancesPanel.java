@@ -117,7 +117,7 @@ public final class InstancesPanel extends HBox {
                     + " -fx-cursor: hand; -fx-font-size: 12px;");
             render();
         });
-        Button refresh = new Button("↻ 刷新");
+        Button refresh = new Button(I18n.t("instances.refresh", "↻ 刷新"));
         refresh.setStyle("-fx-background-color: -app-row3; -fx-text-fill: -app-text-2; -fx-background-radius: 8;"
                 + " -fx-padding: 6 14; -fx-cursor: hand; -fx-font-size: 12px;");
         refresh.setOnAction(e -> reload());
@@ -162,7 +162,7 @@ public final class InstancesPanel extends HBox {
 
     private void renderSide() {
         side.getChildren().clear();
-        Label back = new Label("‹ 返回启动页");
+        Label back = new Label(I18n.t("instances.back", "‹ 返回启动页"));
         back.setStyle("-fx-text-fill: -app-text-dim; -fx-font-size: 12px; -fx-cursor: hand;"
                 + " -fx-padding: 2 18 10 18;");
         back.setOnMouseEntered(e -> back.setStyle("-fx-text-fill: -app-accent; -fx-font-size: 12px;"
@@ -205,7 +205,7 @@ public final class InstancesPanel extends HBox {
 
     private void exportSelected() {
         if (selectedId == null || selectedId.isBlank()) {
-            Toast.info("先选择一个实例，再导出整合包");
+            Toast.info(I18n.t("instances.pickFirst", "先选择一个实例，再导出整合包"));
             return;
         }
         if (onExport != null) onExport.accept(Instance.of(gameDir, selectedId));
@@ -214,9 +214,9 @@ public final class InstancesPanel extends HBox {
     /** 目录右键菜单：重命名 / 移除。 */
     private void attachDirMenu(HBox item, File dir, boolean active) {
         javafx.scene.control.ContextMenu menu = new javafx.scene.control.ContextMenu();
-        javafx.scene.control.MenuItem rename = new javafx.scene.control.MenuItem("重命名");
+        javafx.scene.control.MenuItem rename = new javafx.scene.control.MenuItem(I18n.t("instances.rename", "重命名"));
         rename.setOnAction(e -> renameDir(dir));
-        javafx.scene.control.MenuItem remove = new javafx.scene.control.MenuItem("从列表移除");
+        javafx.scene.control.MenuItem remove = new javafx.scene.control.MenuItem(I18n.t("instances.remove", "从列表移除"));
         remove.setOnAction(e -> removeDir(dir, active));
         menu.getItems().addAll(rename, remove);
         item.setOnContextMenuRequested(e -> menu.show(item, e.getScreenX(), e.getScreenY()));
@@ -225,9 +225,9 @@ public final class InstancesPanel extends HBox {
     private void renameDir(File dir) {
         javafx.scene.control.TextInputDialog dialog = new javafx.scene.control.TextInputDialog(
                 config.gameDirName(dir.getAbsolutePath()));
-        dialog.setTitle("重命名目录");
+        dialog.setTitle(I18n.t("instances.rename.title", "重命名目录"));
         dialog.setHeaderText("给「" + displayName(dir) + "」起一个显示名");
-        dialog.setContentText("显示名");
+        dialog.setContentText(I18n.t("instances.rename.label", "显示名"));
         dialog.showAndWait().ifPresent(name -> {
             config.setGameDirName(dir.getAbsolutePath(), name);
             config.save();
@@ -288,7 +288,7 @@ public final class InstancesPanel extends HBox {
 
     private void browseFolder() {
         javafx.stage.DirectoryChooser chooser = new javafx.stage.DirectoryChooser();
-        chooser.setTitle("选择 .minecraft 目录");
+        chooser.setTitle(I18n.t("instances.pickDir", "选择 .minecraft 目录"));
         File chosen = chooser.showDialog(getScene() == null ? null : getScene().getWindow());
         if (chosen != null) switchTo(chosen);
     }
@@ -433,7 +433,7 @@ public final class InstancesPanel extends HBox {
         star.setOnMouseClicked(e -> {
             boolean nowFavorite = !InstanceMeta.isFavorite(gameDir, instance.id);
             if (!InstanceMeta.setFavorite(gameDir, instance.id, nowFavorite)) {
-                Toast.error("收藏没能保存（磁盘只读或被占用）");
+                Toast.error(I18n.t("instances.favoriteFailed", "收藏没能保存（磁盘只读或被占用）"));
                 e.consume();
                 return;
             }
@@ -497,26 +497,26 @@ public final class InstancesPanel extends HBox {
     private void attachInstanceMenu(HBox row, Instance instance) {
         javafx.scene.control.ContextMenu menu = new javafx.scene.control.ContextMenu();
 
-        javafx.scene.control.MenuItem openFolder = new javafx.scene.control.MenuItem("打开实例文件夹");
+        javafx.scene.control.MenuItem openFolder = new javafx.scene.control.MenuItem(I18n.t("instances.openFolder", "打开实例文件夹"));
         openFolder.setOnAction(e -> openInstanceFolder(instance, false));
-        javafx.scene.control.MenuItem openLogs = new javafx.scene.control.MenuItem("打开日志目录");
+        javafx.scene.control.MenuItem openLogs = new javafx.scene.control.MenuItem(I18n.t("instances.openLogs", "打开日志目录"));
         openLogs.setOnAction(e -> openInstanceFolder(instance, true));
-        javafx.scene.control.MenuItem copyId = new javafx.scene.control.MenuItem("复制实例 ID");
+        javafx.scene.control.MenuItem copyId = new javafx.scene.control.MenuItem(I18n.t("instances.copyId", "复制实例 ID"));
         copyId.setOnAction(e -> {
             javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
             content.putString(instance.id);
             javafx.scene.input.Clipboard.getSystemClipboard().setContent(content);
             Toast.ok("已复制实例 ID: " + instance.id);
         });
-        javafx.scene.control.MenuItem delete = new javafx.scene.control.MenuItem("删除实例");
+        javafx.scene.control.MenuItem delete = new javafx.scene.control.MenuItem(I18n.t("instances.delete", "删除实例"));
         delete.setOnAction(e -> confirmDelete(instance));
 
-        javafx.scene.control.MenuItem settings = new javafx.scene.control.MenuItem("实例设置");
+        javafx.scene.control.MenuItem settings = new javafx.scene.control.MenuItem(I18n.t("instances.settings", "实例设置"));
         settings.setOnAction(e -> {
             if (onSettings != null) onSettings.accept(instance);
         });
 
-        javafx.scene.control.MenuItem check = new javafx.scene.control.MenuItem("检查实例完整性");
+        javafx.scene.control.MenuItem check = new javafx.scene.control.MenuItem(I18n.t("instances.verify", "检查实例完整性"));
         check.setOnAction(e -> {
             if (onCheck != null) onCheck.accept(instance);
         });

@@ -132,6 +132,39 @@ public final class ServerFiles {
     }
 
     /** 追加一条 whitelist.json。 */
+    /**
+     * 从 server-console.log 里推断当前在线玩家（原版日志的 joined / left the game 事件）。
+     *
+     * <p>只读日志、不连服务器，所以离线也能用；日志被截断时最多不准，不会报错。
+     */
+    public static java.util.List<String> onlinePlayers(File dir) {
+        File log = new File(dir, "server-console.log");
+        java.util.LinkedHashSet<String> online = new java.util.LinkedHashSet<>();
+        if (!log.isFile()) {
+            return new java.util.ArrayList<>(online);
+        }
+        try {
+            java.util.List<String> lines = java.nio.file.Files.readAllLines(log.toPath());
+            java.util.regex.Pattern join = java.util.regex.Pattern
+                    .compile("([A-Za-z0-9_]{1,16}) joined the game");
+            java.util.regex.Pattern leave = java.util.regex.Pattern
+                    .compile("([A-Za-z0-9_]{1,16}) left the game");
+            for (String line : lines) {
+                java.util.regex.Matcher left = leave.matcher(line);
+                if (left.find()) {
+                    online.remove(left.group(1));
+                    continue;
+                }
+                java.util.regex.Matcher joined = join.matcher(line);
+                if (joined.find()) {
+                    online.add(joined.group(1));
+                }
+            }
+        } catch (Exception ignored) {
+            // 日志读不到就当作没有在线玩家
+        }
+        return new java.util.ArrayList<>(online);
+    }
     /** 白名单里没有就追加；返回 true 表示这次真的加了。 */
     public static boolean addWhitelistIfMissing(File dir, String name) throws IOException {
         if (name == null || name.isBlank()) {

@@ -535,13 +535,23 @@ public final class ServerPanel {
         File dir = new File(profile.dir());
         VBox lists = new VBox(10);
         Runnable[] reload = new Runnable[1];
-        reload[0] = () -> lists.getChildren().setAll(
-                playerSection(I18n.t("server.panel.ops", "OP 列表"), ServerFiles.readOps(dir), true,
-                        dir, true, reload[0]),
-                playerSection(I18n.t("server.panel.whitelist", "白名单"),
-                        ServerFiles.readWhitelist(dir), false, dir, false, reload[0]),
-                playerSection(I18n.t("server.panel.banned", "封禁列表"),
-                        ServerFiles.readBanned(dir), false, dir, false, reload[0]));
+        // 在线玩家从 server-console.log 的 joined / left 事件推断，显示在名单里
+        reload[0] = () -> {
+            java.util.List<String> online = ServerFiles.onlinePlayers(dir);
+            Label onlineHead = new Label(I18n.t("server.panel.online", "在线玩家")
+                    + " (" + online.size() + ")"
+                    + (online.isEmpty() ? "" : "：" + String.join("、", online)));
+            onlineHead.setStyle("-fx-text-fill: " + (online.isEmpty() ? "-app-text-dim-3" : "#22c55e")
+                    + "; -fx-font-size: 11.5px;" + (online.isEmpty() ? "" : " -fx-font-weight: bold;"));
+            lists.getChildren().setAll(
+                    onlineHead,
+                    playerSection(I18n.t("server.panel.ops", "OP 列表"), ServerFiles.readOps(dir), true,
+                            dir, true, reload[0]),
+                    playerSection(I18n.t("server.panel.whitelist", "白名单"),
+                            ServerFiles.readWhitelist(dir), false, dir, false, reload[0]),
+                    playerSection(I18n.t("server.panel.banned", "封禁列表"),
+                            ServerFiles.readBanned(dir), false, dir, false, reload[0]));
+        };
         reload[0].run();
 
         TextField name = new TextField();
