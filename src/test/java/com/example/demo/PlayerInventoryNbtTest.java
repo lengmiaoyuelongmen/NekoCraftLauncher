@@ -92,4 +92,22 @@ class PlayerInventoryNbtTest {
         assertEquals(dat, PlayerInventory.datFile(root.toFile(), "abcdefab-1111-2222-3333-444444444444"));
         assertEquals(dat, PlayerInventory.datFile(root.toFile(), "ABCDEFAB11112222333344444444 4444".replace(" ", "")));
     }
+    @Test
+    void enchantmentsCanBeWrittenAndCleared(@TempDir Path root) throws Exception {
+        File dat = playerDat(root, "bbbbbbbb-1111-2222-3333-444444444444");
+        // 给 0 号槽位的剑加锋利 V + 击退 II
+        PlayerInventory.applyEnchants(dat, 0, List.of(
+                new PlayerInventory.Enchant("minecraft:sharpness", 5),
+                new PlayerInventory.Enchant("minecraft:knockback", 2)));
+
+        List<PlayerInventory.Enchant> read = PlayerInventory.readEnchants(dat, 0);
+        assertEquals(2, read.size(), read.toString());
+        assertTrue(read.stream().anyMatch(e -> e.id().equals("minecraft:sharpness") && e.level() == 5));
+
+        // 清空
+        PlayerInventory.applyEnchants(dat, 0, List.of());
+        assertTrue(PlayerInventory.readEnchants(dat, 0).isEmpty());
+        // 其它槽位不受影响
+        assertTrue(PlayerInventory.readEnchants(dat, 5).isEmpty());
+    }
 }

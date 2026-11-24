@@ -9,6 +9,13 @@ public class Launcher {
     /** 进程启动时刻，用来量「到首帧」的真实耗时。 */
     private static final long START_NANOS = System.nanoTime();
 
+    /** 配置加载耗时（毫秒），由 main 在启动时写入。 */
+    private static long configLoadMs = -1L;
+
+    public static long configLoadMs() {
+        return configLoadMs;
+    }
+
     /** 当前进程从启动到现在的毫秒数（性能日志用）。 */
     public static long sinceStartMs() {
         return (System.nanoTime() - START_NANOS) / 1_000_000L;
@@ -21,7 +28,9 @@ public class Launcher {
             // 使用 Windows 系统证书库，避免 Java 自带 cacerts 缺失导致更新下载 SSL 失败
             System.setProperty("javax.net.ssl.trustStoreType", "WINDOWS-ROOT");
         }
+        long configStart = System.nanoTime();
         LauncherConfig config = LauncherConfig.load();
+        configLoadMs = (System.nanoTime() - configStart) / 1_000_000L;
         if (!config.isHardwareAcceleration()) {
             // 软件渲染：显卡驱动有问题 / 远程桌面 / 花屏时的兜底方案
             System.setProperty("prism.order", "sw");

@@ -247,7 +247,8 @@ public final class LaunchOverviewPane extends VBox {
         setPadding(new Insets(6.0, 4.0, 2.0, 4.0));
         setMaxHeight(Double.MAX_VALUE);
         VBox.setVgrow(this, Priority.ALWAYS);
-        refresh();
+        // 首帧之后再读历史/崩溃报告：这些是磁盘 IO + 解析，别挡第一屏
+        javafx.application.Platform.runLater(this::refresh);
     }
 
     /** 重新读取启动历史并刷新所有数字。 */

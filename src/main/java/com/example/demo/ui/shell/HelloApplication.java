@@ -860,6 +860,7 @@ public class HelloApplication extends Application {
   }
 
   public void start(Stage stage) {
+    long startEnter = com.example.demo.Launcher.sinceStartMs();
     List<MinecraftVersion> cachedVersions;
     this.stageRef = stage;
     this.primaryStage = stage;
@@ -953,7 +954,10 @@ public class HelloApplication extends Application {
     this.mouseSheen.widthProperty().bind(rootWrap.widthProperty());
     this.mouseSheen.heightProperty().bind(rootWrap.heightProperty());
     rootWrap.getChildren().add(Math.max(0, rootWrap.getChildren().indexOf(this.dialogLayer)), this.mouseSheen);
+    long rootBuilt = com.example.demo.Launcher.sinceStartMs();
+    long sceneStart = System.nanoTime();
     Scene scene = this.createScene(rootWrap, stage);
+    long sceneMs = (System.nanoTime() - sceneStart) / 1_000_000L;
     // 键盘流：Ctrl+, 打开设置；Esc 关掉最上层弹窗；启动页按 Enter 直接启动
     scene.getAccelerators().put(
         new javafx.scene.input.KeyCodeCombination(
@@ -1135,8 +1139,17 @@ public class HelloApplication extends Application {
     stage.setScene(scene);
     stage.show();
         // 首帧耗时：启动慢时先看这个数，别靠感觉
-        javafx.application.Platform.runLater(() -> System.out.println(
-                "STARTUP first-frame " + com.example.demo.Launcher.sinceStartMs() + " ms"));
+        javafx.application.Platform.runLater(() -> {
+          long firstFrame = com.example.demo.Launcher.sinceStartMs();
+          System.out.println("STARTUP first-frame " + firstFrame + " ms");
+          // 三段计时：配置加载 / 场景构建 / 首页构建（首帧 - 前两段）
+          System.out.println("TIMING startEnter=" + startEnter + "ms rootBuilt=" + rootBuilt
+                  + "ms sceneMs=" + sceneMs);
+          System.out.println("TIMING config=" + com.example.demo.Launcher.configLoadMs()
+                  + "ms scene=" + sceneMs + "ms firstPage="
+                  + (firstFrame - com.example.demo.Launcher.configLoadMs() - sceneMs) + "ms total="
+                  + firstFrame + "ms");
+        });
 
     // 网络加速：启动后异步测速并配置 DNS（失败只写日志，不影响使用）
     if (this.config.isNetworkBoost()) {

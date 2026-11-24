@@ -194,8 +194,8 @@ public final class SettingsPanel extends VBox {
         heightSpinner = spinner(240, 2160, config.getWindowHeight(), 10, 100);
 
         ToggleGroup memoryGroup = new ToggleGroup();
-        autoMemoryRadio = new RadioButton("自动配置");
-        customMemoryRadio = new RadioButton("自定义");
+        autoMemoryRadio = new RadioButton(I18n.t("settings.memory.auto", "自动配置"));
+        customMemoryRadio = new RadioButton(I18n.t("settings.memory.custom", "自定义"));
         autoMemoryRadio.setToggleGroup(memoryGroup);
         customMemoryRadio.setToggleGroup(memoryGroup);
         autoMemoryRadio.setStyle("-fx-text-fill: -app-text-2;");
@@ -637,10 +637,10 @@ public final class SettingsPanel extends VBox {
                 new HBox(8, memorySpinner, hint("MB")));
         VBox card = card(
                 section("启动设置"),
-                labeled("窗口尺寸", new HBox(8, widthSpinner, new Label("×"), heightSpinner, hint("像素"))),
-                section("游戏内存"),
+                labeled(I18n.t("settings.windowSize", "窗口尺寸"), new HBox(8, widthSpinner, new Label("×"), heightSpinner, hint("像素"))),
+                section(I18n.t("settings.memory", "游戏内存")),
                 new HBox(18, autoMemoryRadio, customMemoryRadio),
-                labeled("最大内存 (-Xmx)", memoryBox),
+                labeled(I18n.t("settings.maxMemory", "最大内存 (-Xmx)"), memoryBox),
                 labeled("系统内存占用", new VBox(4, systemMemoryBar, systemMemoryLabel)),
                 labeled("游戏分配", new VBox(4, gameMemoryBar, gameMemoryLabel)),
                 labeled("内存优化", memoryOptimizeRow()),
@@ -653,7 +653,7 @@ public final class SettingsPanel extends VBox {
                 hint("参考 Pavise 的思路，只做 JVM 调优与进程优先级；不写注册表、不改系统服务、不清理 standby 内存"),
                 section("实例"),
                 isolationBox,
-                labeled("游戏目录", new HBox(8, gameDirField, browseButton("浏览", this::browseGameDir))),
+                labeled(I18n.t("settings.gameDir", "游戏目录"), new HBox(8, gameDirField, browseButton(I18n.t("common.browse", "浏览"), this::browseGameDir))),
                 labeled("额外 JVM 参数", jvmArgsField));
         return scroll(card);
     }
@@ -729,7 +729,7 @@ public final class SettingsPanel extends VBox {
                 autoJava,
                 javaContainer(),
                 new HBox(8, smallButton("重新检测", e -> reloadJavaList()), hint("选中某一项会填进下面的路径")),
-                labeled("Java 路径", new HBox(8, javaPathField, browseButton("浏览", this::browseJava),
+                labeled(I18n.t("settings.javaPath", "Java 路径"), new HBox(8, javaPathField, browseButton(I18n.t("common.browse", "浏览"), this::browseJava),
                         smallButton(I18n.t("settings.java.detect", "自动检测"), e -> detectLocalJava()))));
         return scroll(card);
     }

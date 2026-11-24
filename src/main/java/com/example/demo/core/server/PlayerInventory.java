@@ -135,6 +135,89 @@ public final class PlayerInventory {
         return read(dat);
     }
 
+    /** 一条附魔：id 形如 {@code minecraft:sharpness}，等级 1~255。 */
+    public record Enchant(String id, int level) {
+    }
+
+    /** 读取某个槽位的附魔（没有附魔返回空列表）。 */
+    @SuppressWarnings("unchecked")
+    public static List<Enchant> readEnchants(File dat, int slot) throws IOException {
+        List<Enchant> result = new ArrayList<>();
+        Map<String, Object> item = findItem(Nbt.read(dat), slot);
+        if (item == null) {
+            return result;
+        }
+        Object tag = item.get("tag");
+        if (!(tag instanceof Map<?, ?> tagMap)) {
+            return result;
+        }
+        Object enchants = ((Map<String, Object>) tagMap).get("Enchantments");
+        if (!(enchants instanceof List<?> list)) {
+            return result;
+        }
+        for (Object element : list) {
+            if (!(element instanceof Map<?, ?> raw)) {
+                continue;
+            }
+            Map<String, Object> enchant = (Map<String, Object>) raw;
+            String id = enchant.get("id") instanceof String text ? text : "";
+            int level = enchant.get("lvl") instanceof Number number ? number.intValue() : 0;
+            if (!id.isBlank()) {
+                result.add(new Enchant(id, level));
+            }
+        }
+        return result;
+    }
+
+    /** 覆盖某个槽位的附魔列表；传空列表等于清空附魔。 */
+    @SuppressWarnings("unchecked")
+    public static void applyEnchants(File dat, int slot, List<Enchant> enchants) throws IOException {
+        Map<String, Object> root = Nbt.read(dat);
+        Map<String, Object> item = findItem(root, slot);
+        if (item == null) {
+            throw new IOException("槽位 " + slot + " 没有物品");
+        }
+        Map<String, Object> tag = item.get("tag") instanceof Map<?, ?> rawTag
+                ? (Map<String, Object>) rawTag
+                : new LinkedHashMap<>();
+        if (enchants == null || enchants.isEmpty()) {
+            tag.remove("Enchantments");
+        } else {
+            List<Object> list = new ArrayList<>();
+            for (Enchant enchant : enchants) {
+                Map<String, Object> entry = new LinkedHashMap<>();
+                entry.put("id", enchant.id());
+                entry.put("lvl", (short) Math.max(1, Math.min(255, enchant.level())));
+                list.add(entry);
+            }
+            tag.put("Enchantments", list);
+        }
+        if (tag.isEmpty()) {
+            item.remove("tag");
+        } else {
+            item.put("tag", tag);
+        }
+        backup(dat);
+        Nbt.write(dat, root);
+    }
+
+    /** 在根的 Inventory 里按槽位找物品。 */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> findItem(Map<String, Object> root, int slot) {
+        if (!(root.get("Inventory") instanceof List<?> list)) {
+            return null;
+        }
+        for (Object element : list) {
+            if (!(element instanceof Map<?, ?> raw)) {
+                continue;
+            }
+            Map<String, Object> item = (Map<String, Object>) raw;
+            if (item.get("Slot") instanceof Number number && number.intValue() == slot) {
+                return item;
+            }
+        }
+        return null;
+    }
     private static int freeSlot(List<Object> inventory) {
         java.util.Set<Integer> used = new java.util.HashSet<>();
         for (Object element : inventory) {

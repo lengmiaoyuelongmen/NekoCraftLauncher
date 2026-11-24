@@ -683,6 +683,85 @@ public final class ServerPanel {
         return box;
     }
 
+    /** 附魔编辑：列出已有附魔（可改等级/删除），也能新增一条。 */
+    private void openEnchantEditor(File dat, PlayerInventory.Slot slot, Runnable onChange) {
+        List<PlayerInventory.Enchant> existing;
+        try {
+            existing = PlayerInventory.readEnchants(dat, slot.slot());
+        } catch (Exception ex) {
+            Toast.error(I18n.t("server.player.readFailed", "读取背包失败：") + ex.getMessage());
+            return;
+        }
+        VBox rows = new VBox(6);
+        java.util.List<javafx.scene.control.Spinner<Integer>> levels = new java.util.ArrayList<>();
+        java.util.List<String> ids = new java.util.ArrayList<>();
+        for (PlayerInventory.Enchant enchant : existing) {
+            Label name = new Label(PlayerInventory.shortId(enchant.id()));
+            name.setMinWidth(200);
+            name.setStyle("-fx-text-fill: -app-text-2; -fx-font-size: 11px;");
+            javafx.scene.control.Spinner<Integer> level =
+                    new javafx.scene.control.Spinner<>(0, 255, enchant.level());
+            level.setPrefWidth(90);
+            levels.add(level);
+            ids.add(enchant.id());
+            HBox line = new HBox(10, name, level,
+                    new Label(I18n.t("server.player.enchantHint", "0 = 移除")));
+            line.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+            rows.getChildren().add(line);
+        }
+        if (existing.isEmpty()) {
+            Label empty = new Label(I18n.t("server.player.noEnchant", "这个物品还没有附魔"));
+            empty.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 11px;");
+            rows.getChildren().add(empty);
+        }
+        TextField newId = new TextField();
+        newId.setPromptText(I18n.t("server.player.addEnchant", "新增附魔 id，例如 minecraft:unbreaking"));
+        javafx.scene.control.Spinner<Integer> newLevel =
+                new javafx.scene.control.Spinner<>(1, 255, 1);
+        newLevel.setPrefWidth(90);
+        HBox addRow = new HBox(8, newId, newLevel);
+        HBox.setHgrow(newId, javafx.scene.layout.Priority.ALWAYS);
+        VBox sheet = new VBox(10, rows, new javafx.scene.control.Separator(), addRow);
+        sheet.setPrefWidth(480);
+        com.example.demo.ui.shell.InAppDialog.customSized(
+                com.example.demo.ui.shell.InAppDialog.globalHost(),
+                I18n.t("server.player.enchantTitle", "编辑附魔 · ")
+                        + PlayerInventory.shortId(slot.itemId()),
+                sheet,
+                java.util.List.of(
+                        com.example.demo.ui.shell.InAppDialog.Action.primary(
+                                I18n.t("server.player.enchantSave", "保存附魔"), () -> {
+                                    java.util.List<PlayerInventory.Enchant> next = new java.util.ArrayList<>();
+                                    for (int i = 0; i < ids.size(); i++) {
+                                        int level = levels.get(i).getValue();
+                                        if (level > 0) {
+                                            next.add(new PlayerInventory.Enchant(ids.get(i), level));
+                                        }
+                                    }
+                                    String id = newId.getText() == null ? "" : newId.getText().trim();
+                                    if (!id.isEmpty()) {
+                                        if (!id.contains(":")) {
+                                            id = "minecraft:" + id;
+                                        }
+                                        next.add(new PlayerInventory.Enchant(id, newLevel.getValue()));
+                                    }
+                                    try {
+                                        PlayerInventory.applyEnchants(dat, slot.slot(), next);
+                                        Toast.ok(I18n.t("server.player.enchantSaved", "附魔已保存"));
+                                        if (onChange != null) {
+                                            onChange.run();
+                                        }
+                                    } catch (Exception ex) {
+                                        Toast.error(I18n.t("server.player.saveFailed", "保存失败：")
+                                                + ex.getMessage());
+                                    }
+                                }),
+                        com.example.demo.ui.shell.InAppDialog.Action.secondary(
+                                I18n.t("common.close", "关闭"), null)),
+                null,
+                540,
+                420);
+    }
     /** 编辑玩家背包：读 playerdata/<uuid>.dat 的 Inventory，改数量 / 删除 / 新增后写回（带备份）。 */
     private void openInventoryEditor(File serverDir, ServerFiles.PlayerEntry entry, Runnable onChange) {
         File dat = PlayerInventory.datFile(serverDir, entry.uuid());
@@ -711,10 +790,23 @@ public final class ServerPanel {
             javafx.scene.control.Spinner<Integer> count =
                     new javafx.scene.control.Spinner<>(0, 64, Math.max(0, Math.min(64, slot.count())));
             count.setPrefWidth(90);
+            // 物品图标：没有材质包就按 id 生成稳定色块，至少能一眼分辨
+            javafx.scene.layout.StackPane icon = new javafx.scene.layout.StackPane();
+            icon.setPrefSize(22, 22);
+            icon.setMinSize(22, 22);
+            String shortName = PlayerInventory.shortId(slot.itemId());
+            int hue = Math.abs(shortName.hashCode()) % 360;
+            icon.setStyle("-fx-background-color: hsb(" + hue + ", 45%, 78%); -fx-background-radius: 5;");
+            Label iconText = new Label(shortName.isEmpty() ? "?" : shortName.substring(0, 1).toUpperCase());
+            iconText.setStyle("-fx-text-fill: #1f2937; -fx-font-size: 10px; -fx-font-weight: bold;");
+            icon.getChildren().add(iconText);
+            Button enchant = new Button(I18n.t("server.player.enchant", "附魔"));
+            enchant.getStyleClass().addAll("btn-ghost", "btn-sm");
+            enchant.setOnAction(ev -> openEnchantEditor(dat, slot, onChange));
             Label hint = new Label(I18n.t("server.player.countHint", "0 = 删除"));
             hint.setStyle("-fx-text-fill: -app-text-dim-3; -fx-font-size: 10px;");
             counts.put(slot.slot(), count);
-            HBox line = new HBox(10, name, count, hint);
+            HBox line = new HBox(10, icon, name, count, hint, enchant);
             line.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
             rows.getChildren().add(line);
         }
