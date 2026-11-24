@@ -36,4 +36,19 @@ class ServerOnlinePlayersTest {
     void missingLogMeansNobodyOnline(@TempDir Path dir) {
         assertTrue(ServerFiles.onlinePlayers(dir.toFile()).isEmpty());
     }
+    @Test
+    void parsesListCommandResponse(@TempDir Path dir) throws Exception {
+        String log = String.join("\n",
+                "[12:00:00] [Server thread/INFO]: There are 2 of a max of 20 players online: Steve, Alex",
+                "[12:00:05] [Server thread/INFO]: There are 0 of a max of 20 players online: ");
+        java.util.List<String> all = ServerFiles.parseListResponse(log);
+        // 两行都命中，合并后应为 Steve/Alex（第二行没有名字）
+        assertTrue(all.contains("Steve"));
+        assertTrue(all.contains("Alex"));
+        assertEquals(2, all.size(), all.toString());
+
+        java.util.List<String> none = ServerFiles.parseListResponse(
+                "[x] There are 0 of a max of 20 players online: ");
+        assertTrue(none.isEmpty());
+    }
 }

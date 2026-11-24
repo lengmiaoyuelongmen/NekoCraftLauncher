@@ -1950,6 +1950,12 @@ private static void setFlexible(Node node, boolean on) {
   }
 
   private VBox createLaunchPanel() {
+    // 诊断用：-Dmc.minimalLaunch=1 只放一个占位块，用来量「首屏节点树」到底值多少钱
+    if (System.getProperty("mc.minimalLaunch") != null) {
+      javafx.scene.layout.StackPane placeholder = new javafx.scene.layout.StackPane(new Label("MINIMAL"));
+      placeholder.setMinSize(200, 200);
+      return new VBox(placeholder);
+    }
     this.createAccountColumn();
     this.createVersionSelector();
     VBox userArea = this.accountColumn;

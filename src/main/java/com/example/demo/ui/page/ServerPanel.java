@@ -544,8 +544,35 @@ public final class ServerPanel {
                     + (online.isEmpty() ? "" : "：" + String.join("、", online)));
             onlineHead.setStyle("-fx-text-fill: " + (online.isEmpty() ? "-app-text-dim-3" : "#22c55e")
                     + "; -fx-font-size: 11.5px;" + (online.isEmpty() ? "" : " -fx-font-weight: bold;"));
+            Button calibrate = new Button(I18n.t("server.panel.calibrate", "用 /list 校准"));
+            calibrate.getStyleClass().addAll("btn-ghost", "btn-sm");
+            calibrate.setOnAction(ev -> {
+                PortableServerManager.RunningServer handle = running.get(profile.id());
+                if (handle == null) {
+                    Toast.info(I18n.t("server.panel.calibrate.needRun", "服务器没在运行，先启动服务器"));
+                    return;
+                }
+                try {
+                    handle.send("list");
+                } catch (Exception ex) {
+                    Toast.error(I18n.t("server.panel.calibrate.failed", "发送失败：") + ex.getMessage());
+                    return;
+                }
+                javafx.animation.PauseTransition wait =
+                        new javafx.animation.PauseTransition(javafx.util.Duration.millis(900));
+                wait.setOnFinished(ev2 -> {
+                    java.util.List<String> precise = ServerFiles.parseListResponse(ServerFiles.tail(dir, 40));
+                    Toast.ok(precise.isEmpty()
+                            ? I18n.t("server.panel.calibrate.none", "服务器回了 /list，但没解析到在线玩家")
+                            : I18n.t("server.panel.calibrate.ok", "校准完成：") + String.join("、", precise));
+                    reload[0].run();
+                });
+                wait.play();
+            });
+            HBox onlineRow = new HBox(8, onlineHead, calibrate);
+            onlineRow.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
             lists.getChildren().setAll(
-                    onlineHead,
+                    onlineRow,
                     playerSection(I18n.t("server.panel.ops", "OP 列表"), ServerFiles.readOps(dir), true,
                             dir, true, reload[0]),
                     playerSection(I18n.t("server.panel.whitelist", "白名单"),

@@ -137,6 +137,45 @@ public final class ServerFiles {
      *
      * <p>只读日志、不连服务器，所以离线也能用；日志被截断时最多不准，不会报错。
      */
+    /** 解析 /list 的输出：「There are 2 of a max of 20 players online: Steve, Alex」。 */
+    public static java.util.List<String> parseListResponse(String consoleTail) {
+        java.util.List<String> players = new java.util.ArrayList<>();
+        if (consoleTail == null) {
+            return players;
+        }
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("players online:\\s*(.*)$");
+        for (String line : consoleTail.split("\\R")) {
+            java.util.regex.Matcher matcher = pattern.matcher(line);
+            if (matcher.find()) {
+                String names = matcher.group(1).trim();
+                if (names.isEmpty()) {
+                    continue;
+                }
+                for (String name : names.split(",")) {
+                    String trimmed = name.trim();
+                    if (!trimmed.isEmpty()) {
+                        players.add(trimmed);
+                    }
+                }
+            }
+        }
+        return players;
+    }
+
+    /** 读日志尾部若干行（校准 /list 用）。 */
+    public static String tail(File dir, int lines) {
+        File log = new File(dir, "server-console.log");
+        if (!log.isFile()) {
+            return "";
+        }
+        try {
+            java.util.List<String> all = java.nio.file.Files.readAllLines(log.toPath());
+            int from = Math.max(0, all.size() - Math.max(1, lines));
+            return String.join("\n", all.subList(from, all.size()));
+        } catch (Exception e) {
+            return "";
+        }
+    }
     public static java.util.List<String> onlinePlayers(File dir) {
         File log = new File(dir, "server-console.log");
         java.util.LinkedHashSet<String> online = new java.util.LinkedHashSet<>();
