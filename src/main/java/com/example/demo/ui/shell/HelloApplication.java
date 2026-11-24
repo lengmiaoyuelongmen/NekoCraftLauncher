@@ -588,8 +588,8 @@ public class HelloApplication extends Application {
             ex -> {
               Platform.runLater(
                   () -> {
-                    if (this.versionComboBox.getItems().isEmpty()) {
-                      this.versionComboBox.setPromptText("版本列表加载失败");
+if (this.versionComboBox != null && this.versionComboBox.getItems().isEmpty()) {
+          this.versionComboBox.setPromptText("版本列表加载失败");
                     }
                     this.logArea.appendText("❌ 版本列表加载失败: " + ex.getMessage() + "\n");
                     this.logArea.appendText("   已安装的版本仍然可以直接启动。\n");
@@ -1191,6 +1191,9 @@ public class HelloApplication extends Application {
       if (announce) {
         this.logArea.appendText("⚠️ 版本列表里没有正式版，只拿到快照。\n");
       }
+      return;
+    }
+    if (this.versionComboBox == null) {
       return;
     }
     this.versionComboBox.getItems().setAll((Collection<MinecraftVersion>) releases);
@@ -1956,6 +1959,34 @@ private static void setFlexible(Node node, boolean on) {
       placeholder.setMinSize(200, 200);
       return new VBox(placeholder);
     }
+    // 骨架化：默认先放两个占位块，首帧画出来之后再构建真实内容并替换。
+    // 实测（-Dmc.minimalLaunch 上界实验）启动页内容值 1.3 秒，所以这部分值得延后。
+    if (System.getProperty("mc.noSkeleton") == null) {
+      javafx.scene.layout.StackPane userHolder = new javafx.scene.layout.StackPane();
+      userHolder.setMinSize(300, 520);
+      javafx.scene.layout.StackPane rightHolder = new javafx.scene.layout.StackPane();
+      rightHolder.setMinSize(520, 520);
+      VBox skeletonPanel = LaunchPage.build(userHolder, rightHolder);
+      // 日志区先建好：准备阶段会往 logArea 写东西，不能等右列构建完
+      if (this.logArea == null) {
+        this.createLogPane();
+      }
+      // 首帧之后再建：用一次性 AnimationTimer，保证不是在「事件队列刚排到」时抢活
+      new javafx.animation.AnimationTimer() {
+        @Override
+        public void handle(long now) {
+          stop();
+          javafx.application.Platform.runLater(
+              () -> {
+                VBox realUser = buildLaunchUserArea();
+                userHolder.getChildren().setAll(realUser);
+                VBox realRight = buildLaunchRightColumn();
+                rightHolder.getChildren().setAll(realRight);
+              });
+        }
+      }.start();
+      return skeletonPanel;
+    }
     this.createAccountColumn();
     this.createVersionSelector();
     VBox userArea = this.accountColumn;
@@ -1999,6 +2030,36 @@ private static void setFlexible(Node node, boolean on) {
     return launchPanel;
   }
 
+  /** 骨架化里的左列：账户卡 + 版本选择 + 登录/启动按钮绑定。 */
+  private VBox buildLaunchUserArea() {
+    this.createAccountColumn();
+    this.createVersionSelector();
+    VBox userArea = this.accountColumn;
+    if (this.loginForm != null && this.loginForm.loginButton() != null) {
+      this.loginForm
+          .loginButton()
+          .setOnAction(
+              e ->
+                  this.handleLogin(
+                      this.loginForm.typeCombo(),
+                      this.loginForm.serverCombo(),
+                      this.loginForm.username(),
+                      this.loginForm.password(),
+                      this.loginForm.loginButton()));
+    }
+    if (this.launchBtn != null) {
+      this.launchBtn.setOnAction(e -> this.handleLaunch());
+    }
+    return userArea;
+  }
+
+  /** 骨架化里的右列：控制台区块（含启动概览）+ 展开状态。 */
+  private VBox buildLaunchRightColumn() {
+    VBox logContainer = this.createConsoleSection();
+    this.applyLogExpanded(this.config.isLogExpanded());
+    logContainer.setMinWidth(0.0);
+    return logContainer;
+  }
   /** 命令栏提交：AI 开启时发给模型，否则当启动器 / 游戏命令执行。 */
   private void handleCommandInput(String text) {
     if (this.config.isAiEnabled()) {
@@ -5209,7 +5270,8 @@ private static void setFlexible(Node node, boolean on) {
                         this.currentSession = session;
                         SessionStore.save(session, type, serverUrl);
                         AccountStore.upsert(session, type, serverUrl);
-                        if (this.versionComboBox.getItems() != null
+    if (this.versionComboBox != null
+        && this.versionComboBox.getItems() != null
                             && !this.versionComboBox.getItems().isEmpty()
                             && this.versionComboBox.getValue() == null) {
                           this.versionComboBox.getSelectionModel().selectFirst();
@@ -5630,7 +5692,8 @@ private static void setFlexible(Node node, boolean on) {
     if (this.blockIfAlreadyRunning()) {
       return;
     }
-    MinecraftVersion selectedVersion = this.versionComboBox.getValue();
+    MinecraftVersion selectedVersion =
+        this.versionComboBox == null ? null : this.versionComboBox.getValue();
     if (selectedVersion == null || this.currentSession == null) {
       this.logArea.appendText("⚠️ 请先选择版本并登录！\n");
       return;

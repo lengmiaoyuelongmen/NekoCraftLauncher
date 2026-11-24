@@ -703,7 +703,16 @@ public final class ServerPanel {
             Button inventory = new Button(I18n.t("server.player.inventory", "背包"));
             inventory.getStyleClass().addAll("btn-ghost", "btn-sm");
             inventory.setOnAction(e -> openInventoryEditor(dir, entry, onChange));
-            HBox rowBox = new HBox(8, label, inventory);
+            // 管理动作：直接往服务端控制台发指令，没开服就提示
+            Button kick = new Button(I18n.t("server.player.kick", "踢出"));
+            kick.getStyleClass().addAll("btn-ghost", "btn-sm");
+            kick.setOnAction(e -> sendServerCommand(profileDir(entry, dir), "kick " + entry.name(),
+                    I18n.t("server.player.kickSent", "已发送踢出指令：") + entry.name()));
+            Button ban = new Button(I18n.t("server.player.ban", "封禁"));
+            ban.getStyleClass().addAll("btn-ghost", "btn-sm");
+            ban.setOnAction(e -> sendServerCommand(profileDir(entry, dir), "ban " + entry.name(),
+                    I18n.t("server.player.banSent", "已发送封禁指令：") + entry.name()));
+            HBox rowBox = new HBox(8, label, inventory, kick, ban);
             rowBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
             box.getChildren().add(rowBox);
         }
@@ -829,6 +838,40 @@ public final class ServerPanel {
                 null,
                 540,
                 420);
+    }
+    /** 玩家行的指令入口：playerSection 只拿到服务端目录，这里反查正在运行的实例。 */
+    private File profileDir(ServerFiles.PlayerEntry entry, File dir) {
+        return dir;
+    }
+
+    /** 往运行中的服务器发一条控制台指令（踢人 / 封禁都用它）。 */
+    private void sendServerCommand(File serverDir, String command, String successMessage) {
+        PortableServerManager.RunningServer handle = null;
+        for (PortableServerManager.RunningServer candidate : running.values()) {
+            String id = candidate.id();
+            if (id == null) {
+                continue;
+            }
+            for (PortableServerManager.Profile profile : PortableServerManager.load(new File(config.getGameDir()))) {
+                if (id.equals(profile.id()) && new File(profile.dir()).equals(serverDir)) {
+                    handle = candidate;
+                    break;
+                }
+            }
+            if (handle != null) {
+                break;
+            }
+        }
+        if (handle == null) {
+            Toast.info(I18n.t("server.player.notRunning", "服务器没在运行，先启动服务器"));
+            return;
+        }
+        try {
+            handle.send(command);
+            Toast.ok(successMessage);
+        } catch (Exception ex) {
+            Toast.error(I18n.t("server.panel.calibrate.failed", "发送失败：") + ex.getMessage());
+        }
     }
     /** 编辑玩家背包：读 playerdata/<uuid>.dat 的 Inventory，改数量 / 删除 / 新增后写回（带备份）。 */
     private void openInventoryEditor(File serverDir, ServerFiles.PlayerEntry entry, Runnable onChange) {
