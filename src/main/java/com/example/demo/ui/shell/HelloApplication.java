@@ -1966,7 +1966,7 @@ private static void setFlexible(Node node, boolean on) {
       userHolder.setMinSize(300, 520);
       javafx.scene.layout.StackPane rightHolder = new javafx.scene.layout.StackPane();
       rightHolder.setMinSize(520, 520);
-      VBox skeletonPanel = LaunchPage.build(userHolder, rightHolder);
+      VBox skeletonPanel = LaunchPage.build(userHolder, rightHolder, true);
       // 日志区先建好：准备阶段会往 logArea 写东西，不能等右列构建完
       if (this.logArea == null) {
         this.createLogPane();

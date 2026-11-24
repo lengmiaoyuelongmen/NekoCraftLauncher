@@ -143,4 +143,24 @@ class PlayerInventoryNbtTest {
         // 苹果本身还在
         assertEquals(2, PlayerInventory.read(dat).size());
     }
+    @Test
+    void batchEnchantAppliesToEveryMatchingItem(@TempDir Path root) throws Exception {
+        File dat = playerDat(root, "eeeeeeee-1111-2222-3333-444444444444");
+        // 再加一个苹果，批量附魔应该同时命中两个
+        PlayerInventory.apply(dat, new java.util.LinkedHashMap<>(), List.of(
+                new PlayerInventory.Slot(0, "minecraft:apple", 4)));
+        int changed = PlayerInventory.applyEnchantsToAll(dat, "minecraft:apple",
+                List.of(new PlayerInventory.Enchant("minecraft:unbreaking", 3)));
+        assertEquals(2, changed, "两个苹果槽位都该被改");
+        for (PlayerInventory.Slot slot : PlayerInventory.read(dat)) {
+            if (slot.itemId().equals("minecraft:apple")) {
+                List<PlayerInventory.Enchant> enchants = PlayerInventory.readEnchants(dat, slot.slot());
+                assertEquals(1, enchants.size(), enchants.toString());
+                assertEquals(3, enchants.get(0).level());
+            }
+        }
+        // 没匹配到物品时不应写入，也不该报错
+        assertEquals(0, PlayerInventory.applyEnchantsToAll(dat, "minecraft:diamond",
+                List.of(new PlayerInventory.Enchant("minecraft:sharpness", 1))));
+    }
 }

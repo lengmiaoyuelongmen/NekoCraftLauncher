@@ -139,6 +139,59 @@ public final class PlayerInventory {
     public record Enchant(String id, int level) {
     }
 
+    /**
+     * 批量给「同一物品 id 的所有槽位」覆盖同一组附魔（一次读、一次写、一次备份）。
+     *
+     * @return 实际改动的槽位数量
+     */
+    @SuppressWarnings("unchecked")
+    public static int applyEnchantsToAll(File dat, String itemId, List<Enchant> enchants)
+            throws IOException {
+        if (itemId == null || itemId.isBlank()) {
+            return 0;
+        }
+        Map<String, Object> root = Nbt.read(dat);
+        if (!(root.get("Inventory") instanceof List<?> rawList)) {
+            return 0;
+        }
+        List<Object> inventory = (List<Object>) rawList;
+        int changed = 0;
+        for (Object element : inventory) {
+            if (!(element instanceof Map<?, ?> raw)) {
+                continue;
+            }
+            Map<String, Object> item = (Map<String, Object>) raw;
+            if (!(item.get("id") instanceof String id) || !id.equalsIgnoreCase(itemId)) {
+                continue;
+            }
+            Map<String, Object> tag = item.get("tag") instanceof Map<?, ?> rawTag
+                    ? (Map<String, Object>) rawTag
+                    : new LinkedHashMap<>();
+            if (enchants == null || enchants.isEmpty()) {
+                tag.remove("Enchantments");
+            } else {
+                List<Object> list = new ArrayList<>();
+                for (Enchant enchant : enchants) {
+                    Map<String, Object> entry = new LinkedHashMap<>();
+                    entry.put("id", enchant.id());
+                    entry.put("lvl", (short) Math.max(1, Math.min(255, enchant.level())));
+                    list.add(entry);
+                }
+                tag.put("Enchantments", list);
+            }
+            if (tag.isEmpty()) {
+                item.remove("tag");
+            } else {
+                item.put("tag", tag);
+            }
+            changed++;
+        }
+        if (changed > 0) {
+            backup(dat);
+            Nbt.write(dat, root);
+        }
+        return changed;
+    }
     /** 读取某个槽位的附魔（没有附魔返回空列表）。 */
     @SuppressWarnings("unchecked")
     public static List<Enchant> readEnchants(File dat, int slot) throws IOException {

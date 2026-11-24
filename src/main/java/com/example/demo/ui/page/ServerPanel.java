@@ -719,6 +719,55 @@ public final class ServerPanel {
         return box;
     }
 
+    /** 批量给「同 id 的所有物品」加同一组附魔，省得一件件点。 */
+    private void openBatchEnchant(File dat, PlayerInventory.Slot slot, Runnable onChange) {
+        TextField id = new TextField();
+        id.setPromptText(I18n.t("server.player.batch.id", "附魔 id，例如 minecraft:unbreaking"));
+        javafx.scene.control.Spinner<Integer> level = new javafx.scene.control.Spinner<>(1, 255, 3);
+        level.setPrefWidth(90);
+        Label hint = new Label(I18n.t("server.player.batch.hint1", "会对背包里所有 ")
+                + PlayerInventory.shortId(slot.itemId())
+                + I18n.t("server.player.batch.hint2", " 应用这一条附魔"));
+        hint.setStyle("-fx-text-fill: -app-text-muted; -fx-font-size: 10.5px;");
+        hint.setWrapText(true);
+        VBox sheet = new VBox(10, hint, new HBox(8, id, level));
+        sheet.setPrefWidth(460);
+        com.example.demo.ui.shell.InAppDialog.customSized(
+                com.example.demo.ui.shell.InAppDialog.globalHost(),
+                I18n.t("server.player.batch.title", "批量附魔"),
+                sheet,
+                java.util.List.of(
+                        com.example.demo.ui.shell.InAppDialog.Action.primary(
+                                I18n.t("server.player.batch.apply", "应用到同类物品"), () -> {
+                                    String enchantId = id.getText() == null ? "" : id.getText().trim();
+                                    if (enchantId.isEmpty()) {
+                                        Toast.info(I18n.t("server.player.batch.needId", "先填附魔 id"));
+                                        return;
+                                    }
+                                    if (!enchantId.contains(":")) {
+                                        enchantId = "minecraft:" + enchantId;
+                                    }
+                                    try {
+                                        int changed = PlayerInventory.applyEnchantsToAll(dat,
+                                                slot.itemId(),
+                                                java.util.List.of(new PlayerInventory.Enchant(
+                                                        enchantId, level.getValue())));
+                                        Toast.ok(I18n.t("server.player.batch.done", "已应用到 ")
+                                                + changed + I18n.t("server.player.batch.doneTail", " 个物品"));
+                                        if (onChange != null) {
+                                            onChange.run();
+                                        }
+                                    } catch (Exception ex) {
+                                        Toast.error(I18n.t("server.player.saveFailed", "保存失败：")
+                                                + ex.getMessage());
+                                    }
+                                }),
+                        com.example.demo.ui.shell.InAppDialog.Action.secondary(
+                                I18n.t("common.close", "关闭"), null)),
+                null,
+                500,
+                260);
+    }
     /** 附魔编辑：列出已有附魔（可改等级/删除），也能新增一条。 */
     private void openEnchantEditor(File dat, PlayerInventory.Slot slot, Runnable onChange) {
         List<PlayerInventory.Enchant> existing;
@@ -914,10 +963,13 @@ public final class ServerPanel {
             Button enchant = new Button(I18n.t("server.player.enchant", "附魔"));
             enchant.getStyleClass().addAll("btn-ghost", "btn-sm");
             enchant.setOnAction(ev -> openEnchantEditor(dat, slot, onChange));
+            Button batch = new Button(I18n.t("server.player.batch", "批量"));
+            batch.getStyleClass().addAll("btn-ghost", "btn-sm");
+            batch.setOnAction(ev -> openBatchEnchant(dat, slot, onChange));
             Label hint = new Label(I18n.t("server.player.countHint", "0 = 删除"));
             hint.setStyle("-fx-text-fill: -app-text-dim-3; -fx-font-size: 10px;");
             counts.put(slot.slot(), count);
-            HBox line = new HBox(10, icon, name, count, hint, enchant);
+            HBox line = new HBox(10, icon, name, count, hint, enchant, batch);
             line.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
             rows.getChildren().add(line);
         }

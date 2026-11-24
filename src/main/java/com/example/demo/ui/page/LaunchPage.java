@@ -26,6 +26,11 @@ public final class LaunchPage {
     }
 
     public static VBox build(Node userArea, Node rightColumn) {
+        return build(userArea, rightColumn, true);
+    }
+
+    /** @param animate 首帧时是否跑入场动画（骨架模式下关掉，省一次重绘） */
+    public static VBox build(Node userArea, Node rightColumn, boolean animate) {
         VBox panel = new VBox(21.0);
         panel.setPadding(new Insets(21.0));
 
@@ -61,7 +66,9 @@ public final class LaunchPage {
                 "为爱发电 · 永远免费更新");
         panel.getChildren().addAll(header, mainContent);
 
-        Motion.stagger(List.of(userArea, rightColumn));
+        if (animate) {
+            Motion.stagger(List.of(userArea, rightColumn));
+        }
         return panel;
     }
 }
