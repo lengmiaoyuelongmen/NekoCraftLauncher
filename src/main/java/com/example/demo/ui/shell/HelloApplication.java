@@ -1139,7 +1139,12 @@ public class HelloApplication extends Application {
     stage.setScene(scene);
     stage.show();
         // 首帧耗时：启动慢时先看这个数，别靠感觉
-        javafx.application.Platform.runLater(() -> {
+        // 用 AnimationTimer 的第一次 handle 作为「真正画出第一帧」的时刻，
+        // runLater 只代表事件队列排到了，可能还没绘制，数字会虚高。
+        new javafx.animation.AnimationTimer() {
+          @Override
+          public void handle(long now) {
+            stop();
           long firstFrame = com.example.demo.Launcher.sinceStartMs();
           System.out.println("STARTUP first-frame " + firstFrame + " ms");
           // 三段计时：配置加载 / 场景构建 / 首页构建（首帧 - 前两段）
@@ -1149,7 +1154,8 @@ public class HelloApplication extends Application {
                   + "ms scene=" + sceneMs + "ms firstPage="
                   + (firstFrame - com.example.demo.Launcher.configLoadMs() - sceneMs) + "ms total="
                   + firstFrame + "ms");
-        });
+          }
+        }.start();
 
     // 网络加速：启动后异步测速并配置 DNS（失败只写日志，不影响使用）
     if (this.config.isNetworkBoost()) {

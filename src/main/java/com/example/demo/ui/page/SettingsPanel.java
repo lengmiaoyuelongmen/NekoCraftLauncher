@@ -807,13 +807,13 @@ public final class SettingsPanel extends VBox {
                 hint(I18n.t("settings.instances.hint",
                         "只打包各实例的 instance.json（内存/JVM/Java/游戏参数/隔离），不含模组与世界")),
                 section("下载"),
-                labeled("下载源", new HBox(10, sourceCombo, hint("auto=镜像优先失败回官方；official/mirror=只用其一"))),
-                labeled("下载策略", downloadRow),
-                section("模组"),
+                labeled(I18n.t("settings.downloadSource", "下载源"), new HBox(10, sourceCombo, hint("auto=镜像优先失败回官方；official/mirror=只用其一"))),
+                labeled(I18n.t("settings.downloadPolicy", "下载策略"), downloadRow),
+                section(I18n.t("settings.modsSection", "模组")),
                 autoDepsBox,
                 keyHintsBox,
                 autoRepairBox,
-                labeled("完整性抽样", new HBox(10, assetSampleSpinner, hint("每个实例抽样校验的 assets 对象数，0 = 不抽样"))),
+                labeled(I18n.t("settings.integritySample", "完整性抽样"), new HBox(10, assetSampleSpinner, hint("每个实例抽样校验的 assets 对象数，0 = 不抽样"))),
                 hint("自动补装会从 Modrinth 按当前实例的版本与加载器挑选，缺前置时先弹窗确认"));
         return scroll(card);
     }

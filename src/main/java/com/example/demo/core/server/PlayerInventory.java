@@ -201,6 +201,78 @@ public final class PlayerInventory {
         Nbt.write(dat, root);
     }
 
+    /** 物品附加信息：自定义名与耐久。 */
+    public record ItemMeta(String customName, int damage, int maxDamage) {
+    }
+
+    /** 读取自定义名 / 耐久（没有就返回空串与 0）。 */
+    @SuppressWarnings("unchecked")
+    public static ItemMeta readMeta(File dat, int slot) throws IOException {
+        Map<String, Object> item = findItem(Nbt.read(dat), slot);
+        if (item == null) {
+            return new ItemMeta("", 0, 0);
+        }
+        int damage = item.get("Damage") instanceof Number number ? number.intValue() : 0;
+        String name = "";
+        int maxDamage = 0;
+        if (item.get("tag") instanceof Map<?, ?> rawTag) {
+            Map<String, Object> tag = (Map<String, Object>) rawTag;
+            if (tag.get("display") instanceof Map<?, ?> rawDisplay) {
+                Map<String, Object> display = (Map<String, Object>) rawDisplay;
+                if (display.get("Name") instanceof String text) {
+                    name = text;
+                }
+            }
+            if (tag.get("Damage") instanceof Number number) {
+                maxDamage = number.intValue();
+            }
+        }
+        return new ItemMeta(name, damage, maxDamage);
+    }
+
+    /**
+     * 写入自定义名与已损耗耐久；{@code maxDamage} 用于把上限写进 tag（避免物品在游戏里报错）。
+     * 空名字表示清掉自定义名。
+     */
+    @SuppressWarnings("unchecked")
+    public static void applyMeta(File dat, int slot, String customName, int damage, int maxDamage)
+            throws IOException {
+        Map<String, Object> root = Nbt.read(dat);
+        Map<String, Object> item = findItem(root, slot);
+        if (item == null) {
+            throw new IOException("槽位 " + slot + " 没有物品");
+        }
+        Map<String, Object> tag = item.get("tag") instanceof Map<?, ?> rawTag
+                ? (Map<String, Object>) rawTag
+                : new LinkedHashMap<>();
+        if (customName == null || customName.isBlank()) {
+            tag.remove("display");
+        } else {
+            Map<String, Object> display = tag.get("display") instanceof Map<?, ?> rawDisplay
+                    ? (Map<String, Object>) rawDisplay
+                    : new LinkedHashMap<>();
+            // 1.13+ 用 JSON 文本作为名字，这里按 JSON 字符串存，兼容大多数服务端
+            display.put("Name", "{\"text\":\"" + customName.replace("\"", "\\\"") + "\"}");
+            tag.put("display", display);
+        }
+        if (maxDamage > 0) {
+            tag.put("Damage", maxDamage);
+        } else {
+            tag.remove("Damage");
+        }
+        if (tag.isEmpty()) {
+            item.remove("tag");
+        } else {
+            item.put("tag", tag);
+        }
+        if (damage > 0) {
+            item.put("Damage", damage);
+        } else {
+            item.remove("Damage");
+        }
+        backup(dat);
+        Nbt.write(dat, root);
+    }
     /** 在根的 Inventory 里按槽位找物品。 */
     @SuppressWarnings("unchecked")
     private static Map<String, Object> findItem(Map<String, Object> root, int slot) {

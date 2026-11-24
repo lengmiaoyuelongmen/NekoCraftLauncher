@@ -721,11 +721,31 @@ public final class ServerPanel {
         newLevel.setPrefWidth(90);
         HBox addRow = new HBox(8, newId, newLevel);
         HBox.setHgrow(newId, javafx.scene.layout.Priority.ALWAYS);
-        VBox sheet = new VBox(10, rows, new javafx.scene.control.Separator(), addRow);
-        sheet.setPrefWidth(480);
+        // 自定义名 + 耐久：这两项也在 tag / 根标签里，和附魔一起编辑最省事
+        PlayerInventory.ItemMeta meta;
+        try {
+            meta = PlayerInventory.readMeta(dat, slot.slot());
+        } catch (Exception ex) {
+            meta = new PlayerInventory.ItemMeta("", 0, 0);
+        }
+        TextField customName = new TextField(meta.customName());
+        customName.setPromptText(I18n.t("server.player.customName", "自定义名称（留空清掉）"));
+        javafx.scene.control.Spinner<Integer> damage =
+                new javafx.scene.control.Spinner<>(0, 32000, Math.max(0, meta.damage()));
+        damage.setPrefWidth(100);
+        javafx.scene.control.Spinner<Integer> maxDamage =
+                new javafx.scene.control.Spinner<>(0, 32000, Math.max(0, meta.maxDamage()));
+        maxDamage.setPrefWidth(100);
+        HBox metaRow = new HBox(8, customName, new Label(I18n.t("server.player.damage", "已损耗")), damage,
+                new Label(I18n.t("server.player.maxDamage", "上限")), maxDamage);
+        metaRow.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        HBox.setHgrow(customName, javafx.scene.layout.Priority.ALWAYS);
+        VBox sheet = new VBox(10, metaRow, new javafx.scene.control.Separator(), rows,
+                new javafx.scene.control.Separator(), addRow);
+        sheet.setPrefWidth(560);
         com.example.demo.ui.shell.InAppDialog.customSized(
                 com.example.demo.ui.shell.InAppDialog.globalHost(),
-                I18n.t("server.player.enchantTitle", "编辑附魔 · ")
+                I18n.t("server.player.itemTitle", "编辑物品 · ")
                         + PlayerInventory.shortId(slot.itemId()),
                 sheet,
                 java.util.List.of(
@@ -746,6 +766,9 @@ public final class ServerPanel {
                                         next.add(new PlayerInventory.Enchant(id, newLevel.getValue()));
                                     }
                                     try {
+                                        PlayerInventory.applyMeta(dat, slot.slot(),
+                                                customName.getText() == null ? "" : customName.getText().trim(),
+                                                damage.getValue(), maxDamage.getValue());
                                         PlayerInventory.applyEnchants(dat, slot.slot(), next);
                                         Toast.ok(I18n.t("server.player.enchantSaved", "附魔已保存"));
                                         if (onChange != null) {

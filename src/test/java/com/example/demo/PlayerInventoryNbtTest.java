@@ -110,4 +110,22 @@ class PlayerInventoryNbtTest {
         // 其它槽位不受影响
         assertTrue(PlayerInventory.readEnchants(dat, 5).isEmpty());
     }
+    @Test
+    void customNameAndDurabilityRoundTrip(@TempDir Path root) throws Exception {
+        File dat = playerDat(root, "cccccccc-1111-2222-3333-444444444444");
+        PlayerInventory.applyMeta(dat, 0, "喵剑", 7, 1561);
+
+        PlayerInventory.ItemMeta meta = PlayerInventory.readMeta(dat, 0);
+        assertEquals(7, meta.damage());
+        assertEquals(1561, meta.maxDamage());
+        assertTrue(meta.customName().contains("喵剑"), meta.customName());
+
+        // 清掉自定义名与耐久
+        PlayerInventory.applyMeta(dat, 0, "", 0, 0);
+        PlayerInventory.ItemMeta cleared = PlayerInventory.readMeta(dat, 0);
+        assertEquals(0, cleared.damage());
+        assertTrue(cleared.customName().isEmpty());
+        // 物品本身还在
+        assertEquals(2, PlayerInventory.read(dat).size());
+    }
 }
