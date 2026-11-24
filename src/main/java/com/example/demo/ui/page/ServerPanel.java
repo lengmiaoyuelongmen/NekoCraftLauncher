@@ -740,7 +740,18 @@ public final class ServerPanel {
                 new Label(I18n.t("server.player.maxDamage", "上限")), maxDamage);
         metaRow.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
         HBox.setHgrow(customName, javafx.scene.layout.Priority.ALWAYS);
-        VBox sheet = new VBox(10, metaRow, new javafx.scene.control.Separator(), rows,
+        // 描述行（Lore）：每行一条，空白行自动忽略
+        List<String> loreLines;
+        try {
+            loreLines = PlayerInventory.readLore(dat, slot.slot());
+        } catch (Exception ex) {
+            loreLines = new java.util.ArrayList<>();
+        }
+        javafx.scene.control.TextArea loreArea = new javafx.scene.control.TextArea(String.join("\n", loreLines));
+        loreArea.setPrefRowCount(3);
+        loreArea.setPromptText(I18n.t("server.player.lorePrompt", "描述行：每行一条，留空即清除"));
+        VBox sheet = new VBox(10, metaRow, new javafx.scene.control.Separator(), loreArea,
+                new javafx.scene.control.Separator(), rows,
                 new javafx.scene.control.Separator(), addRow);
         sheet.setPrefWidth(560);
         com.example.demo.ui.shell.InAppDialog.customSized(
@@ -769,6 +780,13 @@ public final class ServerPanel {
                                         PlayerInventory.applyMeta(dat, slot.slot(),
                                                 customName.getText() == null ? "" : customName.getText().trim(),
                                                 damage.getValue(), maxDamage.getValue());
+                                        java.util.List<String> lore = new java.util.ArrayList<>();
+                                        for (String line : loreArea.getText().split("\\R")) {
+                                            if (!line.isBlank()) {
+                                                lore.add(line.trim());
+                                            }
+                                        }
+                                        PlayerInventory.applyLore(dat, slot.slot(), lore);
                                         PlayerInventory.applyEnchants(dat, slot.slot(), next);
                                         Toast.ok(I18n.t("server.player.enchantSaved", "附魔已保存"));
                                         if (onChange != null) {

@@ -273,6 +273,68 @@ public final class PlayerInventory {
         backup(dat);
         Nbt.write(dat, root);
     }
+    /** 读取物品描述行（tag.display.Lore，每行一个 JSON 文本）。 */
+    @SuppressWarnings("unchecked")
+    public static List<String> readLore(File dat, int slot) throws IOException {
+        List<String> lines = new ArrayList<>();
+        Map<String, Object> item = findItem(Nbt.read(dat), slot);
+        if (item == null || !(item.get("tag") instanceof Map<?, ?> rawTag)) {
+            return lines;
+        }
+        Map<String, Object> tag = (Map<String, Object>) rawTag;
+        if (!(tag.get("display") instanceof Map<?, ?> rawDisplay)) {
+            return lines;
+        }
+        Map<String, Object> display = (Map<String, Object>) rawDisplay;
+        if (!(display.get("Lore") instanceof List<?> list)) {
+            return lines;
+        }
+        for (Object element : list) {
+            if (element instanceof String text) {
+                lines.add(text);
+            }
+        }
+        return lines;
+    }
+
+    /** 覆盖描述行；传空列表等于清掉 Lore。 */
+    @SuppressWarnings("unchecked")
+    public static void applyLore(File dat, int slot, List<String> lore) throws IOException {
+        Map<String, Object> root = Nbt.read(dat);
+        Map<String, Object> item = findItem(root, slot);
+        if (item == null) {
+            throw new IOException("槽位 " + slot + " 没有物品");
+        }
+        Map<String, Object> tag = item.get("tag") instanceof Map<?, ?> rawTag
+                ? (Map<String, Object>) rawTag
+                : new LinkedHashMap<>();
+        if (lore == null || lore.isEmpty()) {
+            if (tag.get("display") instanceof Map<?, ?> rawDisplay) {
+                Map<String, Object> display = (Map<String, Object>) rawDisplay;
+                display.remove("Lore");
+                if (display.isEmpty()) {
+                    tag.remove("display");
+                }
+            }
+        } else {
+            Map<String, Object> display = tag.get("display") instanceof Map<?, ?> rawDisplay
+                    ? (Map<String, Object>) rawDisplay
+                    : new LinkedHashMap<>();
+            List<Object> list = new ArrayList<>();
+            for (String line : lore) {
+                list.add("{\"text\":\"" + line.replace("\"", "\\\"") + "\",\"color\":\"gray\",\"italic\":false}");
+            }
+            display.put("Lore", list);
+            tag.put("display", display);
+        }
+        if (tag.isEmpty()) {
+            item.remove("tag");
+        } else {
+            item.put("tag", tag);
+        }
+        backup(dat);
+        Nbt.write(dat, root);
+    }
     /** 在根的 Inventory 里按槽位找物品。 */
     @SuppressWarnings("unchecked")
     private static Map<String, Object> findItem(Map<String, Object> root, int slot) {

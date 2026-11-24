@@ -1839,6 +1839,7 @@ private static void setFlexible(Node node, boolean on) {
 
   /** 启动概览：面板本体 + 透明滚动容器。 */
   private void createOverviewPane() {
+    long overviewStart = System.nanoTime();
     this.launchOverviewPane =
         new LaunchOverviewPane(
             this.config,
@@ -1853,6 +1854,7 @@ private static void setFlexible(Node node, boolean on) {
             () -> this.exportLaunchScript(this.currentInstanceId()),
             () -> this.reproduceCommand(this.currentInstanceId()));
     this.launchOverviewScroll = new javafx.scene.control.ScrollPane(this.launchOverviewPane);
+    System.out.println("BUILD overview=" + (System.nanoTime() - overviewStart) / 1_000_000L + "ms");
     this.launchOverviewScroll.setFitToWidth(true);
     this.launchOverviewScroll.setHbarPolicy(
         javafx.scene.control.ScrollPane.ScrollBarPolicy.NEVER);

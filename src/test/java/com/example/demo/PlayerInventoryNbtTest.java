@@ -128,4 +128,19 @@ class PlayerInventoryNbtTest {
         // 物品本身还在
         assertEquals(2, PlayerInventory.read(dat).size());
     }
+    @Test
+    void loreLinesRoundTrip(@TempDir Path root) throws Exception {
+        File dat = playerDat(root, "dddddddd-1111-2222-3333-444444444444");
+        PlayerInventory.applyLore(dat, 5, List.of("来自服务器的礼物", "第 2 行"));
+
+        List<String> lore = PlayerInventory.readLore(dat, 5);
+        assertEquals(2, lore.size(), lore.toString());
+        assertTrue(lore.get(0).contains("来自服务器的礼物"), lore.get(0));
+        assertTrue(lore.get(0).contains("color"), "应当带上灰色样式: " + lore.get(0));
+
+        PlayerInventory.applyLore(dat, 5, List.of());
+        assertTrue(PlayerInventory.readLore(dat, 5).isEmpty());
+        // 苹果本身还在
+        assertEquals(2, PlayerInventory.read(dat).size());
+    }
 }

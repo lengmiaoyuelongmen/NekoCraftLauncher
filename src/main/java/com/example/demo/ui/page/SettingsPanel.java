@@ -290,7 +290,7 @@ public final class SettingsPanel extends VBox {
         feedbackAttach.setSelected(true);
         feedbackAttach.setStyle("-fx-text-fill: -app-text-2;");
 
-        lightModeBox = new CheckBox("浅色模式（顶栏保持深色）");
+        lightModeBox = new CheckBox(I18n.t("settings.lightMode", "浅色模式（顶栏保持深色）"));
         lightModeBox.setSelected(config.isLightTheme());
         lightModeBox.setStyle("-fx-text-fill: -app-text-2;");
         lightModeBox.selectedProperty().addListener((o, ov, nv) -> {
@@ -300,7 +300,7 @@ public final class SettingsPanel extends VBox {
             if (getScene() != null) Theme.apply(getScene().getRoot());
         });
 
-        smartPerformanceBox = new CheckBox("启用智能性能（G1GC 参数优化）");
+        smartPerformanceBox = new CheckBox(I18n.t("settings.smartPerf.enable", "启用智能性能（G1GC 参数优化）"));
         smartPerformanceBox.setSelected(config.isSmartPerformance());
         smartPerformanceBox.setStyle("-fx-text-fill: -app-text-2;");
         gamePriorityCombo = new ComboBox<>();
@@ -644,7 +644,7 @@ public final class SettingsPanel extends VBox {
                 labeled("系统内存占用", new VBox(4, systemMemoryBar, systemMemoryLabel)),
                 labeled("游戏分配", new VBox(4, gameMemoryBar, gameMemoryLabel)),
                 labeled("内存优化", memoryOptimizeRow()),
-                section("智能性能"),
+                section(I18n.t("settings.smartPerf", "智能性能")),
                 labeled("智能优化", new HBox(10, smartPerformanceBox, gamePriorityCombo,
                         hint("G1GC 参数优化；进程优先级右侧独立设置"))),
                 labeled("一键分配", new HBox(10,
