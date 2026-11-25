@@ -966,10 +966,39 @@ public final class ServerPanel {
             Button batch = new Button(I18n.t("server.player.batch", "批量"));
             batch.getStyleClass().addAll("btn-ghost", "btn-sm");
             batch.setOnAction(ev -> openBatchEnchant(dat, slot, onChange));
+            Button copy = new Button(I18n.t("server.player.copy", "复制"));
+            copy.getStyleClass().addAll("btn-ghost", "btn-sm");
+            copy.setOnAction(ev -> {
+                try {
+                    int free = PlayerInventory.copySlot(dat, slot.slot(), Math.max(1, slot.count()));
+                    Toast.ok(free < 0
+                            ? I18n.t("server.player.copy.full", "背包已满，复制不了")
+                            : I18n.t("server.player.copied", "已复制到槽位 ") + free);
+                    if (free >= 0 && onChange != null) {
+                        onChange.run();
+                    }
+                } catch (Exception ex) {
+                    Toast.error(I18n.t("server.player.saveFailed", "保存失败：") + ex.getMessage());
+                }
+            });
             Label hint = new Label(I18n.t("server.player.countHint", "0 = 删除"));
             hint.setStyle("-fx-text-fill: -app-text-dim-3; -fx-font-size: 10px;");
             counts.put(slot.slot(), count);
-            HBox line = new HBox(10, icon, name, count, hint, enchant, batch);
+            Button clearSame = new Button(I18n.t("server.player.clearSame", "清空同类"));
+            clearSame.getStyleClass().addAll("btn-ghost", "btn-sm");
+            clearSame.setOnAction(ev -> {
+                try {
+                    int removed = PlayerInventory.removeAll(dat, slot.itemId());
+                    Toast.ok(I18n.t("server.player.removeAll.done2", "已清空同名物品：") + removed
+                            + I18n.t("server.player.batch.doneTail", " 个"));
+                    if (removed > 0 && onChange != null) {
+                        onChange.run();
+                    }
+                } catch (Exception ex) {
+                    Toast.error(I18n.t("server.player.saveFailed", "保存失败：") + ex.getMessage());
+                }
+            });
+            HBox line = new HBox(10, icon, name, count, hint, enchant, copy, clearSame, batch);
             line.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
             // 拖拽换位：把这一行拖到另一行上，两个槽位交换（空的就移动过去）
             final int fromSlot = slot.slot();

@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$JavaHome = "C:\Program Files\Java\jdk-21.0.11",
     [string]$AppVersion = "1.0.0",
     [switch]$SkipBuild

@@ -412,6 +412,56 @@ public final class PlayerInventory {
         Nbt.write(dat, root);
         return true;
     }
+    /** 把某个槽位的物品复制一份到最前面的空槽位（数量可指定）。 */
+    @SuppressWarnings("unchecked")
+    public static int copySlot(File dat, int slot, int count) throws IOException {
+        Map<String, Object> root = Nbt.read(dat);
+        Map<String, Object> item = findItem(root, slot);
+        if (item == null) {
+            throw new IOException("槽位 " + slot + " 没有物品");
+        }
+        if (!(root.get("Inventory") instanceof List<?> rawList)) {
+            return -1;
+        }
+        List<Object> inventory = (List<Object>) rawList;
+        int free = freeSlot(inventory);
+        if (free < 0) {
+            return -1;
+        }
+        Map<String, Object> copy = new LinkedHashMap<>();
+        copy.put("Slot", (byte) free);
+        copy.put("id", item.get("id"));
+        copy.put("Count", (byte) Math.max(1, Math.min(64, count)));
+        if (item.get("tag") instanceof Map<?, ?> tag) {
+            copy.put("tag", new LinkedHashMap<>((Map<String, Object>) tag));
+        }
+        inventory.add(copy);
+        backup(dat);
+        Nbt.write(dat, root);
+        return free;
+    }
+
+    /** 清空所有「同一 id」的槽位（批量删除）。 */
+    @SuppressWarnings("unchecked")
+    public static int removeAll(File dat, String itemId) throws IOException {
+        if (itemId == null || itemId.isBlank()) {
+            return 0;
+        }
+        Map<String, Object> root = Nbt.read(dat);
+        if (!(root.get("Inventory") instanceof List<?> rawList)) {
+            return 0;
+        }
+        List<Object> inventory = (List<Object>) rawList;
+        int removed = inventory.size();
+        inventory.removeIf(element -> element instanceof Map<?, ?> raw
+                && raw.get("id") instanceof String id && id.equalsIgnoreCase(itemId));
+        removed -= inventory.size();
+        if (removed > 0) {
+            backup(dat);
+            Nbt.write(dat, root);
+        }
+        return removed;
+    }
     /** 在根的 Inventory 里按槽位找物品。 */
     @SuppressWarnings("unchecked")
     private static Map<String, Object> findItem(Map<String, Object> root, int slot) {

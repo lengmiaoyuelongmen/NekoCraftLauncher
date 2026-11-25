@@ -180,4 +180,19 @@ class PlayerInventoryNbtTest {
         // 空槽位移动不改文件
         assertTrue(!PlayerInventory.moveSlot(dat, 20, 3));
     }
+    @Test
+    void copyAndRemoveEveryMatchingItem(@TempDir Path root) throws Exception {
+        File dat = playerDat(root, "abcdef12-1111-2222-3333-444444444444");
+        int free = PlayerInventory.copySlot(dat, 5, 3);
+        assertTrue(free >= 0, "应当复制到空槽位");
+        List<PlayerInventory.Slot> copied = PlayerInventory.read(dat);
+        assertEquals(3, copied.size(), copied.toString());
+        assertTrue(copied.stream().anyMatch(s -> s.slot() == free
+                && s.itemId().equals("minecraft:apple") && s.count() == 3));
+
+        int removed = PlayerInventory.removeAll(dat, "minecraft:apple");
+        assertEquals(2, removed);
+        assertEquals(1, PlayerInventory.read(dat).size());
+        assertEquals(0, PlayerInventory.removeAll(dat, "minecraft:apple"));
+    }
 }

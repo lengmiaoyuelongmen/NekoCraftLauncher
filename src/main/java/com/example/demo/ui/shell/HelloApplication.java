@@ -1150,6 +1150,11 @@ if (this.versionComboBox != null && this.versionComboBox.getItems().isEmpty()) {
           // 三段计时：配置加载 / 场景构建 / 首页构建（首帧 - 前两段）
           System.out.println("TIMING startEnter=" + startEnter + "ms rootBuilt=" + rootBuilt
                   + "ms sceneMs=" + sceneMs);
+          // -Dmc.exitAfterInit=1：打印完计时就退出，用来生成 CDS 归档 / 跑基准
+          if (System.getProperty("mc.exitAfterInit") != null) {
+            javafx.application.Platform.exit();
+            System.exit(0);
+          }
           System.out.println("TIMING config=" + com.example.demo.Launcher.configLoadMs()
                   + "ms scene=" + sceneMs + "ms firstPage="
                   + (firstFrame - com.example.demo.Launcher.configLoadMs() - sceneMs) + "ms total="
