@@ -388,6 +388,30 @@ public final class PlayerInventory {
         backup(dat);
         Nbt.write(dat, root);
     }
+    /**
+     * 把某个槽位移动到目标槽位（目标有物品就交换）。
+     *
+     * @return 是否真的改动了文件
+     */
+    @SuppressWarnings("unchecked")
+    public static boolean moveSlot(File dat, int fromSlot, int toSlot) throws IOException {
+        if (fromSlot == toSlot) {
+            return false;
+        }
+        Map<String, Object> root = Nbt.read(dat);
+        Map<String, Object> from = findItem(root, fromSlot);
+        if (from == null) {
+            return false;
+        }
+        Map<String, Object> to = findItem(root, toSlot);
+        from.put("Slot", (byte) toSlot);
+        if (to != null) {
+            to.put("Slot", (byte) fromSlot);
+        }
+        backup(dat);
+        Nbt.write(dat, root);
+        return true;
+    }
     /** 在根的 Inventory 里按槽位找物品。 */
     @SuppressWarnings("unchecked")
     private static Map<String, Object> findItem(Map<String, Object> root, int slot) {

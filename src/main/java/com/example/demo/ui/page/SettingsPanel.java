@@ -128,7 +128,7 @@ public final class SettingsPanel extends VBox {
         this.log = log;
         setSpacing(0);
 
-        aiEnabledBox = new CheckBox("启用 DeepSeek AI");
+        aiEnabledBox = new CheckBox(I18n.t("settings.ai.enable", "启用 DeepSeek AI"));
         aiEnabledBox.setSelected(config.isAiEnabled());
         aiEnabledBox.setStyle("-fx-text-fill: -app-text-2;");
         aiKeyField = new PasswordField();
@@ -162,7 +162,7 @@ public final class SettingsPanel extends VBox {
                 + " -fx-border-color: transparent -app-border-5 transparent transparent;");
 
         TextField tabSearch = new TextField();
-        tabSearch.setPromptText("搜索设置…");
+        tabSearch.setPromptText(I18n.t("settings.search", "搜索设置…"));
         tabSearch.setStyle("-fx-background-color: -app-row3; -fx-text-fill: -app-text;"
                 + " -fx-prompt-text-fill: -app-text-muted; -fx-background-radius: 8;"
                 + " -fx-border-color: -app-border-soft; -fx-border-radius: 8; -fx-padding: 5 9;"
@@ -283,10 +283,10 @@ public final class SettingsPanel extends VBox {
         fontScaleCombo.setMaxWidth(200);
 
         feedbackArea = new TextArea();
-        feedbackArea.setPromptText("描述你遇到的问题 / 想要的功能…（可以附上复现步骤）");
+        feedbackArea.setPromptText(I18n.t("settings.feedback.prompt", "描述你遇到的问题 / 想要的功能…（可以附上复现步骤）"));
         feedbackArea.setPrefRowCount(6);
         feedbackArea.setWrapText(true);
-        feedbackAttach = new CheckBox("附加系统信息（启动器版本 / Java / 系统）");
+        feedbackAttach = new CheckBox(I18n.t("settings.feedback.attach", "附加系统信息（启动器版本 / Java / 系统）"));
         feedbackAttach.setSelected(true);
         feedbackAttach.setStyle("-fx-text-fill: -app-text-2;");
 
@@ -308,7 +308,7 @@ public final class SettingsPanel extends VBox {
         gamePriorityCombo.setValue("above".equals(config.getGamePriority()) ? "高于正常"
                 : "high".equals(config.getGamePriority()) ? "高" : "普通");
         gamePriorityCombo.setStyle("-fx-padding: 2;");
-        preferGpuBox = new CheckBox("优先高性能独显（写入 HKCU 显卡首选项）");
+        preferGpuBox = new CheckBox(I18n.t("settings.preferGpu", "优先高性能独显（写入 HKCU 显卡首选项）"));
         preferGpuBox.setSelected(config.isPreferDiscreteGpu());
         preferGpuBox.setStyle("-fx-text-fill: -app-text-2;");
 
@@ -317,7 +317,7 @@ public final class SettingsPanel extends VBox {
         assetSampleSpinner = spinner(0, 200, config.getAssetSampleCount(), 10, 100);
 
         javaPathField = new TextField(config.getJavaPath());
-        javaPathField.setPromptText("留空 = 自动检测，检测不到再自动下载 Zulu");
+        javaPathField.setPromptText(I18n.t("settings.javaPath.prompt", "留空 = 自动检测，检测不到再自动下载 Zulu"));
         HBox.setHgrow(javaPathField, Priority.ALWAYS);
 
         gameDirField = new TextField(config.getGameDir());
@@ -325,14 +325,14 @@ public final class SettingsPanel extends VBox {
         HBox.setHgrow(gameDirField, Priority.ALWAYS);
 
         jvmArgsField = new TextField(config.getJvmArgs());
-        jvmArgsField.setPromptText("可选，例如 -XX:+UseG1GC");
+        jvmArgsField.setPromptText(I18n.t("settings.jvmArgs.prompt", "可选，例如 -XX:+UseG1GC"));
 
         sourceCombo = new ComboBox<>(FXCollections.observableArrayList("auto", "official", "mirror"));
         sourceCombo.setValue(config.getDownloadSource());
         sourceCombo.setPrefWidth(150);
 
-        autoJava = check("自动检测并选择最合适的 Java（推荐）", config.isAutoSelectJava());
-        isolationBox = check("开启版本隔离（每个实例独立 mods / config / saves）", config.isIsolation());
+        autoJava = check(I18n.t("settings.autoJava", "自动检测并选择最合适的 Java（推荐）"), config.isAutoSelectJava());
+        isolationBox = check(I18n.t("settings.isolation", "开启版本隔离（每个实例独立 mods / config / saves）"), config.isIsolation());
         autoDepsBox = check("启动时自动补装缺失的前置依赖（从 Modrinth 下载）", config.isAutoInstallDeps());
         keyHintsBox = check("体检面板显示键盘提示（Esc/Tab/Enter）", config.isShowKeyHints());
         autoRepairBox = check("启动前自动补全缺失的库文件", config.isAutoRepairLibraries());

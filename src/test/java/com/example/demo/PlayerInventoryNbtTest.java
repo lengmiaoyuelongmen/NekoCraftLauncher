@@ -163,4 +163,21 @@ class PlayerInventoryNbtTest {
         assertEquals(0, PlayerInventory.applyEnchantsToAll(dat, "minecraft:diamond",
                 List.of(new PlayerInventory.Enchant("minecraft:sharpness", 1))));
     }
+    @Test
+    void moveSlotSwapsOrRelocates(@TempDir Path root) throws Exception {
+        File dat = playerDat(root, "ffffffff-1111-2222-3333-444444444444");
+        // 0 号（剑）移到 9 号空位
+        assertTrue(PlayerInventory.moveSlot(dat, 0, 9));
+        assertTrue(PlayerInventory.read(dat).stream()
+                .anyMatch(s -> s.slot() == 9 && s.itemId().equals("minecraft:diamond_sword")));
+        // 9 号与 5 号（苹果）交换
+        assertTrue(PlayerInventory.moveSlot(dat, 9, 5));
+        List<PlayerInventory.Slot> after = PlayerInventory.read(dat);
+        assertTrue(after.stream().anyMatch(s -> s.slot() == 5
+                && s.itemId().equals("minecraft:diamond_sword")), after.toString());
+        assertTrue(after.stream().anyMatch(s -> s.slot() == 9
+                && s.itemId().equals("minecraft:apple")), after.toString());
+        // 空槽位移动不改文件
+        assertTrue(!PlayerInventory.moveSlot(dat, 20, 3));
+    }
 }

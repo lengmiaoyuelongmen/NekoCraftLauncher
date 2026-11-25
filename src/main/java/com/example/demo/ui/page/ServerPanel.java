@@ -971,6 +971,46 @@ public final class ServerPanel {
             counts.put(slot.slot(), count);
             HBox line = new HBox(10, icon, name, count, hint, enchant, batch);
             line.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+            // 拖拽换位：把这一行拖到另一行上，两个槽位交换（空的就移动过去）
+            final int fromSlot = slot.slot();
+            line.setOnDragDetected(ev2 -> {
+                javafx.scene.input.Dragboard board = line.startDragAndDrop(
+                        javafx.scene.input.TransferMode.MOVE);
+                board.setDragView(line.snapshot(null, null));
+                javafx.scene.input.ClipboardContent content =
+                        new javafx.scene.input.ClipboardContent();
+                content.putString(String.valueOf(fromSlot));
+                board.setContent(content);
+                ev2.consume();
+            });
+            line.setOnDragOver(ev2 -> {
+                if (ev2.getDragboard().hasString()) {
+                    ev2.acceptTransferModes(javafx.scene.input.TransferMode.MOVE);
+                }
+                ev2.consume();
+            });
+            line.setOnDragDropped(ev2 -> {
+                String payload = ev2.getDragboard().getString();
+                if (payload == null) {
+                    ev2.setDropCompleted(false);
+                    ev2.consume();
+                    return;
+                }
+                try {
+                    int from = Integer.parseInt(payload.trim());
+                    if (PlayerInventory.moveSlot(dat, from, slot.slot())) {
+                        Toast.ok(I18n.t("server.player.moved", "已交换槽位 ")
+                                + from + " ↔ " + slot.slot());
+                        if (onChange != null) {
+                            onChange.run();
+                        }
+                    }
+                } catch (Exception ex) {
+                    Toast.error(I18n.t("server.player.saveFailed", "保存失败：") + ex.getMessage());
+                }
+                ev2.setDropCompleted(true);
+                ev2.consume();
+            });
             rows.getChildren().add(line);
         }
         TextField addId = new TextField();
